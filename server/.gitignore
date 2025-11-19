@@ -1,0 +1,10 @@
+# Server-specific ignores
+node_modules/
+/upload/
+upload/
+.env*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
