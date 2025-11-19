@@ -52,15 +52,16 @@ export const checkUser = async (req, res, next) => {
 
 export const onBoardUser = async (req, res, next) => {
     try {
-        const { name, email, about, image } = req.body
+        const { name, email, about, image, profileImage } = req.body
 
-        if (!name || !email || typeof image !== 'string') {
-            return res.status(400).json({ message: "Name, email, about and image are required", status: false })
+        const finalProfileImage = typeof profileImage === 'string' ? profileImage : (typeof image === 'string' ? image : null);
+        if (!name || !email) {
+            return res.status(400).json({ message: "Name and email are required", status: false })
         }
 
         const prisma = getPrismaInstance()
 
-        const user = await prisma.user.create({ data: { name, email, about: about || "", image } })
+        const user = await prisma.user.create({ data: { name, email, about: about || undefined, profileImage: finalProfileImage || undefined } })
 
         return res.status(200).json({ message: "User created", status: true, user })
     } catch (error) {
@@ -78,7 +79,7 @@ export const getAllUser = async (req, res, next) => {
                 name: true,
                 email: true,
                 about: true,
-                image: true,
+                profileImage: true,
             }
         })
 
@@ -109,7 +110,7 @@ export const login = async (req, res, next) => {
     let user = await prisma.user.findUnique({ where: { email } });
     // If user doesn't exist yet, allow client to onboard later; return minimal user shape
     if (!user) {
-      user = { id: "", name: email.split("@")[0], email, about: "", image: "" };
+      user = { id: "", name: email.split("@")[0], email, about: "", profileImage: "" };
     }
     const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user);

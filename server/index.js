@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import AuthRoutes from "./routes/AuthRoutes.js";
 import MessageRoutes from "./routes/MessageRoutes.js";
+import UserRoutes from "./routes/UserRoutes.js";
 import { Server } from "socket.io";
 import http from "http";
 
@@ -26,6 +27,7 @@ app.use("/upload/recordings", express.static("upload/recordings"));
 
 app.use("/api/auth", AuthRoutes);
 app.use("/api/messages", MessageRoutes);
+app.use("/api/users", UserRoutes);
 
 const port = process.env.PORT || 3005;
 

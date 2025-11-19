@@ -71,21 +71,21 @@ function Main() {
   useEffect(() => {
     if (!authEmail) return;
     if (foundUser === null) {
-      // New user → seed minimal info and go to onboarding
-      setUserInfo({
-        id: "",
-        name: authDisplayName,
-        email: authEmail,
-        profileImage: authPhotoURL,
-        about: "",
-      });
-      router.push("/onboarding");
+      if (!userInfo?.id) {
+        setUserInfo({
+          id: "",
+          name: authDisplayName,
+          email: authEmail,
+          profileImage: authPhotoURL,
+          about: "",
+        });
+        router.push("/onboarding");
+      }
     } else if (foundUser) {
       setUserInfo(foundUser);
     }
-  }, [authEmail, foundUser, authDisplayName, authPhotoURL, setUserInfo, router]);
+  }, [authEmail, foundUser, authDisplayName, authPhotoURL, setUserInfo, router, userInfo?.id]);
 
-  // Fetch messages via React Query and sync to Zustand
   const { data: queriedMessages, error: messagesError, refetch: refetchMessages } = useMessages(
     userInfo?.id,
     currentChatUser?.id
@@ -94,7 +94,6 @@ function Main() {
     if (queriedMessages) setMessages(queriedMessages);
   }, [queriedMessages, setMessages]);
 
-  // Mark unread messages from the peer as read when the chat loads
   const updateMsgStatus = useUpdateMessageStatus();
   useEffect(() => {
     if (!queriedMessages || !userInfo?.id || !currentChatUser?.id) return;
@@ -109,11 +108,10 @@ function Main() {
   useEffect(() => {
     if (userInfo) {
       socketRef.current = io(HOST);
-      // set socket ref in store and emit add-user
       setSocket(socketRef);
       socketRef.current.emit("add-user", userInfo.id);
     }
-  }, [userInfo, setSocket])
+  }, [userInfo, setSocket]);
 
   useEffect(() => {
     if (socket.current && !socketEvent) {
@@ -134,7 +132,22 @@ function Main() {
         socketSync.onMessageStatusUpdate(messageId, status);
       });
 
-      // call signaling
+      socket.current.on("message-edited", ({ messageId, newContent, editedAt }) => {
+        socketSync.onMessageEdited(messageId, newContent, editedAt);
+      });
+      socket.current.on("message-deleted", ({ messageId, deleteType, deletedBy }) => {
+        socketSync.onMessageDeleted(messageId, deleteType, { deletedBy });
+      });
+      socket.current.on("message-reacted", ({ messageId, reactions }) => {
+        socketSync.onMessageReacted(messageId, reactions || []);
+      });
+      socket.current.on("message-starred", ({ messageId, starred }) => {
+        socketSync.onMessageStarred(messageId, starred, userInfo?.id);
+      });
+      socket.current.on("message-forwarded", (payload) => {
+        socketSync.onMessageForwarded(payload);
+      });
+
       socket.current.on("incoming-call", (data) => {
         useCallStore.getState().setCall(data);
         if (data?.callType === "audio") useCallStore.getState().setAudioCall(true);
@@ -163,7 +176,6 @@ function Main() {
         }
       });
 
-      // Socket connection status toasts
       socket.current.on("disconnect", () => {
         connectionToastId.current = showToast.loading("Connecting...");
       });
@@ -191,6 +203,11 @@ function Main() {
         socket.current.off("connect_error");
         socket.current.off("call-busy");
         socket.current.off("call-failed");
+        socket.current.off("message-edited");
+        socket.current.off("message-deleted");
+        socket.current.off("message-reacted");
+        socket.current.off("message-starred");
+        socket.current.off("message-forwarded");
       }
     };
   }, [socket.current, socketEvent, userInfo?.id, currentChatUser?.id, queryClient, socketSync]);
@@ -209,16 +226,16 @@ function Main() {
       {videoCall && <VideoCall />}
       {audioCall && <AudioCall />}
       {!audioCall && !videoCall && (
-        <div className="grid grid-cols-main h-screen w-screen max-h-screen max-w-full overflow-hidden">
+        <div className="grid grid-cols-main h-screen w-screen max-h-screen max-w-full overflow-hidden bg-bg-main text-text-primary">
           <ChatList />
           {currentChatUser ? (
             <div className={messageSearch ? "grid grid-cols-2" : "grid-cols-2"}>
               {messagesError && (
-                <div className="col-span-2 px-4 py-2 bg-search-input-container-background border-b border-conversation-border flex items-center gap-3">
+                <div className="col-span-2 px-4 py-2 bg-bg-secondary border-b border-conversation-border flex items-center gap-3 text-text-primary">
                   <ErrorMessage message="Failed to load messages" />
                   <button
                     type="button"
-                    className="bg-panel-header-background hover:bg-[#2b3942] text-white text-sm px-3 py-1 rounded"
+                    className="bg-user-bubble hover:bg-other-bubble text-text-primary text-sm px-3 py-1 rounded transition-colors"
                     onClick={() => refetchMessages()}
                   >
                     Retry
@@ -234,7 +251,7 @@ function Main() {
         </div>
       )}
     </>
-  )
+  );
 }
 
 export default Main;

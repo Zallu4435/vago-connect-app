@@ -22,29 +22,29 @@ function List() {
   }, [contacts, contactsSearch]);
 
   return (
-    <div className="bg-search-input-container-background flex-auto overflow-auto max-h-full custom-scrollbar">
+    <div className="bg-bg-secondary flex-auto overflow-auto max-h-full custom-scrollbar">
       {isLoading ? (
-        <LoadingSpinner label="Loading chats..." className="px-4 py-6" />
+        <LoadingSpinner label="Loading chats..." className="px-4 py-6 text-text-primary" />
       ) : error ? (
-        <div className="px-4 py-6 flex items-center gap-3">
+        <div className="px-4 py-6 flex items-center gap-3 text-text-primary">
           <ErrorMessage message="Failed to load chats" />
           <button
             type="button"
-            className="bg-search-input-container-background hover:bg-[#2b3942] text-white text-sm px-3 py-1 rounded"
+            className="bg-user-bubble hover:bg-other-bubble text-text-primary text-sm px-3 py-1 rounded transition-colors"
             onClick={() => refetch()}
           >
             Retry
           </button>
         </div>
       ) : contactsSearch && filteredContacts.length === 0 ? (
-        <div className="text-secondary text-sm px-4 py-6">No chats found</div>
+        <div className="text-text-secondary text-sm px-4 py-6">No chats found</div>
       ) : (
         (filteredContacts.length > 0 ? filteredContacts : contacts).map((contact) => (
           <ChatListItem data={contact} key={contact.id} />
         ))
       )}
     </div>
-  )
+  );
 }
 
-export default List; 
+export default List;

@@ -10,24 +10,404 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// USER MODEL
+// ============================================
 model User {
-  id Int @id @default(autoincrement())
-  email String @unique
-  name String
-  about String @default("")
-  image String @default("")
-  sentMessages Message[] @relation("sentMessages")
-  receivedMessages Message[] @relation("receivedMessages")
+  id           Int     @id @default(autoincrement())
+  name         String  @db.VarChar(255)
+  email        String  @unique @db.VarChar(255)
+  phone        String? @unique @db.VarChar(50)
+  profileImage String? @db.Text
+  profileImagePublicId String? @db.VarChar(255)
+  profileImageVersion  Int?
+  about        String  @default("Hey there! I am using WhatsApp") @db.Text
+
+  // Privacy settings
+  lastSeenPrivacy       String @default("everyone") @db.VarChar(20)
+  profilePicturePrivacy String @default("everyone") @db.VarChar(20)
+  aboutPrivacy          String @default("everyone") @db.VarChar(20)
+
+  // Online status
+  isOnline Boolean   @default(false)
+  lastSeen DateTime?
+
+  // User settings
+  readReceipts      Boolean @default(true)
+  autoDownloadMedia Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sentMessages         Message[]                 @relation("SentMessages")
+  conversationsCreated Conversation[]            @relation("ConversationCreator")
+  participations       ConversationParticipant[]
+  reactions            MessageReaction[]
+  blockedUsers         BlockedUser[]             @relation("Blocker")
+  blockedByUsers       BlockedUser[]             @relation("Blocked")
+  reportsSubmitted     ReportedUser[]            @relation("Reporter")
+  reportsReceived      ReportedUser[]            @relation("Reported")
+  contacts             Contact[]                 @relation("UserContacts")
+  contactOf            Contact[]                 @relation("ContactUser")
+  typingIndicators     TypingIndicator[]
+  reviewsPerformed    ReportedUser[]            @relation("Reviewer")
+
+  @@index([email])
+  @@index([phone])
+  @@index([isOnline])
+  @@index([lastSeen])
+  @@map("users")
 }
 
+// ============================================
+// CONVERSATION MODEL (Chats)
+// ============================================
+model Conversation {
+  id   Int    @id @default(autoincrement())
+  type String @db.VarChar(20) // 'direct' or 'group'
+
+  // Group specific (null for direct chats)
+  groupName        String? @db.VarChar(255)
+  groupDescription String? @db.Text
+  groupIcon        String? @db.Text
+  createdById      Int?
+
+  // Disappearing messages
+  disappearingMessages Boolean @default(false)
+  disappearingDuration Int? // in days: 1, 7, 90
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  creator          User?                     @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  participants     ConversationParticipant[]
+  messages         Message[]
+  typingIndicators TypingIndicator[]
+
+  @@index([type])
+  @@index([createdById])
+  @@map("conversations")
+}
+
+// ============================================
+// CONVERSATION PARTICIPANT MODEL
+// Per-user chat states (archive, pin, mute, etc.)
+// ============================================
+model ConversationParticipant {
+  id             Int @id @default(autoincrement())
+  conversationId Int
+  userId         Int
+
+  // Pin functionality
+  isPinned Boolean   @default(false)
+  pinnedAt DateTime?
+  pinOrder Int       @default(0)
+
+  // Archive functionality
+  isArchived   Boolean   @default(false)
+  archivedAt   DateTime?
+  keepArchived Boolean   @default(false)
+
+  // Mute functionality
+  isMuted    Boolean   @default(false)
+  mutedUntil DateTime?
+
+  // Delete chat functionality
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
+
+  // Clear chat functionality
+  clearedAt DateTime?
+
+  // Read receipts
+  unreadCount       Int  @default(0)
+  lastReadMessageId Int?
+
+  // Group specific
+  role     String    @default("member") @db.VarChar(20) // 'admin' or 'member'
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  // Notifications
+  notificationsEnabled Boolean @default(true)
+
+  // Relations
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage  Message?     @relation("LastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+  @@index([userId, isPinned])
+  @@index([userId, isArchived])
+  @@index([userId, isDeleted])
+  @@map("conversation_participants")
+}
+
+// ============================================
+// MESSAGE MODEL
+// ============================================
 model Message {
-  id Int @id @default(autoincrement())
-  content String
-  senderId Int
-  receiverId Int
-  timestamp DateTime @default(now())
-  type String @default("text")
-  messageStatus String @default("sent")
-  sender User @relation("sentMessages", fields: [senderId], references: [id])
-  receiver User @relation("receivedMessages", fields: [receiverId], references: [id])
+  id             Int @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+
+  // Message content
+  type    String  @db.VarChar(20) // 'text', 'image', 'video', 'audio', 'document'
+  content String? @db.Text
+  caption String? @db.Text
+
+  // Media metadata
+  fileName     String? @db.VarChar(255)
+  fileSize     BigInt?
+  mimeType     String? @db.VarChar(100)
+  duration     Int?
+  thumbnailUrl String? @db.Text
+
+  // Message status
+  status String @default("sent") @db.VarChar(20) // 'sent', 'delivered', 'read', 'failed'
+
+  // Edit functionality
+  isEdited        Boolean   @default(false)
+  editedAt        DateTime?
+  originalContent String?   @db.Text
+  editHistory     Json?     @default(dbgenerated("'{}'::jsonb")) @db.JsonB
+
+  // Delete functionality
+  isDeletedForEveryone Boolean   @default(false)
+  deletedForEveryoneAt DateTime?
+  deletedBy            Json      @default(dbgenerated("'[]'::jsonb")) @db.JsonB // array of user IDs
+
+  // Forward functionality
+  isForwarded       Boolean @default(false)
+  originalMessageId Int?
+  forwardCount      Int     @default(0)
+
+  // Reply functionality
+  replyToMessageId Int?
+  quotedMessage    Json? @db.JsonB
+
+  // Star functionality
+  starredBy Json @default(dbgenerated("'[]'::jsonb")) @db.JsonB // [{userId, starredAt}]
+
+  // Read receipts
+  readBy      Json @default(dbgenerated("'[]'::jsonb")) @db.JsonB
+  deliveredTo Json @default(dbgenerated("'[]'::jsonb")) @db.JsonB
+
+  // Mentions (for groups)
+  mentions Json @default(dbgenerated("'[]'::jsonb")) @db.JsonB
+
+  // Disappearing messages
+  expiresAt DateTime?
+
+  // System messages
+  isSystemMessage   Boolean @default(false)
+  systemMessageType String? @db.VarChar(50)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  conversation      Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender            User              @relation("SentMessages", fields: [senderId], references: [id])
+  originalMessage   Message?          @relation("ForwardedMessages", fields: [originalMessageId], references: [id], onDelete: SetNull)
+  forwardedMessages Message[]         @relation("ForwardedMessages")
+  replyToMessage    Message?          @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies           Message[]         @relation("MessageReplies")
+  reactions         MessageReaction[]
+  mediaFiles        MediaFile[]
+  lastReadBy        ConversationParticipant[] @relation("LastReadMessage")
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([senderId])
+  @@index([replyToMessageId])
+  @@index([status])
+  @@index([isDeletedForEveryone])
+  @@index([expiresAt])
+  @@map("messages")
+}
+
+// ============================================
+// MESSAGE REACTION MODEL
+// ============================================
+model MessageReaction {
+  id        Int    @id @default(autoincrement())
+  messageId Int
+  userId    Int
+  emoji     String @db.VarChar(10)
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@index([emoji])
+  @@map("message_reactions")
+}
+
+// ============================================
+// BLOCKED USER MODEL
+// ============================================
+model BlockedUser {
+  id        Int     @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  reason    String? @db.Text
+
+  blockedAt DateTime @default(now())
+
+  // Relations
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("blocked_users")
+}
+
+// ============================================
+// REPORTED USER MODEL
+// ============================================
+model ReportedUser {
+  id             Int  @id @default(autoincrement())
+  reporterId     Int
+  reportedId     Int
+  conversationId Int?
+
+  reason      String  @db.VarChar(100)
+  description String? @db.Text
+
+  // Admin review
+  status      String    @default("pending") @db.VarChar(20)
+  reviewedBy  Int?
+  reviewedAt  DateTime?
+  actionTaken String?   @db.Text
+
+  reportedAt DateTime @default(now())
+
+  // Relations
+  reporter User @relation("Reporter", fields: [reporterId], references: [id])
+  reported User @relation("Reported", fields: [reportedId], references: [id])
+  reviewer  User? @relation("Reviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([reporterId])
+  @@index([reportedId])
+  @@index([status])
+  @@map("reported_users")
+}
+
+// ============================================
+// CONTACT MODEL
+// ============================================
+model Contact {
+  id            Int @id @default(autoincrement())
+  userId        Int
+  contactUserId Int
+
+  // Contact info
+  displayName String? @db.VarChar(255)
+  phoneNumber String? @db.VarChar(50)
+
+  // Status
+  isBlocked  Boolean @default(false)
+  isFavorite Boolean @default(false)
+
+  addedAt         DateTime  @default(now())
+  lastContactedAt DateTime?
+
+  // Relations
+  user        User @relation("UserContacts", fields: [userId], references: [id], onDelete: Cascade)
+  contactUser User @relation("ContactUser", fields: [contactUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactUserId])
+  @@index([userId])
+  @@index([contactUserId])
+  @@index([userId, isBlocked])
+  @@index([userId, isFavorite])
+  @@map("contacts")
+}
+
+// ============================================
+// TYPING INDICATOR MODEL
+// ============================================
+model TypingIndicator {
+  id             Int @id @default(autoincrement())
+  conversationId Int
+  userId         Int
+
+  isTyping     Boolean  @default(false)
+  lastTypingAt DateTime @default(now())
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@map("typing_indicators")
+}
+
+// ============================================
+// MEDIA FILE MODEL
+// ============================================
+model MediaFile {
+  id        Int @id @default(autoincrement())
+  messageId Int
+
+  // Storage
+  storageKey      String @db.VarChar(500)
+  storageProvider String @default("cloudinary") @db.VarChar(50)
+
+  // File info
+  originalName String? @db.VarChar(255)
+  mimeType     String? @db.VarChar(100)
+  fileSize     BigInt?
+
+  // Media specific
+  width    Int?
+  height   Int?
+  duration Int?
+
+  // Thumbnails
+  thumbnailKey  String? @db.VarChar(500)
+  thumbnailSize BigInt?
+
+  // Cloudinary-specific (optional)
+  cloudinaryPublicId   String? @db.VarChar(255)
+  cloudinaryVersion    Int?
+  cloudinaryResourceType String? @db.VarChar(30) // image, video, raw
+  cloudinaryFormat     String? @db.VarChar(20)
+  cloudinaryFolder     String? @db.VarChar(255)
+  cloudinaryAssetId    String? @db.VarChar(100)
+
+  // Status
+  uploadStatus  String @default("pending") @db.VarChar(20)
+  downloadCount Int    @default(0)
+
+  // Compression
+  isCompressed     Boolean @default(false)
+  originalFileSize BigInt?
+
+  uploadedAt DateTime  @default(now())
+  expiresAt  DateTime?
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([storageKey])
+  @@index([cloudinaryPublicId])
+  @@index([expiresAt])
+  @@map("media_files")
 }

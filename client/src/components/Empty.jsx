@@ -1,15 +1,11 @@
 import React from "react";
-import Image from "next/image";
+import { HiChatBubbleLeftRight } from "react-icons/hi2";
 
 function Empty() {
   return (
-    <div className="border-conversation-border border-1 w-full bg-panel-header-background flex flex-col h-[100vh] items-center justify-center border-b-4 border-b-icon-green">
-      <Image 
-        src="/whatsapp.gif" 
-        alt="whatsapp" 
-        width={300} 
-        height={300} 
-      />
+    <div className="border-conversation-border border-b-4 border-b-icon-green w-full bg-bg-secondary flex flex-col h-[100vh] items-center justify-center">
+      <HiChatBubbleLeftRight className="text-[300px] text-icon-active" />
+      <p className="text-text-primary mt-6 text-xl select-none">No chat selected</p>
     </div>
   );
 }

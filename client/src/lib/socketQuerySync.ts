@@ -45,6 +45,66 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
       });
     },
 
+    onMessageEdited: (messageId: number | string, newContent: string, editedAt?: string) => {
+      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((m) => (m?.id === messageId ? { ...m, content: newContent, isEdited: true, editedAt: editedAt || new Date().toISOString() } : m));
+        }
+        return old;
+      });
+    },
+
+    onMessageDeleted: (messageId: number | string, deleteType: 'forMe' | 'forEveryone', payload?: any) => {
+      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          if (deleteType === 'forEveryone') {
+            return old.map((m) => (m?.id === messageId ? { ...m, content: 'This message was deleted', isDeletedForEveryone: true } : m));
+          }
+          // forMe: attach deletedBy so UI can filter/hide if needed
+          return old.map((m) => (m?.id === messageId ? { ...m, deletedBy: payload?.deletedBy || [] } : m));
+        }
+        return old;
+      });
+    },
+
+    onMessageReacted: (messageId: number | string, reactions: any[]) => {
+      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((m) => (m?.id === messageId ? { ...m, reactions } : m));
+        }
+        return old;
+      });
+    },
+
+    onMessageStarred: (messageId: number | string, starred: boolean, userId?: number | string) => {
+      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) {
+          return old.map((m) => {
+            if (m?.id !== messageId) return m;
+            const arr = Array.isArray(m.starredBy) ? m.starredBy.slice() : [];
+            const uid = Number(userId);
+            const exists = arr.some((e: any) => (e?.userId ?? e) === uid);
+            let next = arr;
+            if (starred && !exists) next = [...arr, { userId: uid, starredAt: new Date().toISOString() }];
+            if (!starred && exists) next = arr.filter((e: any) => (e?.userId ?? e) !== uid);
+            return { ...m, starredBy: next };
+          });
+        }
+        return old;
+      });
+    },
+
+    onMessageForwarded: (_payload: { message: any; conversationId: number | string }) => {
+      // We don't have a userId/peerId mapping for conversationId here, so simply invalidate
+      // messages and contacts; the next query fetch will include forwarded items.
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+
     onUserOnline: (_userId: number | string) => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
     },

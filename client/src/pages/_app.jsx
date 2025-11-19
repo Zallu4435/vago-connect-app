@@ -12,8 +12,6 @@ import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 export default function App({ Component, pageProps }) {
   const handleError = (error, errorInfo) => {
-    // Centralized error hook (extend to Sentry/LogRocket later)
-    // eslint-disable-next-line no-console
     console.error("App crashed:", error, errorInfo);
   };
 
@@ -25,10 +23,8 @@ export default function App({ Component, pageProps }) {
     const initAuth = async () => {
       try {
         await refreshAccessToken();
-        // eslint-disable-next-line no-console
         console.log("Auth restored from refresh token");
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.log("No valid session, user needs to login");
       } finally {
         if (mounted) setAuthChecked(true);
@@ -42,18 +38,19 @@ export default function App({ Component, pageProps }) {
 
   if (!authChecked) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-conversation-panel-background text-white">
-        <div className="mb-4 text-3xl">Whatsapp</div>
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#DDE4E9] text-[#4C5F6C]">
+        <div className="mb-4 text-3xl font-semibold">GhostChat</div>
         <LoadingSpinner />
-        <div className="mt-2 text-secondary">Loading...</div>
+        <div className="mt-2 text-[#859BA8]">Loading...</div>
       </div>
     );
   }
+
   return (
     <ErrorBoundary onError={handleError}>
       <QueryClientProvider client={queryClient}>
         <Head>
-          <title>Whatsapp</title>
+          <title>GhostChat</title>
           <link rel="shortcut icon" href="/favicon.png" />
         </Head>
         <Component {...pageProps} />
@@ -64,12 +61,14 @@ export default function App({ Component, pageProps }) {
           toastOptions={{
             duration: 3000,
             style: {
-              background: "#1f2c33",
-              color: "#fff",
+              background: "#DDE4E9",
+              color: "#4C5F6C",
             },
           }}
         />
-        <ReactQueryDevtools initialIsOpen={false} />
+        {process.env.NEXT_PUBLIC_ENABLE_RQ_DEVTOOLS === "true" && (
+          <ReactQueryDevtools initialIsOpen={false} />
+        )}
       </QueryClientProvider>
     </ErrorBoundary>
   );
