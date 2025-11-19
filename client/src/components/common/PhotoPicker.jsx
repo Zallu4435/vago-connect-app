@@ -7,8 +7,21 @@ function PhotoPicker({ onChange, accept = "image/*" }) {
 
   useEffect(() => {
     setMounted(true);
-    const el = document.getElementById("photo-picker-element");
-    if (el) setTarget(el);
+    // Ensure the target element for the portal exists
+    let el = document.getElementById("photo-picker-element");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "photo-picker-element";
+      document.body.appendChild(el);
+    }
+    setTarget(el);
+
+    // Clean up the element if component unmounts
+    return () => {
+      if (el && document.body.contains(el)) {
+        document.body.removeChild(el);
+      }
+    };
   }, []);
 
   if (!mounted || !target) return null;

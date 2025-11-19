@@ -1,13 +1,12 @@
 import Image from "next/image";
 import React, { useState } from "react";
-import { FaCamera } from "react-icons/fa";
-import ContextMenu from "./ContextMenu";
-import PhotoPicker from "./PhotoPicker";
-import PhotoLibrary from "./PhotoLibrary";
-import CapturePhoto from "./CapturePhoto";
+import { FaCamera, FaMagic, FaCircle, FaUserCircle } from "react-icons/fa"; // Reliable icons
+import ContextMenu from "./ContextMenu"; // These will also need thematic updates
+import PhotoPicker from "./PhotoPicker"; // These will also need thematic updates
+import PhotoLibrary from "./PhotoLibrary"; // These will also need thematic updates
+import CapturePhoto from "./CapturePhoto"; // These will also need thematic updates
 
-function Avatar({ type, image, setImage }) {
-
+function Avatar({ type, image, setImage, defaultImage = "/default_mystical_avatar.png" }) { // Added defaultImage prop
   const [hover, setHover] = useState(false);
   const [isContextMenuVisible, setIsContextMenuVisible] = useState(false);
   const [contextMenuCoordinates, setContextMenuCoordinates] = useState({ x: 0, y: 0 });
@@ -34,55 +33,61 @@ function Avatar({ type, image, setImage }) {
       if (typeof result === "string") setImage(result);
     };
     reader.readAsDataURL(file);
-    // reset input so same file can be selected again later
-    e.target.value = "";
+    e.target.value = ""; // Reset input
   };
 
   const contetMenuOptions = [
-    { name: "Take Photo", callback: () => setShowCapture(true) },
-    { name: "Chose from Library", callback: () => setShowLibrary(true) },
-    { name: "Upload photo", callback: openUpload },
-    { name: "Remove photo", callback: () => setImage("/default_avatar.png") },
+    { name: "Scry from Orb (Take Photo)", callback: () => setShowCapture(true) }, // Themed
+    { name: "Consult Ancient Archives (Choose from Library)", callback: () => setShowLibrary(true) }, // Themed
+    { name: "Channel New Visage (Upload photo)", callback: openUpload }, // Themed
+    { name: "Revert to Default Aspect", callback: () => setImage(defaultImage) }, // Themed, uses defaultImage
   ];
+
+  const sizeClasses = {
+    sm: "h-10 w-10",
+    md: "h-14 w-14",
+    lg: "h-20 w-20",
+    xl: "h-60 w-60",
+  };
 
   return (
     <>
       <div className="flex items-center justify-center">
-        {type === "sm" && (
-          <div className="relative h-10 w-10 cursor-pointer overflow-hidden rounded-full">
-            <Image src={image || "/default_avatar.png"} alt="avatar" className="rounded-full" fill />
-          </div>
-        )}
-        {type === "lg" && (
-          <div className="relative h-14 w-14 cursor-pointer overflow-hidden rounded-full">
-            <Image src={image || "/default_avatar.png"} alt="avatar" className="rounded-full" fill />
+        {["sm", "lg"].includes(type) && (
+          <div className={`relative ${sizeClasses[type]} cursor-pointer overflow-hidden rounded-full border border-ancient-border-stone bg-ancient-input-bg flex items-center justify-center group`}>
+            <Image src={image || defaultImage} alt="avatar" className="rounded-full object-cover" fill />
+            {/* Subtle hover effect for smaller avatars */}
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <FaCamera className="text-ancient-icon-glow text-xl" />
+            </div>
           </div>
         )}
         {type === "xl" && (
-          <div className="relative cursor-pointer"
+          <div
+            className="relative cursor-pointer group"
             onMouseEnter={() => setHover(true)}
             onMouseLeave={() => setHover(false)}
           >
-            <div className={`h-60 w-60 absolute top-0 left-0 z-10 flex items-center justify-center flex-col text-center gap-2 rounded-full bg-photo-picker-overlay-background/80
-              ${hover ? "visible" : "hidden"}`}
+            {/* Overlay for large avatar */}
+            <div
+              className={`absolute inset-0 z-10 flex items-center justify-center flex-col text-center gap-2 rounded-full bg-ancient-bg-medium/80 backdrop-blur-sm border-2 border-ancient-icon-glow shadow-lg transition-opacity duration-300
+                ${hover ? "opacity-100 visible" : "opacity-0 invisible"}`} // Smooth fade in/out
               onClick={(e) => showContextMenu(e)}
             >
-              <div className="absolute inset-0 rounded-full">
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-28 bg-teal-800/80 rounded-t-full z-0"></div>
-                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-20 h-20 bg-gray-300/50 rounded-full z-0"></div>
-              </div>
-              <FaCamera className="text-2xl z-20" id="context-opener"
-                onClick={(e) => showContextMenu(e)}
-              />
-              <span className="z-20">Change <br /> profile <br /> photo</span>
+              <FaCircle className="text-5xl text-ancient-icon-glow drop-shadow-md animate-pulse-light-slow" /> {/* Themed icon */}
+              <span className="text-ancient-text-light text-lg font-bold z-20">
+                Change <br /> Ethereal Visage
+              </span>
+              <FaMagic className="absolute bottom-4 right-4 text-4xl text-ancient-icon-glow opacity-80 animate-spin-slow-reverse" />
             </div>
-            <div className="relative z-0 h-60 w-60 flex items-center justify-center overflow-hidden rounded-full">
-              <Image src={image || "/default_avatar.png"} alt="avatar" className="rounded-full" fill />
+            {/* Main Avatar Image */}
+            <div className={`relative z-0 ${sizeClasses.xl} flex items-center justify-center overflow-hidden rounded-full border-4 border-ancient-icon-glow shadow-xl`}>
+              <Image src={image || defaultImage} alt="avatar" className="rounded-full object-cover" fill />
             </div>
           </div>
         )}
       </div>
-      { isContextMenuVisible && (
+      {isContextMenuVisible && (
         <ContextMenu
           options={contetMenuOptions}
           cordinates={contextMenuCoordinates}

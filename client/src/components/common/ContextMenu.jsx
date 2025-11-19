@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from "react";
+import ReactDOM from "react-dom";
+import { FaMagic } from "react-icons/fa"; // Reliable subtle animation icon
 
 function ContextMenu({ options, cordinates, contextMenu, setContextMenu }) {
   const contextMenuRef = useRef(null);
@@ -13,7 +15,7 @@ function ContextMenu({ options, cordinates, contextMenu, setContextMenu }) {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [contextMenuRef]);
+  }, [contextMenuRef, setContextMenu]); // Added setContextMenu to dependency array
 
   const handleClick = (e, callback) => {
     e.stopPropagation();
@@ -21,24 +23,28 @@ function ContextMenu({ options, cordinates, contextMenu, setContextMenu }) {
     setContextMenu(false);
   };
   
-  return (
-    <div
-      className={"bg-dropdown-background fixed py-2 z-[100] shadow-xl rounded-md min-w-[200px]"}
-      ref={contextMenuRef}
-      style={{ top: cordinates.y, left: cordinates.x }}
-    >
-      <ul className="text-white text-sm">
-        {options.map(({ name, callback }) => (
-          <li
-            key={name}
-            onClick={(e) => handleClick(e, callback)}
-            className="px-4 py-2 hover:bg-white/10 cursor-pointer"
-          >
-            {name}
-          </li>
-        ))}
-      </ul>
-    </div>
+  return ReactDOM.createPortal(
+    (
+      <div
+        className={"bg-ancient-bg-medium fixed py-3 z-[9999] shadow-2xl rounded-lg min-w-[220px] border border-ancient-border-stone animate-zoom-in-fade-in transform -translate-x-1/2"}
+        ref={contextMenuRef}
+        style={{ top: cordinates.y, left: cordinates.x }}
+      >
+        <ul className="text-ancient-text-light text-base font-medium">
+          {options.map(({ name, callback }) => (
+            <li
+              key={name}
+              onClick={(e) => handleClick(e, callback)}
+              className="px-5 py-2 flex items-center gap-3 hover:bg-ancient-bubble-user-light cursor-pointer transition-colors duration-200"
+            >
+              <FaMagic className="text-ancient-icon-glow text-lg opacity-70" />
+              <span>{name}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ),
+    document.body
   );
 }
 

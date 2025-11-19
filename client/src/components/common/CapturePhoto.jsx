@@ -1,4 +1,7 @@
 import React, { useEffect, useRef } from "react";
+import { IoClose } from "react-icons/io5";
+import { GiCrystalBall } from "react-icons/gi"; // New mystical icons
+import { FaCamera, FaMagic } from "react-icons/fa"; // Reliable icons
 
 function CapturePhoto({ onCapture, onClose }) {
   const videoRef = useRef(null);
@@ -18,7 +21,6 @@ function CapturePhoto({ onCapture, onClose }) {
           video.srcObject = stream;
           const playSafe = () => {
             video.play().catch((err) => {
-              // Ignore AbortError caused by rapid mount/unmount or reloads
               if (err?.name !== "AbortError") console.error("video.play error:", err);
             });
           };
@@ -26,8 +28,8 @@ function CapturePhoto({ onCapture, onClose }) {
           else video.onloadedmetadata = playSafe;
         }
       } catch (err) {
-        console.error("Camera error:", err);
-        onClose?.();
+        console.error("Camera (Scrying Orb) error:", err);
+        onClose?.(); // Close if camera fails
       } finally {
         startingRef.current = false;
       }
@@ -58,13 +60,44 @@ function CapturePhoto({ onCapture, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-gray-900 rounded-lg p-4 w-[520px] max-w-[95vw] shadow-xl flex flex-col items-center gap-4">
-        <video ref={videoRef} className="w-full rounded-md bg-black" playsInline muted autoPlay />
-        <div className="flex gap-3">
-          <button onClick={handleCapture} className="px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-500">Capture</button>
-          <button onClick={onClose} className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600">Cancel</button>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+      <div className="relative bg-ancient-bg-dark rounded-xl p-6 w-[560px] max-w-[95vw] shadow-2xl border border-ancient-border-stone flex flex-col items-center gap-6 animate-zoom-in">
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          aria-label="Close Scrying Orb"
+          className="absolute top-3 right-3 text-ancient-text-muted hover:text-red-400 transition-colors duration-200"
+        >
+          <IoClose className="h-7 w-7" />
+        </button>
+
+        {/* Title */}
+        <h3 className="text-ancient-text-light text-2xl font-bold mb-2 flex items-center gap-3">
+          <GiCrystalBall className="text-ancient-icon-glow text-3xl" />
+          Gaze into the Scrying Orb
+        </h3>
+
+        {/* Video Feed */}
+        <div className="relative w-full aspect-video rounded-md overflow-hidden border-2 border-ancient-icon-glow shadow-lg bg-black flex items-center justify-center">
+          <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
+          {/* Subtle orb glow animation */}
+          <FaMagic className="absolute text-[10rem] text-ancient-icon-glow/30 animate-spin-slow-reverse" />
+        </div>
+
+        {/* Controls */}
+        <div className="flex gap-4 mt-2">
+          <button
+            onClick={handleCapture}
+            className="px-6 py-3 bg-ancient-icon-glow text-ancient-bg-dark font-bold rounded-lg hover:bg-ancient-bubble-user-light transition-all duration-300 shadow-md flex items-center gap-2"
+          >
+            <FaCamera className="text-xl" /> Capture Vision
+          </button>
+          <button
+            onClick={onClose}
+            className="px-6 py-3 bg-ancient-input-bg text-ancient-text-light font-bold rounded-lg hover:bg-ancient-input-border transition-all duration-300 shadow-md flex items-center gap-2"
+          >
+            Cancel Ritual
+          </button>
         </div>
         <canvas ref={canvasRef} className="hidden" />
       </div>

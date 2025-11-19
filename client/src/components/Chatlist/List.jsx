@@ -21,28 +21,49 @@ function List() {
     });
   }, [contacts, contactsSearch]);
 
+  let content = null;
+
+  if (isLoading) {
+    content = (
+      <div className="w-full py-8 flex justify-center items-center">
+        <LoadingSpinner label="Decoding ancient messages..." className="text-ancient-text-muted" />
+      </div>
+    );
+  } else if (error) {
+    content = (
+      <div className="mx-4 my-6 px-5 py-6 flex flex-col gap-4 rounded-xl shadow-xl bg-ancient-warning-bg text-ancient-text-light">
+        <ErrorMessage message="Failed to retrieve ancient archives." />
+        <button
+          type="button"
+          className="self-start bg-ancient-bubble-user hover:bg-ancient-bubble-user-light text-ancient-text-light text-sm px-4 py-2 rounded shadow-md transition-colors"
+          onClick={() => refetch()}
+        >
+          Re-read the Runes
+        </button>
+      </div>
+    );
+  } else if (contactsSearch && filteredContacts.length === 0) {
+    content = (
+      <div className="w-full py-8 text-center text-base text-ancient-text-muted">
+        No matching echoes found.
+      </div>
+    );
+  } else {
+    const list = filteredContacts.length > 0 ? filteredContacts : contacts;
+    content = (
+      <ul className="space-y-0">
+        {list.map((contact) => (
+          <li key={contact.id}>
+            <ChatListItem data={contact} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
   return (
-    <div className="bg-bg-secondary flex-auto overflow-auto max-h-full custom-scrollbar">
-      {isLoading ? (
-        <LoadingSpinner label="Loading chats..." className="px-4 py-6 text-text-primary" />
-      ) : error ? (
-        <div className="px-4 py-6 flex items-center gap-3 text-text-primary">
-          <ErrorMessage message="Failed to load chats" />
-          <button
-            type="button"
-            className="bg-user-bubble hover:bg-other-bubble text-text-primary text-sm px-3 py-1 rounded transition-colors"
-            onClick={() => refetch()}
-          >
-            Retry
-          </button>
-        </div>
-      ) : contactsSearch && filteredContacts.length === 0 ? (
-        <div className="text-text-secondary text-sm px-4 py-6">No chats found</div>
-      ) : (
-        (filteredContacts.length > 0 ? filteredContacts : contacts).map((contact) => (
-          <ChatListItem data={contact} key={contact.id} />
-        ))
-      )}
+    <div className="bg-ancient-bg-dark flex-auto overflow-auto max-h-full custom-scrollbar border-r border-ancient-border-stone">
+      {content}
     </div>
   );
 }

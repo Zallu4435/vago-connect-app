@@ -5,12 +5,12 @@ import MessageStatus from "../common/MessageStatus";
 import dynamic from "next/dynamic";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
-import MessageActions from "./MessageActions";
+import MessageActions from "./MessageActions"; // This component will also need thematic updates
 import { FaStar } from "react-icons/fa";
-import ForwardModal from "./ForwardModal";
+import ForwardModal from "./ForwardModal"; // This component will also need thematic updates
 import { showToast } from "@/lib/toast";
 
-const VoiceMessage = dynamic(() => import("../Chat/VoiceMessage"));
+const VoiceMessage = dynamic(() => import("../Chat/VoiceMessage")); // This component will need thematic updates
 
 function ChatContainer() {
   const messages = useChatStore((s) => s.messages);
@@ -24,7 +24,7 @@ function ChatContainer() {
     setSelectedIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
       if (prev.length >= 5) {
-        showToast.info("You can forward up to 5 messages at once");
+        showToast.info("You can forward up to 5 echoes at once"); // Themed toast
         return prev;
       }
       return [...prev, id];
@@ -32,22 +32,29 @@ function ChatContainer() {
   };
 
   return (
-    <div className="h-[80vh] w-full relative flex-grow overflow-auto custom-scrollbar bg-bg-main text-text-primary">
-      <div className="bg-chat-background bg-fixed h-full w-full opacity-5 fixed left-0 top-0 z-0 pointer-events-none rounded-lg"></div>
+    <div className="h-[80vh] w-full relative flex-grow overflow-auto custom-scrollbar bg-ancient-bg-dark text-ancient-text-light">
+      {/* Background Image/Pattern - Adjust opacity and blend mode as needed for your image */}
+      <div className="bg-chat-background bg-fixed h-full w-full opacity-[0.05] fixed left-0 top-0 z-0 pointer-events-none rounded-lg"></div>
 
       <div className="flex w-full">
-        <div className="flex flex-col justify-end w-full gap-1 overflow-auto px-3">
+        <div className="flex flex-col justify-end w-full gap-2 overflow-auto px-4 py-2">
+          {" "}
+          {/* Increased gap and padding */}
           {(Array.isArray(messages) ? messages : [])
             .filter((m) => !(Array.isArray(m?.deletedBy) && m.deletedBy.includes(userInfo?.id)))
             .map((message) => {
               const isIncoming = message.senderId === currentChatUser?.id;
+              const messageBubbleClass = isIncoming
+                ? "bg-ancient-bubble-user rounded-br-lg rounded-tl-lg rounded-tr-lg" // Incoming bubble
+                : "bg-ancient-bubble-other rounded-bl-lg rounded-tl-lg rounded-tr-lg"; // Outgoing bubble (reversed the colors from default for the theme)
+
               return (
                 <div key={message.id} className={`flex ${isIncoming ? "justify-start" : "justify-end"}`}>
                   {/* Selection checkbox when selectMode is on */}
                   {selectMode && (
                     <input
                       type="checkbox"
-                      className="mr-2 mt-1"
+                      className="mr-3 mt-1 form-checkbox h-5 w-5 text-ancient-icon-glow border-ancient-border-stone rounded focus:ring-0 cursor-pointer" // Themed checkbox
                       checked={selectedIds.includes(message.id)}
                       onChange={() => toggleSelect(message.id)}
                     />
@@ -55,35 +62,46 @@ function ChatContainer() {
 
                   {/* Text message */}
                   {message.type === "text" && (
-                    <div className="flex flex-col max-w-[60%] gap-1">
+                    <div className="flex flex-col max-w-[65%] gap-1">
+                      {" "}
+                      {/* Increased max-width */}
                       {message.isForwarded && (
-                        <span className="self-start text-[10px] text-text-secondary">Forwarded</span>
+                        <span className="self-start text-[10px] text-ancient-text-muted italic">
+                          Forwarded Echo
+                        </span> // Themed
                       )}
-                      <div
-                        className={`text-text-primary px-3 py-[5px] text-sm rounded-md flex gap-2 items-end ${isIncoming ? "bg-incoming-background" : "bg-outgoing-background"}`}
-                      >
+                      <div className={`px-4 py-2 text-base shadow-md ${messageBubbleClass} text-ancient-text-light flex gap-2 items-end relative`}>
                         <span className="break-all">{message.content}</span>
-                        <div className="flex gap-1 items-end">
-                          <span className="text-bubble-meta text-[11px] pt-1 min-w-fit">
+                        <div className="flex gap-1 items-end ml-auto">
+                          {" "}
+                          {/* Push time/status to right */}
+                          <span className="text-ancient-text-muted text-[11px] pt-1 min-w-fit">
                             {calculateTime(message.timestamp)}
                           </span>
                           {message.isEdited && (
-                            <span className="text-bubble-meta text-[10px] ml-1">(edited)</span>
-                          )}
+                            <span className="text-ancient-text-muted text-[10px] ml-1">
+                              (altered)
+                            </span>
+                          )}{" "}
+                          {/* Themed */}
                           {Array.isArray(message.starredBy) &&
                             message.starredBy.some((e) => (e?.userId ?? e) === userInfo.id) && (
-                              <FaStar className="text-yellow-400 text-[10px] mb-[2px]" />
-                            )}
+                              <FaStar className="text-ancient-icon-glow text-[10px] mb-[2px] shadow-sm" />
+                            )}{" "}
+                          {/* Themed star */}
                           <span>
                             {message.senderId === userInfo.id && (
                               <MessageStatus MessageStatus={message.messageStatus} />
-                            )}
+                            )}{" "}
+                            {/* MessageStatus component needs theme updates */}
                           </span>
                         </div>
+                        <MessageActions message={message} />{" "}
+                        {/* This component will need thematic updates */}
                       </div>
                       {/* Reactions summary */}
                       {Array.isArray(message.reactions) && message.reactions.length > 0 && (
-                        <div className="flex gap-2 text-xs text-white/80">
+                        <div className="flex gap-2 text-xs text-ancient-text-light/80 mt-1">
                           {Object.entries(
                             message.reactions.reduce((acc, r) => {
                               const key = r.emoji || r;
@@ -93,41 +111,46 @@ function ChatContainer() {
                           ).map(([emoji, count]) => (
                             <span
                               key={emoji}
-                              className="px-2 py-[2px] rounded-full bg-[#1f2c33] border border-[#2a3942]"
+                              className="px-2 py-[2px] rounded-full bg-ancient-input-bg border border-ancient-border-stone shadow-sm" // Themed reactions
                             >
                               {emoji} {count}
                             </span>
                           ))}
                         </div>
                       )}
-                      <MessageActions message={message} />
                     </div>
                   )}
 
                   {/* Image message */}
                   {message.type === "image" && (
-                    <div className="flex flex-col max-w-[60%] gap-1">
+                    <div className="flex flex-col max-w-[65%] gap-1">
                       {message.isForwarded && (
-                        <span className="self-start text-[10px] text-text-secondary">Forwarded</span>
+                        <span className="self-start text-[10px] text-ancient-text-muted italic">
+                          Forwarded Echo
+                        </span>
                       )}
                       <div
-                        className={`text-text-primary p-1 rounded-md flex gap-2 items-end ${isIncoming ? "bg-incoming-background" : "bg-outgoing-background"}`}
+                        className={`p-2 rounded-md shadow-md ${messageBubbleClass} flex gap-2 items-end relative`}
                       >
                         <img
                           src={message.content}
-                          alt="image message"
-                          className="rounded-md max-w-[320px] max-h-72 object-cover"
+                          alt="ancient image echo" // Themed alt text
+                          className="rounded-lg max-w-[350px] max-h-80 object-cover border border-ancient-border-stone" // Themed image border
                         />
-                        <div className="flex gap-1 items-end">
-                          <span className="text-bubble-meta text-[11px] pt-1 min-w-fit">
+                        <div className="flex gap-1 items-end absolute bottom-2 right-2">
+                          {" "}
+                          {/* Positioning time/status on image */}
+                          <span className="text-ancient-text-muted text-[11px] pt-1 min-w-fit bg-ancient-bg-dark/70 px-1 rounded">
                             {calculateTime(message.timestamp)}
                           </span>
                           {message.isEdited && (
-                            <span className="text-bubble-meta text-[10px] ml-1">(edited)</span>
+                            <span className="text-ancient-text-muted text-[10px] ml-1 bg-ancient-bg-dark/70 px-1 rounded">
+                              (altered)
+                            </span>
                           )}
                           {Array.isArray(message.starredBy) &&
                             message.starredBy.some((e) => (e?.userId ?? e) === userInfo.id) && (
-                              <FaStar className="text-yellow-400 text-[10px] mb-[2px]" />
+                              <FaStar className="text-ancient-icon-glow text-[10px] mb-[2px] bg-ancient-bg-dark/70 px-1 rounded" />
                             )}
                           <span>
                             {message.senderId === userInfo.id && (
@@ -135,10 +158,11 @@ function ChatContainer() {
                             )}
                           </span>
                         </div>
+                        <MessageActions message={message} />
                       </div>
                       {/* Reactions summary */}
                       {Array.isArray(message.reactions) && message.reactions.length > 0 && (
-                        <div className="flex gap-2 text-xs text-white/80">
+                        <div className="flex gap-2 text-xs text-ancient-text-light/80 mt-1">
                           {Object.entries(
                             message.reactions.reduce((acc, r) => {
                               const key = r.emoji || r;
@@ -148,26 +172,28 @@ function ChatContainer() {
                           ).map(([emoji, count]) => (
                             <span
                               key={emoji}
-                              className="px-2 py-[2px] rounded-full bg-[#1f2c33] border border-[#2a3942]"
+                              className="px-2 py-[2px] rounded-full bg-ancient-input-bg border border-ancient-border-stone shadow-sm"
                             >
                               {emoji} {count}
                             </span>
                           ))}
                         </div>
                       )}
-                      <MessageActions message={message} />
                     </div>
                   )}
 
                   {/* Audio message */}
                   {message.type === "audio" && (
-                    <div className="flex flex-col max-w-[60%] gap-1">
+                    <div className="flex flex-col max-w-[65%] gap-1">
                       {message.isForwarded && (
-                        <span className="self-start text-[10px] text-text-secondary">Forwarded</span>
+                        <span className="self-start text-[10px] text-ancient-text-muted italic">
+                          Forwarded Echo
+                        </span>
                       )}
-                      <VoiceMessage message={message} />
+                      <VoiceMessage message={message} isIncoming={isIncoming} />{" "}
+                      {/* Pass isIncoming for thematic styling */}
                       {Array.isArray(message.reactions) && message.reactions.length > 0 && (
-                        <div className="flex gap-2 text-xs text-white/80">
+                        <div className="flex gap-2 text-xs text-ancient-text-light/80 mt-1">
                           {Object.entries(
                             message.reactions.reduce((acc, r) => {
                               const key = r.emoji || r;
@@ -177,7 +203,7 @@ function ChatContainer() {
                           ).map(([emoji, count]) => (
                             <span
                               key={emoji}
-                              className="px-2 py-[2px] rounded-full bg-[#1f2c33] border border-[#2a3942]"
+                              className="px-2 py-[2px] rounded-full bg-ancient-input-bg border border-ancient-border-stone shadow-sm"
                             >
                               {emoji} {count}
                             </span>
@@ -191,23 +217,27 @@ function ChatContainer() {
               );
             })}
           {/* Selection bar */}
-          <div className="sticky bottom-2 self-center mt-2">
-            <div className="flex items-center gap-2 bg-bg-secondary border border-conversation-border rounded-full px-3 py-1">
+          <div className="sticky bottom-4 self-center mt-4 z-10">
+            {" "}
+            {/* Adjusted position and z-index */}
+            <div className="flex items-center gap-3 bg-ancient-bg-medium border border-ancient-border-stone rounded-full px-4 py-2 shadow-lg">
               <button
-                className="text-sm text-text-primary/90 hover:underline"
+                className="text-base text-ancient-text-light/90 hover:text-ancient-icon-glow transition-colors duration-200"
                 onClick={() => setSelectMode((v) => !v)}
               >
-                {selectMode ? "Cancel" : "Select"}
+                {selectMode ? "Halt Selection" : "Select Echoes"}
               </button>
               {selectMode && (
                 <>
-                  <span className="text-bubble-meta text-xs">{selectedIds.length} selected</span>
+                  <span className="text-ancient-text-muted text-sm">
+                    {selectedIds.length} chosen
+                  </span>
                   <button
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded disabled:opacity-50"
+                    className="bg-ancient-icon-glow hover:bg-ancient-bubble-user text-ancient-bg-dark text-sm px-4 py-2 rounded-full disabled:opacity-50 transition-colors duration-200 font-semibold shadow-md"
                     disabled={selectedIds.length === 0}
                     onClick={() => setShowForward(true)}
                   >
-                    Forward
+                    Forward Echoes
                   </button>
                 </>
               )}

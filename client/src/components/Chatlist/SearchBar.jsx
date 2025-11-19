@@ -8,24 +8,26 @@ function SearchBar() {
   const setContactsSearch = useChatStore((s) => s.setContactsSearch);
 
   return (
-    <div className="bg-bg-secondary flex items-center gap-3 h-14 px-4 border-b border-conversation-border">
-      <div className="bg-bg-main flex items-center gap-3 px-4 py-2 rounded-lg flex-grow shadow-sm border border-border-dark focus-within:border-icon-active transition-all">
-        <BiSearchAlt2 className="text-icon-active text-xl" />
+    <div className="bg-ancient-bg-medium flex items-center gap-2 h-14 px-5 border-b border-ancient-border-stone shadow-lg">
+      <div className="flex-grow h-10 flex items-center bg-ancient-input-bg border border-ancient-input-border rounded-full px-4 shadow-inner focus-within:border-ancient-icon-glow transition-all duration-300">
+        {/* Search Icon, left inside input */}
+        <BiSearchAlt2 className="text-ancient-icon-inactive text-xl mr-3 transition-colors duration-300" />
         <input
           type="text"
-          placeholder="Search or start a new chat"
-          className="bg-transparent w-full text-text-primary placeholder:text-text-secondary text-sm focus:outline-none"
+          placeholder="Search for whispers or ancient echoes..."
+          className="bg-transparent flex-1 text-ancient-text-light placeholder:text-ancient-text-muted text-base focus:outline-none h-full"
           value={contactsSearch}
           onChange={(e) => setContactsSearch(e.target.value)}
           spellCheck={false}
         />
       </div>
+      {/* Filter Button, right side, circular, subtle border/shadow */}
       <button
         type="button"
-        className="flex items-center justify-center p-2 rounded-lg hover:bg-bg-hover transition-colors"
+        className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-ancient-input-bg transition-colors duration-300 border border-ancient-input-border shadow"
         aria-label="Filter"
       >
-        <BsFilter className="text-icon-active text-xl" />
+        <BsFilter className="text-ancient-icon-inactive text-2xl hover:text-ancient-icon-glow transition-colors duration-300" />
       </button>
     </div>
   );

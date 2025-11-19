@@ -29,56 +29,58 @@ function ContactsList() {
   }, [sections, search]);
 
   return (
-    <div className="h-full flex flex-col bg-bg-secondary">
-      <div className="h-24 flex items-end px-3 py-4 bg-bg-main border-b border-conversation-border">
-        <div className="flex items-center gap-12 text-text-primary">
-          <BiArrowBack className="cursor-pointer text-xl" onClick={() => setAllContactsPage(false)} />
-          <span>New Chat</span>
+    <div className="h-full flex flex-col bg-ancient-bg-dark">
+      {/* Header */}
+      <div className="h-20 flex items-center px-6 border-b border-ancient-border-stone shadow-md bg-ancient-bg-medium">
+        <button className="flex items-center gap-8 text-ancient-text-light bg-transparent" type="button" onClick={() => setAllContactsPage(false)}>
+          <BiArrowBack className="text-2xl cursor-pointer hover:text-ancient-icon-glow transition-colors duration-200" />
+          <span className="text-xl font-bold ml-1">Summon Contacts</span>
+        </button>
+      </div>
+      {/* Search Bar */}
+      <div className="bg-ancient-bg-medium flex items-center py-3 px-6 border-b border-ancient-border-stone">
+        <div className="flex items-center bg-ancient-input-bg border border-ancient-input-border rounded-full flex-grow px-4 py-2 shadow-inner focus-within:border-ancient-icon-glow transition-all duration-300">
+          <BiSearchAlt2 className="text-ancient-icon-inactive text-xl mr-3" />
+          <input
+            type="text"
+            placeholder="Search for entities or echoes..."
+            className="bg-transparent text-base flex-1 focus:outline-none text-ancient-text-light placeholder:text-ancient-text-muted"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            spellCheck={false}
+          />
         </div>
       </div>
-
-      <div className="bg-bg-secondary flex py-3 pl-5 items-center gap-3 h-14 border-b border-conversation-border">
-        <div className="bg-bg-main flex items-center gap-5 px-3 py-1 rounded-lg flex-grow">
-          <div>
-            <BiSearchAlt2 className="text-icon-active cursor-pointer text-lg" />
-          </div>
-          <div>
-            <input
-              type="text"
-              placeholder="Search or start a new chat"
-              className="bg-transparent text-sm focus:outline-none text-text-primary placeholder:text-text-secondary w-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-
+      {/* Contacts List Area */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {isLoading ? (
-          <LoadingSpinner label="Loading contacts..." className="px-4 py-6 text-text-primary" />
+          <LoadingSpinner label="Unearthing ancient contacts..." className="px-4 py-8 text-ancient-text-muted" />
         ) : error ? (
-          <div className="px-4 py-6 flex items-center gap-3 text-text-primary">
-            <ErrorMessage message="Failed to load contacts" />
+          <div className="mx-6 my-8 px-6 py-6 flex flex-col items-start gap-4 bg-ancient-warning-bg rounded-xl shadow-xl">
+            <ErrorMessage message="Failed to decipher ancient scrolls." />
             <button
               type="button"
-              className="bg-user-bubble hover:bg-other-bubble text-text-primary text-sm px-3 py-1 rounded transition-colors"
-              onClick={() => refetch()}
+              className="bg-ancient-bubble-user hover:bg-ancient-bubble-user-light text-ancient-text-light text-sm px-4 py-2 rounded shadow-md transition-colors"
+              onClick={refetch}
             >
-              Retry
+              Retry Incantation
             </button>
           </div>
         ) : Object.keys(filteredSections).length === 0 ? (
-          <div className="text-text-secondary text-sm px-4 py-6">No contacts found</div>
+          <div className="w-full py-8 text-center text-base text-ancient-text-muted">
+            No ancient entities found matching your query.
+          </div>
         ) : (
           Object.keys(filteredSections)
             .sort()
             .map((letter) => (
               <div key={letter}>
-                <div className="px-4 py-2 text-xs text-text-secondary">{letter}</div>
+                <div className="px-6 py-3 text-sm font-semibold text-ancient-icon-glow border-b border-ancient-border-stone/50">
+                  {letter}
+                </div>
                 <ul>
                   {filteredSections[letter].map((u) => (
-                    <li key={u.id || u.email} className="border-b border-conversation-border/50">
+                    <li key={u.id || u.email}>
                       <ChatListItem
                         isContactsPage
                         data={{

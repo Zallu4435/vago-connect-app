@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { BsEmojiSmile } from "react-icons/bs";
-import { ImAttachment } from "react-icons/im";
 import { MdSend } from "react-icons/md";
-import { FaMicrophone } from "react-icons/fa";
+import { FaMicrophone, FaCamera } from "react-icons/fa";
 import EmojiPicker from "emoji-picker-react";
 import dynamic from "next/dynamic";
 import { useAuthStore } from "@/stores/authStore";
@@ -17,8 +16,9 @@ import { useUploadFile } from "@/hooks/mutations/useUploadFile";
 import { useSendLocation } from "@/hooks/mutations/useSendLocation";
 import { api } from "@/lib/api";
 import { ADD_IMAGE_ROUTE, ADD_VIDEO_ROUTE, ADD_FILE_ROUTE } from "@/utils/ApiRoutes";
+import AttachmentDropdown from "./AttachmentDropdown";
 
-const CaptureAudio = dynamic(() => import("../common/CaptureAudio"), { ssr: false })
+const CaptureAudio = dynamic(() => import("../common/CaptureAudio"), { ssr: false });
 
 function MessageBar({ isOnline = true }) {
   const userInfo = useAuthStore((s) => s.userInfo);
@@ -55,7 +55,7 @@ function MessageBar({ isOnline = true }) {
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
     try {
-      setUploadingLabel(isImage ? "Uploading image..." : isVideo ? "Uploading video..." : "Uploading file...");
+      setUploadingLabel(isImage ? "Invoking ancient image..." : isVideo ? "Conjuring video essence..." : "Transcribing ancient file...");
       setUploadProgress(0);
       const { data } = await api.post(endpoint, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -74,7 +74,7 @@ function MessageBar({ isOnline = true }) {
       });
       setMessages([...(messages || []), data]);
     } catch (err) {
-      showToast.error("Upload failed. Try again");
+      showToast.error("Invocation failed. Try again.");
       console.error("uploadWithProgress error", err);
     } finally {
       setTimeout(() => { setUploadingLabel(""); setUploadProgress(0); }, 400);
@@ -98,12 +98,13 @@ function MessageBar({ isOnline = true }) {
       uploadWithProgress(files[0]);
     }
   };
+  
   const onDragOver = (e) => { e.preventDefault(); };
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
-      if(event.target.id !== 'emojiopen') {
-        if(emojiPickerRef.current  && !emojiPickerRef.current.contains(event.target)) {
+      if(event.target.id !== 'emoji-open') {
+        if(emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
           setShowEmojiPicker(false);
         }
       }
@@ -118,7 +119,7 @@ function MessageBar({ isOnline = true }) {
   const handleEmojiModal = () => setShowEmojiPicker((v) => !v);
 
   const handleEmojiClick = (_e, emojiObject) => {
-    const emoji = emojiObject?.emoji || _e?.emoji; // lib versions differ
+    const emoji = emojiObject?.emoji || _e?.emoji;
     if (emoji) setMessage((prev) => prev + emoji);
   };
 
@@ -137,16 +138,16 @@ function MessageBar({ isOnline = true }) {
             type: data.type || "text",
             messageId: data.id,
           });
-          // Optimistically reflect in UI immediately
           setMessages([...(messages || []), data]);
           setMessage("");
         },
         onError: (e) => {
           console.error("sendMessage error", e);
+          showToast.error("Failed to invoke message. Try again.");
         },
       }
     );
-  }
+  };
 
   const onAttachmentClick = () => {
     if (!isOnline) return;
@@ -161,11 +162,11 @@ function MessageBar({ isOnline = true }) {
     form.append("image", file);
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
-    const toastId = showToast.loading("Uploading image...");
+    const toastId = showToast.loading("Invoking image...");
     uploadImageMutation.mutate(form, {
       onSuccess: (data) => {
         showToast.dismiss(toastId);
-        showToast.success("Image sent");
+        showToast.success("Image echo sent!");
         socket.current?.emit("send-msg", {
           to: currentChatUser.id,
           from: userInfo.id,
@@ -177,10 +178,11 @@ function MessageBar({ isOnline = true }) {
       },
       onSettled: () => {
         if (imageInputRef.current) imageInputRef.current.value = "";
+        setShowAttachMenu(false);
       },
       onError: (err) => {
         showToast.dismiss(toastId);
-        showToast.error("Upload failed. Try again");
+        showToast.error("Invocation failed. Try again.");
         console.error("sendImage error", err);
       },
     });
@@ -194,11 +196,11 @@ function MessageBar({ isOnline = true }) {
     form.append("video", file);
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
-    const toastId = showToast.loading("Uploading video...");
+    const toastId = showToast.loading("Conjuring video essence...");
     uploadVideoMutation.mutate(form, {
       onSuccess: (data) => {
         showToast.dismiss(toastId);
-        showToast.success("Video sent");
+        showToast.success("Video essence sent!");
         socket.current?.emit("send-msg", {
           to: currentChatUser.id,
           from: userInfo.id,
@@ -210,10 +212,11 @@ function MessageBar({ isOnline = true }) {
       },
       onSettled: () => {
         if (videoInputRef.current) videoInputRef.current.value = "";
+        setShowAttachMenu(false);
       },
       onError: (err) => {
         showToast.dismiss(toastId);
-        showToast.error("Upload failed. Try again");
+        showToast.error("Conjuration failed. Try again.");
         console.error("sendVideo error", err);
       },
     });
@@ -227,11 +230,11 @@ function MessageBar({ isOnline = true }) {
     form.append("file", file);
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
-    const toastId = showToast.loading("Uploading file...");
+    const toastId = showToast.loading("Transcribing ancient file...");
     uploadFileMutation.mutate(form, {
       onSuccess: (data) => {
         showToast.dismiss(toastId);
-        showToast.success("File sent");
+        showToast.success("Ancient file inscribed!");
         socket.current?.emit("send-msg", {
           to: currentChatUser.id,
           from: userInfo.id,
@@ -243,10 +246,11 @@ function MessageBar({ isOnline = true }) {
       },
       onSettled: () => {
         if (genericFileInputRef.current) genericFileInputRef.current.value = "";
+        setShowAttachMenu(false);
       },
       onError: (err) => {
         showToast.dismiss(toastId);
-        showToast.error("Upload failed. Try again");
+        showToast.error("Transcription failed. Try again.");
         console.error("sendFile error", err);
       },
     });
@@ -255,16 +259,16 @@ function MessageBar({ isOnline = true }) {
   const handleSendLocation = () => {
     if (!isOnline || !currentChatUser?.id || !userInfo?.id) return;
     if (!navigator.geolocation) {
-      showToast.error("Geolocation not supported");
+      showToast.error("Ancient geomancy not supported by your device.");
       return;
     }
-    const toastId = showToast.loading("Fetching location...");
+    const toastId = showToast.loading("Divining ley-line coordinates...");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords || {};
         if (typeof latitude !== 'number' || typeof longitude !== 'number') {
           showToast.dismiss(toastId);
-          showToast.error("Failed to get location");
+          showToast.error("Failed to divine location.");
           return;
         }
         sendLocationMutation.mutate(
@@ -272,104 +276,151 @@ function MessageBar({ isOnline = true }) {
           {
             onSuccess: (data) => {
               showToast.dismiss(toastId);
-              showToast.success("Location sent");
+              showToast.success("Ley-line coordinates sent!");
               setMessages([...(messages || []), data]);
             },
             onError: () => {
               showToast.dismiss(toastId);
-              showToast.error("Failed to send location");
+              showToast.error("Failed to send ley-line coordinates.");
             },
           }
         );
       },
       () => {
         showToast.dismiss(toastId);
-        showToast.error("Location permission denied");
+        showToast.error("Permission to access ley-lines denied.");
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
   return (
-    <div className="bg-panel-header-background h-20 px-4 flex items-center gap-6 relative" onDrop={onDrop} onDragOver={onDragOver}>
-      {/* Emoji Icon */}
-      <div className="flex gap-6">
-        <BsEmojiSmile
-          className="text-panel-header-icon cursor-pointer text-xl"
-          title="Emoji"
-          id="emoji-open"
-          onClick={handleEmojiModal}
-        />
-      </div>
-      {showEmojiPicker && (
-        <div className="absolute bottom-20 right-4 z-50" ref={emojiPickerRef}>
-          <EmojiPicker onEmojiClick={handleEmojiClick} theme="dark" />
-        </div>
-      )}
-      {/* Attachment Icon */}
-      <div className="flex gap-6 relative">
-        <ImAttachment
-          className="text-panel-header-icon cursor-pointer text-xl"
-          title="Attach"
+    <div
+      className="bg-ancient-bg-medium h-20 px-4 flex items-center gap-3 relative"
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+    >
+      {/* Camera/Attachment Icon (Left) - Opens attachment menu */}
+      <div className="flex relative">
+        <button
+          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-ancient-bg-dark/50 transition-colors duration-200"
           onClick={onAttachmentClick}
-        />
+          title="Attach Relic"
+        >
+          <FaCamera className="text-ancient-icon-inactive text-xl" />
+        </button>
+
         {showAttachMenu && (
-          <div className="absolute bottom-12 left-0 z-50 bg-[#233138] border border-[#2a3942] rounded-md shadow-lg p-2 w-40">
-            <button className="block w-full text-left px-2 py-1 hover:bg-[#2a3942]" onClick={() => imageInputRef.current?.click()}>Image</button>
-            <button className="block w-full text-left px-2 py-1 hover:bg-[#2a3942]" onClick={() => videoInputRef.current?.click()}>Video</button>
-            <button className="block w-full text-left px-2 py-1 hover:bg-[#2a3942]" onClick={() => genericFileInputRef.current?.click()}>File</button>
-            <button className="block w-full text-left px-2 py-1 hover:bg-[#2a3942]" onClick={handleSendLocation}>Location</button>
-          </div>
+          <AttachmentDropdown
+            onImage={() => {
+              imageInputRef.current?.click();
+              setShowAttachMenu(false);
+            }}
+            onVideo={() => {
+              videoInputRef.current?.click();
+              setShowAttachMenu(false);
+            }}
+            onFile={() => {
+              genericFileInputRef.current?.click();
+              setShowAttachMenu(false);
+            }}
+            onLocation={() => {
+              handleSendLocation();
+              setShowAttachMenu(false);
+            }}
+            onEmoji={() => {
+              setShowEmojiPicker(true);
+              setShowAttachMenu(false);
+            }}
+          />
         )}
-        {/* Hidden pickers */}
+
+        {/* Hidden file inputs */}
         <input type="file" accept="image/*" className="hidden" ref={imageInputRef} onChange={handleImageSelected} />
         <input type="file" accept="video/*" className="hidden" ref={videoInputRef} onChange={handleVideoSelected} />
         <input type="file" className="hidden" ref={genericFileInputRef} onChange={handleGenericFileSelected} />
       </div>
 
-      {/* Message Input */}
-      <div className="w-full rounded-lg h-10 flex items-center">
+      {/* Emoji toggle button */}
+      <button
+        id="emoji-open"
+        className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-ancient-bg-dark/50 transition-colors duration-200"
+        onClick={handleEmojiModal}
+        title="Invoke Glyph"
+      >
+        <BsEmojiSmile className="text-ancient-icon-inactive text-xl" />
+      </button>
+
+      {/* Emoji Picker */}
+      {showEmojiPicker && (
+        <div className="absolute bottom-24 left-4 z-50" ref={emojiPickerRef}>
+          <EmojiPicker onEmojiClick={handleEmojiClick} theme="dark" />
+        </div>
+      )}
+
+      {/* Message Input (Center - Full width) */}
+      <div className="flex-1 h-12 flex items-center bg-ancient-input-bg border border-ancient-input-border rounded-full px-5 shadow-inner focus-within:border-ancient-icon-glow transition-all duration-300">
         <input
           type="text"
-          placeholder="Type a message"
-          className="bg-input-background text-sm focus:outline-none text-white h-10 rounded-lg px-5 py-4 w-full"
+          placeholder="Invoke message..."
+          className="bg-transparent text-sm focus:outline-none text-ancient-text-light placeholder:text-ancient-text-muted h-full w-full"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onPaste={onPaste}
+          onKeyPress={(e) => {
+            if (e.key === 'Enter' && message.trim().length > 0) {
+              sendMessage();
+            }
+          }}
         />
       </div>
 
-      {/* Send Button or Microphone */}
-      <div className="flex w-10 items-center justify-center">
-        {message.length > 0 ? (
-          <MdSend
-            className="text-panel-header-icon cursor-pointer text-xl"
-            title="Send message"
+      {/* Microphone/Send Icon (Right) */}
+      <div className="flex items-center justify-center">
+        {message.trim().length > 0 ? (
+          <button
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-ancient-bg-dark/50 transition-colors duration-200"
             onClick={sendMessage}
-            style={{ opacity: (!isOnline || sendMessageMutation.isPending) ? 0.5 : 1, pointerEvents: (!isOnline || sendMessageMutation.isPending) ? "none" : "auto" }}
-          />
+            title="Send Invocation"
+            disabled={!isOnline || sendMessageMutation.isPending}
+            style={{ opacity: (!isOnline || sendMessageMutation.isPending) ? 0.6 : 1 }}
+          >
+            <MdSend className="text-ancient-icon-glow text-2xl" />
+          </button>
         ) : (
-          <FaMicrophone
-            className="text-panel-header-icon cursor-pointer text-xl"
-            title="Record voice message"
+          <button
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-ancient-bg-dark/50 transition-colors duration-200"
             onClick={() => setShowAudioRecords(true)}
-            style={{ opacity: !isOnline ? 0.5 : 1, pointerEvents: !isOnline ? "none" : "auto" }}
-          />
+            title="Record Whisper"
+            disabled={!isOnline}
+            style={{ opacity: !isOnline ? 0.6 : 1 }}
+          >
+            <FaMicrophone className="text-ancient-icon-glow text-xl" />
+          </button>
         )}
       </div>
+
+      {/* Error Message */}
       {sendMessageMutation.isError && (
-        <div className="absolute bottom-24 right-4">
-          <ErrorMessage message="Failed to send. Please try again." />
+        <div className="absolute -top-12 right-4 z-20">
+          <ErrorMessage message="Failed to send. Re-invoke." />
         </div>
       )}
+
+      {/* Audio Recorder */}
       {showAudioRecords && <CaptureAudio onChange={setShowAudioRecords} />}
+
+      {/* Upload Progress Bar */}
       {uploadingLabel && (
-        <div className="absolute -top-6 right-4 left-4 flex items-center gap-2">
-          <span className="text-bubble-meta text-xs">{uploadingLabel}</span>
-          <div className="flex-1 h-1 bg-[#1f2c33] rounded">
-            <div className="h-1 bg-emerald-500 rounded" style={{ width: `${uploadProgress}%` }} />
+        <div className="absolute -top-12 left-0 right-0 flex items-center justify-center gap-3 px-6 py-2 bg-ancient-bg-medium/95 backdrop-blur-sm rounded-lg shadow-lg mx-4">
+          <span className="text-ancient-text-light text-xs italic whitespace-nowrap">{uploadingLabel}</span>
+          <div className="flex-1 h-1.5 bg-ancient-border-stone rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-ancient-icon-glow rounded-full transition-all duration-100" 
+              style={{ width: `${uploadProgress}%` }} 
+            />
           </div>
-          <span className="text-bubble-meta text-xs">{uploadProgress}%</span>
+          <span className="text-ancient-text-light text-xs font-medium">{uploadProgress}%</span>
         </div>
       )}
     </div>

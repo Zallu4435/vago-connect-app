@@ -10,8 +10,10 @@ import { queryClient } from "@/lib/queryClient";
 import { api } from "@/lib/api";
 import { showToast } from "@/lib/toast";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
+import { FaMagic } from "react-icons/fa";
 
-function logout() {
+function LogoutPage() { // Renamed component to follow Next.js page conventions
   const userInfo = useAuthStore((s) => s.userInfo);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const clearChat = useChatStore((s) => s.clearChat);
@@ -24,43 +26,73 @@ function logout() {
       try {
         // Emit socket signout if connected and then disconnect
         if (socket?.current && userInfo?.id) {
-          try { socket.current.emit("signout", userInfo.id); } catch {}
-          try { socket.current.disconnect(); } catch {}
+          try {
+            console.log("Severing ethereal cord...");
+            socket.current.emit("signout", userInfo.id);
+          } catch (e) {
+            console.warn("Socket signout emission failed:", e);
+          }
+          try {
+            socket.current.disconnect();
+            console.log("Ethereal cord severed.");
+          } catch (e) {
+            console.warn("Socket disconnection failed:", e);
+          }
         }
 
-        // Backend logout to clear refresh cookie
-        try { await api.post("/api/auth/logout", undefined, { withCredentials: true }); } catch {}
+        // Backend logout to clear refresh cookie (Breaking the ancient pact)
+        try {
+          await api.post("/api/auth/logout", undefined, { withCredentials: true });
+          console.log("Ancient pact with server dissolved.");
+        } catch (e) {
+          console.warn("Backend logout failed:", e);
+        }
 
-        // Clear client stores and caches
+        // Clear client stores and caches (Wiping the slate clean)
         clearAuth();
-        try { clearChat?.(); } catch {}
-        try { resetCallState?.(); } catch {}
-        try { queryClient.clear(); } catch {}
+        try { clearChat?.(); } catch (e) { console.warn("Clearing chat history failed:", e); }
+        try { resetCallState?.(); } catch (e) { console.warn("Resetting call state failed:", e); }
+        try { queryClient.clear(); } catch (e) { console.warn("Clearing query cache failed:", e); }
+        console.log("Echoes of current session dispelled.");
 
-        // Firebase sign out
-        try { await signOut(firebaseAuth); } catch {}
+        // Firebase sign out (Extinguishing the sacred flame)
+        try {
+          await signOut(firebaseAuth);
+          console.log("Sacred flame of authentication extinguished.");
+        } catch (e) {
+          console.warn("Firebase sign out failed:", e);
+        }
 
         // Feedback
-        showToast.info("Logged out");
+        showToast.info("You have departed the ethereal plane."); // Themed info toast
 
         // Redirect
         router.push("/login");
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.error("Logout error:", error);
-        router.push("/login");
+        console.error("The dispelling ritual encountered an anomaly:", error); // Themed error message
+        showToast.error("A disturbance prevented a clean departure."); // Themed error toast
+        router.push("/login"); // Ensure redirect even on error
       }
     };
     performLogout();
-  }, [socket, userInfo?.id, router]);
-  
+  }, [socket, userInfo?.id, router, clearAuth, clearChat, resetCallState]); 
+
   return (
     <ProtectedRoute>
-      <div className="bg-conversation-panel-background h-screen w-screen flex items-center justify-center text-white">
-        <div>Logging out...</div>
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-ancient-bg-dark text-ancient-text-light animate-fade-in">
+        <div className="relative mb-4">
+          <FaMagic className="text-6xl text-ancient-icon-glow drop-shadow-lg animate-pulse-light-slow" />
+        </div>
+        <div className="mb-3 text-2xl font-bold font-serif drop-shadow-lg text-center tracking-wide">
+          Severing Ethereal Link
+        </div>
+        <LoadingSpinner label="Signing you out..." />
+        <div className="mt-3 text-ancient-text-muted text-sm italic animate-fade-in delay-700">Safely dispelling session wards.</div>
+        <div className="text-ancient-text-muted text-lg italic animate-fade-in delay-700">Severing your ties to the Ethereal Whispers.</div>
       </div>
     </ProtectedRoute>
   );
 }
 
-export default logout;
+export default LogoutPage;

@@ -11,21 +11,24 @@ function FullPageError({
   retryLabel = "Try Again",
 }) {
   return (
-    <div className="h-screen w-screen bg-panel-header-background text-white flex flex-col items-center justify-center p-6 text-center">
-      <div className="max-w-lg space-y-4">
-        <h1 className="text-3xl font-semibold">{title}</h1>
-        <p className="text-secondary">{message}</p>
+    <div className="h-screen w-screen bg-ancient-bg-dark text-ancient-text-light flex flex-col items-center justify-center p-8">
+      <div className="max-w-lg w-full space-y-4 bg-ancient-bg-medium/90 rounded-2xl shadow-lg border border-ancient-border-stone p-8">
+        <h1 className="text-3xl font-semibold text-ancient-icon-glow drop-shadow">{title}</h1>
+        <p className="text-base text-ancient-text-muted">{message}</p>
         <div className="pt-4 flex items-center justify-center gap-3">
           {typeof onRetry === "function" && (
             <button
               type="button"
               onClick={onRetry}
-              className="inline-block bg-search-input-container-background hover:bg-[#2b3942] px-5 py-2 rounded-lg"
+              className="bg-ancient-bubble-user hover:bg-ancient-bubble-user-light text-ancient-text-light px-5 py-2 rounded-lg shadow transition-colors"
             >
               {retryLabel}
             </button>
           )}
-          <Link href={actionHref} className="inline-block bg-teal-600 hover:bg-teal-500 px-5 py-2 rounded-lg">
+          <Link
+            href={actionHref}
+            className="bg-ancient-icon-glow/80 hover:bg-ancient-icon-glow text-ancient-bg-dark px-5 py-2 rounded-lg shadow transition-colors"
+          >
             {actionLabel}
           </Link>
         </div>

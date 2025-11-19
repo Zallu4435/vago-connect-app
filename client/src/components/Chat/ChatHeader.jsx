@@ -1,9 +1,8 @@
 import Avatar from "../common/Avatar";
-import { MdCall } from "react-icons/md";
+import { MdCall, MdPermMedia } from "react-icons/md";
 import { IoVideocam } from "react-icons/io5";
 import { BiSearchAlt2 } from "react-icons/bi";
 import { BsThreeDotsVertical } from "react-icons/bs";
-import { MdPermMedia } from "react-icons/md";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useCallStore } from "@/stores/callStore";
@@ -24,18 +23,18 @@ function ChatHeader({ onOpenMedia }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showGroupManage, setShowGroupManage] = useState(false);
 
-  // Resolve conversationId for maintenance actions
+  // Get conversation ID and type from contacts
   const { data: contacts = [] } = useContacts(userInfo?.id);
   const conversationId = useMemo(() => {
-    const item = (contacts || []).find((c) => String(c?.user?.id) === String(currentChatUser?.id));
+    const item = contacts.find((c) => String(c?.user?.id) === String(currentChatUser?.id));
     return item?.conversationId;
   }, [contacts, currentChatUser?.id]);
   const conversationType = useMemo(() => {
-    const item = (contacts || []).find((c) => String(c?.user?.id) === String(currentChatUser?.id));
+    const item = contacts.find((c) => String(c?.user?.id) === String(currentChatUser?.id));
     return item?.type;
   }, [contacts, currentChatUser?.id]);
 
-  // Hooks for actions
+  // Maintenance action hooks
   const clearChat = useClearChat();
   const deleteChat = useDeleteChat();
   const archiveChat = useArchiveChat();
@@ -59,8 +58,8 @@ function ChatHeader({ onOpenMedia }) {
     };
     initiateCall(call, "audio");
     socket?.current?.emit?.("call-user", call);
-    setCallToast(() => showToast.info("Calling..."));
-  }
+    setCallToast(() => showToast.info("Summoning via Whisper..."));
+  };
 
   const handleVideoCall = () => {
     if (!currentChatUser || !userInfo) return;
@@ -71,12 +70,13 @@ function ChatHeader({ onOpenMedia }) {
     };
     initiateCall(call, "video");
     socket?.current?.emit?.("call-user", call);
-    setCallToast(() => showToast.info("Calling..."));
-  }
-  
+    setCallToast(() => showToast.info("Conjuring Vision Link..."));
+  };
+
   return (
-    <div className="h-16 px-4 py-3 flex justify-between items-center bg-panel-header-background">
-      <div className="flex items-center justify-center gap-6">
+    <div className="h-20 px-6 py-3 flex items-center justify-between bg-ancient-bg-medium border-b border-ancient-border-stone shadow-md">
+      {/* Left: Avatar and name/status */}
+      <div className="flex items-center gap-6">
         <Avatar
           type="sm"
           image={
@@ -86,51 +86,62 @@ function ChatHeader({ onOpenMedia }) {
           }
         />
         <div className="flex flex-col">
-          <span className="text-primary-strong">{currentChatUser?.name || currentChatUser?.username}</span>
-          <span className="text-secondary text-sm">
-            {onlineUsers?.some((u) => String(u) === String(currentChatUser?.id)) ? 'online' : 'offline'}
+          <span className="text-ancient-text-light text-xl font-bold">
+            {currentChatUser?.name || currentChatUser?.username || "Ancient Echo"}
+          </span>
+          <span className="text-ancient-text-muted text-sm italic">
+            {onlineUsers?.some((u) => String(u) === String(currentChatUser?.id))
+              ? "Connected to the Void"
+              : "Lost in the Mists"}
           </span>
         </div>
       </div>
-      <div className="flex gap-6">
+      {/* Right: Controls */}
+      <div className="flex items-center gap-7">
         <MdPermMedia
-          className="text-panel-header-icon cursor-pointer text-xl"
-          title="Media"
+          className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+          title="Ancient Archive"
           onClick={() => onOpenMedia?.()}
         />
         <MdCall
-          className="text-panel-header-icon cursor-pointer text-xl"
+          className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+          title="Summon via Whisper"
           onClick={handleVoiceCall}
         />
         <IoVideocam
-          className="text-panel-header-icon cursor-pointer text-xl"
+          className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+          title="Conjure Vision Link"
           onClick={handleVideoCall}
         />
         <BiSearchAlt2
-          className="text-panel-header-icon cursor-pointer text-xl"
+          className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+          title="Seek Ancient Runes"
           onClick={() => {
-            // Force messageSearch to true without toggling
             useChatStore.setState({ messageSearch: true });
           }}
         />
         <div className="relative">
           <BsThreeDotsVertical
-            className="text-panel-header-icon cursor-pointer text-xl"
+            className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
             onClick={() => setShowMenu((v) => !v)}
-            title="Menu"
+            title="Ancient Rites Menu"
           />
+          {/* Dropdown menu */}
           {showMenu && (
-            <div className="absolute right-0 mt-2 z-20 w-48 bg-[#1f2c33] border border-[#2a3942] rounded-md shadow-lg p-1">
-              {conversationType === 'group' && (
+            <div className="absolute right-0 top-full mt-2 z-30 w-56 bg-ancient-bg-dark border border-ancient-border-stone rounded-xl shadow-xl p-2 animate-fade-in-down origin-top-right">
+              {conversationType === "group" && (
                 <button
-                  className="w-full text-left px-3 py-2 hover:bg-[#2a3942] text-sm"
-                  onClick={() => { setShowGroupManage(true); setShowMenu(false); }}
+                  className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
+                  onClick={() => {
+                    setShowGroupManage(true);
+                    setShowMenu(false);
+                  }}
                 >
-                  Group settings
+                  Manage Circle
                 </button>
               )}
               <button
-                className="w-full text-left px-3 py-2 hover:bg-[#2a3942] text-sm"
+                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
                 disabled={!conversationId || clearChat.isPending}
                 onClick={() => {
                   if (!conversationId) return;
@@ -138,10 +149,10 @@ function ChatHeader({ onOpenMedia }) {
                   setShowMenu(false);
                 }}
               >
-                Clear chat
+                Erase Scrolls
               </button>
               <button
-                className="w-full text-left px-3 py-2 hover:bg-[#2a3942] text-sm"
+                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
                 disabled={!conversationId || deleteChat.isPending}
                 onClick={() => {
                   if (!conversationId) return;
@@ -149,10 +160,10 @@ function ChatHeader({ onOpenMedia }) {
                   setShowMenu(false);
                 }}
               >
-                Delete chat
+                Banish Echoes
               </button>
               <button
-                className="w-full text-left px-3 py-2 hover:bg-[#2a3942] text-sm"
+                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
                 disabled={!conversationId || archiveChat.isPending}
                 onClick={() => {
                   if (!conversationId) return;
@@ -160,10 +171,10 @@ function ChatHeader({ onOpenMedia }) {
                   setShowMenu(false);
                 }}
               >
-                Archive chat
+                Seal to Archive
               </button>
               <button
-                className="w-full text-left px-3 py-2 hover:bg-[#2a3942] text-sm"
+                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
                 disabled={!conversationId || pinChat.isPending}
                 onClick={() => {
                   if (!conversationId) return;
@@ -171,20 +182,19 @@ function ChatHeader({ onOpenMedia }) {
                   setShowMenu(false);
                 }}
               >
-                Pin chat
+                Mark with Rune
               </button>
               <button
-                className="w-full text-left px-3 py-2 hover:bg-[#2a3942] text-sm"
+                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
                 disabled={!conversationId || muteChat.isPending}
                 onClick={() => {
                   if (!conversationId) return;
-                  // Default mute 24h
-                  const until = new Date(Date.now() + 24*60*60*1000).toISOString();
+                  const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
                   muteChat.mutate({ chatId: conversationId, mutedUntil: until });
                   setShowMenu(false);
                 }}
               >
-                Mute 24h
+                Silence for a Cycle
               </button>
             </div>
           )}
