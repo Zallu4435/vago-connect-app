@@ -4,45 +4,48 @@ import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import Image from "next/image";
 import React from "react";
 import { FcGoogle } from "react-icons/fc";
-import { useRouter } from "next/navigation";
-import { CHECK_USER_ROUTE } from "@/utils/ApiRoutes";
+import { useRouter } from "next/router";
 import { useAuthStore } from "@/stores/authStore";
 import { showToast } from "@/lib/toast";
+import { isTokenExpired } from "@/lib/tokenManager";
 
 function Login() {
   const router = useRouter();
   const setUserInfo = useAuthStore((s) => s.setUserInfo);
+  const setAccessToken = useAuthStore((s) => s.setAccessToken);
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  React.useEffect(() => {
+    if (accessToken && !isTokenExpired(accessToken)) {
+      router.push("/");
+    }
+  }, [accessToken, router]);
   
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
-    const {
-      user: { displayName: name, email, photoURL: profileImage },
-    } = await signInWithPopup(firebaseAuth, provider);
+    const result = await signInWithPopup(firebaseAuth, provider);
     try {
-      if (email) {
-        const { data } = await api.post(CHECK_USER_ROUTE, { email });
-        console.log(data);
-        if (!data.status) {
-          setUserInfo({ id: "", name: name || "", email, profileImage: profileImage || "", about: "" });
-          router.push("/onboarding");
-          return;
-        }
-        if (data.user) {
-          setUserInfo({
-            id: String(data.user.id),
-            name: data.user.name,
-            email: data.user.email,
-            profileImage: data.user.image,
-            about: data.user.about,
-          });
-          router.push("/");
-        }
-      }
+      const firebaseToken = await result.user.getIdToken();
+      const email = result.user.email;
+      const { data } = await api.post(
+        "/api/auth/login",
+        { firebaseToken, email },
+        { withCredentials: true }
+      );
+      const { accessToken: at, user } = data || {};
+      if (!at || !user) throw new Error("Invalid login response");
+      setAccessToken(at);
+      setUserInfo({
+        id: String(user.id),
+        name: user.name,
+        email: user.email,
+        profileImage: user.image || user.profileImage || "",
+        about: user.about || "",
+      });
+      router.push("/");
     } catch (err) {
       console.log(err);
-      const msg = err?.response?.status === 440 || err?.message?.toLowerCase?.().includes("session")
-        ? "Session expired. Please login again"
-        : "Login failed. Please try again";
+      const msg = "Login failed. Please try again";
       showToast.error(msg);
     }
   };

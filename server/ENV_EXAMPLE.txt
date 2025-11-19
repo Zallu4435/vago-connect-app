@@ -1,0 +1,22 @@
+# Backend .env example
+
+# App
+NODE_ENV=development
+PORT=3005
+
+# CORS
+# Adjust if your client runs elsewhere
+CORS_ORIGIN=http://localhost:3000
+
+# Prisma
+# Example: postgresql://user:password@localhost:5432/whatsapp_clone?schema=public
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DBNAME?schema=public
+
+# JWT secrets (change to strong random values in production)
+JWT_ACCESS_SECRET=your-very-strong-access-secret
+JWT_REFRESH_SECRET=your-very-strong-refresh-secret
+
+# Optional Firebase Admin (if verifying Firebase ID tokens server-side)
+# FIREBASE_PROJECT_ID=your-project-id
+# FIREBASE_CLIENT_EMAIL=your-firebase-admin@project.iam.gserviceaccount.com
+# FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"

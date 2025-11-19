@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { showToast } from '@/lib/toast';
+import { useAuthStore } from '@/stores/authStore';
+import { refreshAccessToken } from '@/lib/refreshToken';
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005',
@@ -9,15 +10,16 @@ export const api = axios.create({
 // Request interceptor for auth
 api.interceptors.request.use((config) => {
   try {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      if (token) {
-        // Ensure headers object exists and set Authorization header
-        config.headers = {
-          ...(config.headers || {}),
-          Authorization: `Bearer ${token}`,
-        } as any;
-      }
+    const url = config.url || '';
+    // Skip auth endpoints
+    if (url.includes('/auth/')) return config;
+    // Get token from store (memory only)
+    const token = useAuthStore.getState().getAccessToken?.() || useAuthStore.getState().accessToken;
+    if (token) {
+      config.headers = {
+        ...(config.headers || {}),
+        Authorization: `Bearer ${token}`,
+      } as any;
     }
   } catch {}
   return config;
@@ -26,19 +28,40 @@ api.interceptors.request.use((config) => {
 // Response interceptor for errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    console.error('API Error:', error?.response?.data || error?.message);
-    try {
-      const status = error?.response?.status as number | undefined;
-      if (typeof window !== 'undefined' && (status === 401 || status === 440)) {
-        // Clear token, notify user, and redirect to login
-        try { localStorage.removeItem('token'); } catch {}
-        showToast.error('Session expired. Please login again');
-        // slight delay to allow toast to render before navigation
-        setTimeout(() => { window.location.href = '/login'; }, 50);
-        // Prevent further handling if desired
+  async (error) => {
+    const originalRequest = error?.config || {};
+    const status = error?.response?.status as number | undefined;
+
+    // Do not retry on auth endpoints
+    const url: string = originalRequest?.url || '';
+    const isAuthEndpoint = url.includes('/auth/');
+
+    if (status === 403 || isAuthEndpoint) {
+      return Promise.reject(error);
+    }
+
+    if (status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      try {
+        const newToken = await refreshAccessToken();
+        // Store new token in memory
+        useAuthStore.getState().setAccessToken(newToken || null);
+        // Update header and retry
+        originalRequest.headers = {
+          ...(originalRequest.headers || {}),
+          Authorization: `Bearer ${newToken}`,
+        };
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed → logout and redirect
+        try { useAuthStore.getState().clearAuth(); } catch {}
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshError);
       }
-    } catch {}
+    }
+
     return Promise.reject(error);
   }
 );

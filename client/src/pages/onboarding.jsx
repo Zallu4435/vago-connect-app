@@ -2,11 +2,10 @@ import React, { useState } from "react";
 import Image from "next/image";
 import Input from "@/components/common/Input";
 import Avatar from "@/components/common/Avatar";
-import { ONBOARD_USER_ROUTE } from "@/utils/ApiRoutes";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/router";
 import { useAuthStore } from "@/stores/authStore";
-import { api } from "@/lib/api";
 import { useOnboardUser } from "@/hooks/mutations/useOnboardUser";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 function Onboarding() {
   const userInfo = useAuthStore((s) => s.userInfo);
@@ -38,7 +37,8 @@ function Onboarding() {
   }
 
   return (
-    <div className="bg-panel-header-background h-screen w-screen flex text-white flex-col items-center justify-center">
+    <ProtectedRoute>
+      <div className="bg-panel-header-background h-screen w-screen flex text-white flex-col items-center justify-center">
       <div className="flex items-center justify-center gap-2 text-white">
         <Image src="/whatsapp.gif" alt="Whatsapp" height={300} width={300} />
         <span className="text-7xl">Whatsapp</span>
@@ -56,7 +56,8 @@ function Onboarding() {
           <Avatar type="xl" image={image} setImage={setImage} />
         </div>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }
 

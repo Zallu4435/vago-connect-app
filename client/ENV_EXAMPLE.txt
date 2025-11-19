@@ -1,0 +1,4 @@
+# Client .env example (Next.js)
+
+# Backend base URL for API calls
+NEXT_PUBLIC_API_URL=http://localhost:3005
