@@ -1,30 +1,37 @@
 import React, { useState } from "react";
 import Image from "next/image";
-import { useStateProvider } from "@/context/StateContext";
 import Input from "@/components/common/Input";
 import Avatar from "@/components/common/Avatar";
-import axios from "axios";
 import { ONBOARD_USER_ROUTE } from "@/utils/ApiRoutes";
-import { reducerCases } from "@/context/constants";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/authStore";
+import { api } from "@/lib/api";
+import { useOnboardUser } from "@/hooks/mutations/useOnboardUser";
 
 function Onboarding() {
-  const [{ userInfo }, dispatch] = useStateProvider();
+  const userInfo = useAuthStore((s) => s.userInfo);
+  const setUserInfo = useAuthStore((s) => s.setUserInfo);
   const router = useRouter();
   const [name, setName] = useState(userInfo?.name || "");
   const [about, setAbout] = useState("");
   const [image, setImage] = useState("/default_avatar.png");
+  const onboardMutation = useOnboardUser();
   
   const onBoardUserHandle = async () => {
     const email = userInfo?.email;
     try {
       if (!email || !name?.trim()) return;
-      const { data } = await axios.post(ONBOARD_USER_ROUTE, { email, name: name.trim(), about: about || "", image });
-      if (data?.status && data?.user) {
-        dispatch({ type: reducerCases.SET_NEW_USER, newUser: false });
-        dispatch({ type: reducerCases.SET_USER_INFO, userInfo: { name: data.user.name, email: data.user.email, profileImage: data.user.image, status: data.user.about } });
-        router.push("/");
-      }
+      onboardMutation.mutate(
+        { email, name: name.trim(), about: about || "", image },
+        {
+          onSuccess: (data) => {
+            if (data?.status && data?.user) {
+              setUserInfo({ id: String(data.user.id), name: data.user.name, email: data.user.email, profileImage: data.user.image, about: data.user.about });
+              router.push("/");
+            }
+          },
+        }
+      );
     } catch (error) {
       console.log(error);
     }

@@ -40,6 +40,7 @@ const io = new Server(server, {
     origin: "http://localhost:3000",
   },
 });
+global.io = io;
 
 global.onlineUsers = new Map();
 io.on("connection", (socket) => {
@@ -47,6 +48,7 @@ io.on("connection", (socket) => {
   socket.on("add-user", (userId) => {
     onlineUsers.set(userId, socket.id);
     socket.broadcast.emit("user-online", { userId });
+    io.emit("online-users", Array.from(onlineUsers.keys()));
   });
 
   socket.on("send-msg", (data) => {
@@ -99,6 +101,7 @@ io.on("connection", (socket) => {
       if (onlineUsers.has(userId)) {
         onlineUsers.delete(userId);
         socket.broadcast.emit("user-offline", { userId });
+        io.emit("online-users", Array.from(onlineUsers.keys()));
       }
       // terminate this socket connection
       socket.disconnect(true);
@@ -111,6 +114,7 @@ io.on("connection", (socket) => {
       if (sid === socket.id) {
         onlineUsers.delete(uid);
         socket.broadcast.emit("user-offline", { userId: uid });
+        io.emit("online-users", Array.from(onlineUsers.keys()));
         break;
       }
     }

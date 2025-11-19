@@ -11,3 +11,4 @@ export const ADD_IMAGE_ROUTE = `${MESSAGE_ROUTES}/add-image`
 export const ADD_AUDIO_ROUTE = `${MESSAGE_ROUTES}/add-audio`
 export const GET_MESSAGES_ROUTE = `${MESSAGE_ROUTES}/get-messages`
 export const GET_INITIAL_CONTACTS_ROUTE = `${MESSAGE_ROUTES}/get-initial-contacts`
+export const UPDATE_MESSAGE_STATUS_ROUTE = `${MESSAGE_ROUTES}/update-status`

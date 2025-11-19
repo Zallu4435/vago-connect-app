@@ -3,12 +3,11 @@ import React, { useState, useEffect } from "react";
 import List from "./List";
 import SearchBar from "./SearchBar";
 import ChatListHeader from "./ChatListHeader";
-import { useStateProvider } from "@/context/StateContext";
 import ContactsList from "./ContactsList";
+import { useChatStore } from "@/stores/chatStore";
 
 function ChatList() {
-
-  const [{ allContactsPage }] = useStateProvider();
+  const allContactsPage = useChatStore((s) => s.allContactsPage);
   const [pageType, setPageType] = useState("default");
 
   useEffect(() => {

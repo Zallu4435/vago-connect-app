@@ -1,11 +1,11 @@
 import React from "react";
 import { BiSearchAlt2 } from "react-icons/bi";
 import { BsFilter } from "react-icons/bs";
-import { useStateProvider } from "@/context/StateContext";
-import { reducerCases } from "@/context/constants";
+import { useChatStore } from "@/stores/chatStore";
 
 function SearchBar() {
-  const [{contactsSearch}, dispatch] = useStateProvider();
+  const contactsSearch = useChatStore((s) => s.contactsSearch);
+  const setContactsSearch = useChatStore((s) => s.setContactsSearch);
 
   return (
     <div className="bg-search-input-container-background flex py-3 pl-5 items-center gap-3 h-14 border-b border-conversation-border">
@@ -19,7 +19,7 @@ function SearchBar() {
             placeholder="Search or start a new chat"
             className="bg-transparent text-sm focus:outline-none text-white placeholder:text-secondary w-full"
             value={contactsSearch}
-            onChange={(e) => dispatch({type: reducerCases.SET_CONTACTS_SEARCH, contactsSearch: e.target.value})}
+            onChange={(e) => setContactsSearch(e.target.value)}
           />
         </div>
       </div>

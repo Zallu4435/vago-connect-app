@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { addMessage, getMessages, addImage, addAudio, getInitialContactswithMessages } from "../controllers/MessageController.js";
+import { addMessage, getMessages, addImage, addAudio, getInitialContactswithMessages, updateMessageStatus } from "../controllers/MessageController.js";
 import multer from "multer";
 
 const messageRouter = Router();
@@ -12,5 +12,6 @@ messageRouter.get("/get-messages/:from/:to", getMessages);
 messageRouter.post("/add-image", uploadImage.single("image"), addImage);
 messageRouter.post("/add-audio", upload.single("audio"), addAudio);
 messageRouter.get("/get-initial-contacts/:from", getInitialContactswithMessages);
+messageRouter.put("/update-status", updateMessageStatus);
 
 export default messageRouter;

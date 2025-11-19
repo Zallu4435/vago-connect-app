@@ -1,14 +1,14 @@
 import Avatar from "../common/Avatar";
-import { useStateProvider } from "@/context/StateContext";
 import { BsFillChatLeftTextFill, BsThreeDotsVertical } from "react-icons/bs";
-import { reducerCases } from "@/context/constants";
+import { useAuthStore } from "@/stores/authStore";
+import { useChatStore } from "@/stores/chatStore";
 
 function ChatListHeader() {
-  const [{ userInfo }, dispatch] = useStateProvider();
-  console.log({ userInfo });
+  const userInfo = useAuthStore((s) => s.userInfo);
+  const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
 
   const handleAllContactsPage = () => {
-    dispatch({ type: reducerCases.SET_ALL_CONTACTS_PAGE, allContactsPage: true });
+    setAllContactsPage(true);
   };
 
   return (

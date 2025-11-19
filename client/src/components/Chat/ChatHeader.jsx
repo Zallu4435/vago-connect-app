@@ -3,11 +3,28 @@ import { MdCall } from "react-icons/md";
 import { IoVideocam } from "react-icons/io5";
 import { BiSearchAlt2 } from "react-icons/bi";
 import { BsThreeDotsVertical } from "react-icons/bs";
-import { useStateProvider } from "@/context/StateContext";
-import { reducerCases } from "@/context/constants";
+import { useAuthStore } from "@/stores/authStore";
+import { useChatStore } from "@/stores/chatStore";
+import { useCallStore } from "@/stores/callStore";
+import { useSocketStore } from "@/stores/socketStore";
+import { showToast } from "@/lib/toast";
+import { useRef } from "react";
 
 function ChatHeader() {
-  const [{ currentChatUser, userInfo, socket }, dispatch] = useStateProvider();
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const userInfo = useAuthStore((s) => s.userInfo);
+  const onlineUsers = useChatStore((s) => s.onlineUsers);
+  const socket = useSocketStore((s) => s.socket);
+  const initiateCall = useCallStore((s) => s.initiateCall);
+  const callToastIdRef = useRef(null);
+
+  const setCallToast = (fn) => {
+    if (callToastIdRef.current) {
+      showToast.dismiss(callToastIdRef.current);
+      callToastIdRef.current = null;
+    }
+    callToastIdRef.current = fn();
+  };
 
   const handleVoiceCall = () => {
     if (!currentChatUser || !userInfo) return;
@@ -16,10 +33,9 @@ function ChatHeader() {
       from: { id: userInfo.id, name: userInfo.name, image: userInfo.profileImage },
       to: { id: currentChatUser.id, name: currentChatUser.name, image: currentChatUser.profilePicture || currentChatUser.image || currentChatUser.profileImage },
     };
-    dispatch({ type: reducerCases.SET_CALL, call });
-    dispatch({ type: reducerCases.SET_CALLING, calling: true });
-    dispatch({ type: reducerCases.SET_AUDIO_CALL, audioCall: true });
+    initiateCall(call, "audio");
     socket?.current?.emit?.("call-user", call);
+    setCallToast(() => showToast.info("Calling..."));
   }
 
   const handleVideoCall = () => {
@@ -29,10 +45,9 @@ function ChatHeader() {
       from: { id: userInfo.id, name: userInfo.name, image: userInfo.profileImage },
       to: { id: currentChatUser.id, name: currentChatUser.name, image: currentChatUser.profilePicture || currentChatUser.image || currentChatUser.profileImage },
     };
-    dispatch({ type: reducerCases.SET_CALL, call });
-    dispatch({ type: reducerCases.SET_CALLING, calling: true });
-    dispatch({ type: reducerCases.SET_VIDEO_CALL, videoCall: true });
+    initiateCall(call, "video");
     socket?.current?.emit?.("call-user", call);
+    setCallToast(() => showToast.info("Calling..."));
   }
   
   return (
@@ -48,7 +63,9 @@ function ChatHeader() {
         />
         <div className="flex flex-col">
           <span className="text-primary-strong">{currentChatUser?.name || currentChatUser?.username}</span>
-          <span className="text-secondary text-sm">online/offline</span>
+          <span className="text-secondary text-sm">
+            {onlineUsers?.some((u) => String(u) === String(currentChatUser?.id)) ? 'online' : 'offline'}
+          </span>
         </div>
       </div>
       <div className="flex gap-6">
@@ -63,8 +80,8 @@ function ChatHeader() {
         <BiSearchAlt2
           className="text-panel-header-icon cursor-pointer text-xl"
           onClick={() => {
-            console.log('header: search clicked');
-            dispatch({ type: reducerCases.SET_MESSAGE_SEARCH, messageSearch: true });
+            // Force messageSearch to true without toggling
+            useChatStore.setState({ messageSearch: true });
           }}
         />
         <BsThreeDotsVertical

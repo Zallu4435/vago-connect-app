@@ -1,56 +1,45 @@
-import { reducerCases } from "@/context/constants";
-import { GET_INITIAL_CONTACTS_ROUTE } from "@/utils/ApiRoutes";
-import React, { useEffect } from "react";
-import axios from "axios";
-import { useStateProvider } from "@/context/StateContext";
+import React, { useMemo } from "react";
+import { useAuthStore } from "@/stores/authStore";
+import { useChatStore } from "@/stores/chatStore";
+import { useContacts } from "@/hooks/queries/useContacts";
 import ChatListItem from "./ChatLIstItem";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
+import ErrorMessage from "@/components/common/ErrorMessage";
 
 function List() {
+  const userInfo = useAuthStore((s) => s.userInfo);
+  const contactsSearch = useChatStore((s) => s.contactsSearch);
+  const { data: contacts = [], isLoading, error, refetch } = useContacts(userInfo?.id);
 
-  const [{ userInfo, userContacts, filteredContacts, contactsSearch }, dispatch] = useStateProvider();
-
-  useEffect(() => {
-    const getContacts = async () => {
-      try {
-        const { data: res } = await axios(`${GET_INITIAL_CONTACTS_ROUTE}/${userInfo.id}`);
-        const { data: users, onlineUsers } = res || {};
-        if (Array.isArray(users)) {
-          dispatch({ type: reducerCases.SET_USER_CONTACTS, userContacts: users });
-        }
-        if (Array.isArray(onlineUsers)) {
-          dispatch({ type: reducerCases.SET_ONLINE_USERS, onlineUsers });
-        }
-      } catch (error) {
-        console.error('Error fetching contacts:', error);
-      }
-    };
-    if (userInfo?.id) {
-      getContacts();
-    }
-  }, [userInfo?.id, dispatch]);
-
-  // derive filtered contacts from search term
-  useEffect(() => {
+  const filteredContacts = useMemo(() => {
     const term = (contactsSearch || "").trim().toLowerCase();
-    if (!term) {
-      dispatch({ type: reducerCases.SET_FILTERED_CONTACTS, filteredContacts: [] });
-      return;
-    }
-    const base = Array.isArray(userContacts) ? userContacts : [];
-    const filtered = base.filter((c) => {
+    if (!term) return contacts;
+    return (contacts || []).filter((c) => {
       const name = String(c?.name || c?.username || "").toLowerCase();
       const msg = String(c?.message || "").toLowerCase();
       return name.includes(term) || msg.includes(term);
     });
-    dispatch({ type: reducerCases.SET_FILTERED_CONTACTS, filteredContacts: filtered });
-  }, [contactsSearch, userContacts, dispatch]);
+  }, [contacts, contactsSearch]);
 
   return (
     <div className="bg-search-input-container-background flex-auto overflow-auto max-h-full custom-scrollbar">
-      {contactsSearch && filteredContacts.length === 0 ? (
+      {isLoading ? (
+        <LoadingSpinner label="Loading chats..." className="px-4 py-6" />
+      ) : error ? (
+        <div className="px-4 py-6 flex items-center gap-3">
+          <ErrorMessage message="Failed to load chats" />
+          <button
+            type="button"
+            className="bg-search-input-container-background hover:bg-[#2b3942] text-white text-sm px-3 py-1 rounded"
+            onClick={() => refetch()}
+          >
+            Retry
+          </button>
+        </div>
+      ) : contactsSearch && filteredContacts.length === 0 ? (
         <div className="text-secondary text-sm px-4 py-6">No chats found</div>
       ) : (
-        (filteredContacts.length > 0 ? filteredContacts : userContacts).map((contact) => (
+        (filteredContacts.length > 0 ? filteredContacts : contacts).map((contact) => (
           <ChatListItem data={contact} key={contact.id} />
         ))
       )}

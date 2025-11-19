@@ -3,22 +3,31 @@ import { BsEmojiSmile } from "react-icons/bs";
 import { ImAttachment } from "react-icons/im";
 import { MdSend } from "react-icons/md";
 import { FaMicrophone } from "react-icons/fa";
-import { useStateProvider } from "@/context/StateContext";
-import axios from "axios";
-import { ADD_MESSAGE_ROUTE, ADD_IMAGE_ROUTE } from "@/utils/ApiRoutes";
-import { reducerCases } from "@/context/constants";
 import EmojiPicker from "emoji-picker-react";
 import dynamic from "next/dynamic";
+import { useAuthStore } from "@/stores/authStore";
+import { useChatStore } from "@/stores/chatStore";
+import { useSocketStore } from "@/stores/socketStore";
+import { useSendMessage } from "@/hooks/mutations/useSendMessage";
+import ErrorMessage from "@/components/common/ErrorMessage";
+import { useUploadImage } from "@/hooks/mutations/useUploadImage";
+import { showToast } from "@/lib/toast";
 
 const CaptureAudio = dynamic(() => import("../common/CaptureAudio"), { ssr: false })
 
-function MessageBar() {
-  const [{ userInfo, currentChatUser, messages, socket }, dispatch] = useStateProvider();
+function MessageBar({ isOnline = true }) {
+  const userInfo = useAuthStore((s) => s.userInfo);
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const messages = useChatStore((s) => s.messages);
+  const setMessages = useChatStore((s) => s.setMessages);
+  const socket = useSocketStore((s) => s.socket);
   const [message, setMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAudioRecords, setShowAudioRecords] = useState(false);
   const fileInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const sendMessageMutation = useSendMessage();
+  const uploadImageMutation = useUploadImage();
 
 
   useEffect(() => {
@@ -43,59 +52,68 @@ function MessageBar() {
     if (emoji) setMessage((prev) => prev + emoji);
   };
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
+    if (!isOnline) return;
     const text = message.trim();
     if (!text || !currentChatUser?.id || !userInfo?.id) return;
-    try {
-      const { data } = await axios.post(ADD_MESSAGE_ROUTE, {
-        content: text,
-        from: userInfo.id,
-        to: currentChatUser.id,
-        type: "text",
-      });
-      socket.current?.emit("send-msg", {
-        to: currentChatUser.id,
-        from: userInfo.id,
-        message: data.content,
-        type: "text",
-      });
-      dispatch({
-        type: reducerCases.SET_MESSAGES,
-        messages: [...(messages || []), data],
-      });
-      setMessage("");
-    } catch (e) {
-      console.error("sendMessage error", e);
-    }
+    sendMessageMutation.mutate(
+      { from: userInfo.id, to: currentChatUser.id, content: text, type: "text" },
+      {
+        onSuccess: (data) => {
+          socket.current?.emit("send-msg", {
+            to: currentChatUser.id,
+            from: userInfo.id,
+            message: data.content,
+            type: data.type || "text",
+            messageId: data.id,
+          });
+          // Optimistically reflect in UI immediately
+          setMessages([...(messages || []), data]);
+          setMessage("");
+        },
+        onError: (e) => {
+          console.error("sendMessage error", e);
+        },
+      }
+    );
   }
 
-  const onAttachmentClick = () => fileInputRef.current?.click();
+  const onAttachmentClick = () => {
+    if (!isOnline) return;
+    fileInputRef.current?.click();
+  }
 
   const handleFileSelected = async (e) => {
+    if (!isOnline) return;
     const file = e.target.files?.[0];
     if (!file || !currentChatUser?.id || !userInfo?.id) return;
-    try {
-      const form = new FormData();
-      form.append("image", file);
-      form.append("from", String(userInfo.id));
-      form.append("to", String(currentChatUser.id));
-      const { data } = await axios.post(ADD_IMAGE_ROUTE, form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      socket.current?.emit("send-msg", {
-        to: currentChatUser.id,
-        from: userInfo.id,
-        message: data.content,
-      });
-      dispatch({
-        type: reducerCases.SET_MESSAGES,
-        messages: [...(messages || []), data],
-      });
-    } catch (err) {
-      console.error("sendImage error", err);
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    const form = new FormData();
+    form.append("image", file);
+    form.append("from", String(userInfo.id));
+    form.append("to", String(currentChatUser.id));
+    const toastId = showToast.loading("Uploading image...");
+    uploadImageMutation.mutate(form, {
+      onSuccess: (data) => {
+        showToast.dismiss(toastId);
+        showToast.success("Image sent");
+        socket.current?.emit("send-msg", {
+          to: currentChatUser.id,
+          from: userInfo.id,
+          message: data.content,
+          type: data.type || "image",
+          messageId: data.id,
+        });
+        setMessages([...(messages || []), data]);
+      },
+      onSettled: () => {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      },
+      onError: (err) => {
+        showToast.dismiss(toastId);
+        showToast.error("Upload failed. Try again");
+        console.error("sendImage error", err);
+      },
+    });
   };
 
   return (
@@ -148,15 +166,22 @@ function MessageBar() {
             className="text-panel-header-icon cursor-pointer text-xl"
             title="Send message"
             onClick={sendMessage}
+            style={{ opacity: (!isOnline || sendMessageMutation.isPending) ? 0.5 : 1, pointerEvents: (!isOnline || sendMessageMutation.isPending) ? "none" : "auto" }}
           />
         ) : (
           <FaMicrophone
             className="text-panel-header-icon cursor-pointer text-xl"
             title="Record voice message"
             onClick={() => setShowAudioRecords(true)}
+            style={{ opacity: !isOnline ? 0.5 : 1, pointerEvents: !isOnline ? "none" : "auto" }}
           />
         )}
       </div>
+      {sendMessageMutation.isError && (
+        <div className="absolute bottom-24 right-4">
+          <ErrorMessage message="Failed to send. Please try again." />
+        </div>
+      )}
       {showAudioRecords && <CaptureAudio onChange={setShowAudioRecords} />}
     </div>
   );

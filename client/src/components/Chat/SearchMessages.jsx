@@ -1,10 +1,9 @@
 "use client";
 import React, { useMemo, useState } from "react";
-import { useStateProvider } from "@/context/StateContext";
-import { reducerCases } from "@/context/constants";
 import { IoClose } from "react-icons/io5";
 import { BiSearchAlt2 } from "react-icons/bi";
 import { calculateTime } from "@/utils/CalculateTime";
+import { useChatStore } from "@/stores/chatStore";
 
 function dayLabel(dateStr) {
   try {
@@ -19,7 +18,7 @@ function dayLabel(dateStr) {
 }
 
 function SearchMessages() {
-  const [{ messages }, dispatch] = useStateProvider();
+  const messages = useChatStore((s) => s.messages);
   const [searchTerm, setSearchTerm] = useState("");
 
   const filtered = useMemo(() => {
@@ -44,7 +43,7 @@ function SearchMessages() {
       <div className="h-16 px-4 py-5 flex gap-10 items-center bg-panel-header-background text-primary-strong">
         <IoClose
           className="cursor-pointer text-icon-lighter text-2xl"
-          onClick={() => dispatch({ type: reducerCases.SET_MESSAGE_SEARCH, messageSearch: false })}
+          onClick={() => useChatStore.setState({ messageSearch: false })}
         />
         <span>Search Messages</span>
       </div>

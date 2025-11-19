@@ -1,17 +1,18 @@
 import React from "react";
 import Avatar from "../common/Avatar";
-import { useStateProvider } from "@/context/StateContext";
-import { reducerCases } from "@/context/constants";
 import { calculateTime } from "@/utils/CalculateTime";
 import MessageStatus from "../common/MessageStatus";
+import { useAuthStore } from "@/stores/authStore";
+import { useChatStore } from "@/stores/chatStore";
 
 function ChatListItem({ data, isContactsPage = false }) {
-  const [{ userInfo, currentChatUser }, dispatch] = useStateProvider();
+  const userInfo = useAuthStore((s) => s.userInfo);
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const setCurrentChatUser = useChatStore((s) => s.setCurrentChatUser);
+  const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
   const handleContactClick = () => {
-    // if (currentChatUser?.id === data?.id) {
-        dispatch({type: reducerCases.SET_CURRENT_CHAT_USER, payload: data});
-        dispatch({type: reducerCases.SET_ALL_CONTACTS_PAGE, allContactsPage: false});
-    // }
+    setCurrentChatUser(data);
+    if (isContactsPage) setAllContactsPage(false);
   };
 
   const isSenderLast = data?.senderId === userInfo?.id;

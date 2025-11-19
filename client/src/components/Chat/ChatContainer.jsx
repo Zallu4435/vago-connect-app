@@ -1,14 +1,17 @@
 "use client";
-import { useStateProvider } from "@/context/StateContext";
 import { calculateTime } from "@/utils/CalculateTime";
 import React from "react";
 import MessageStatus from "../common/MessageStatus";
 import dynamic from "next/dynamic";
+import { useChatStore } from "@/stores/chatStore";
+import { useAuthStore } from "@/stores/authStore";
 
 const VoiceMessage = dynamic(() => import("../Chat/VoiceMessage"))
 
 function ChatContainer() {
-  const [{messages, currentChatUser, userInfo}] = useStateProvider();
+  const messages = useChatStore((s) => s.messages);
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const userInfo = useAuthStore((s) => s.userInfo);
 
   return (
      <div className="h-[80vh] w-full relative flex-grow overflow-auto custom-scrollbar">

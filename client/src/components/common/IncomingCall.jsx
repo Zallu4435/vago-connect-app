@@ -1,10 +1,12 @@
 import React from "react";
 import Image from "next/image";
-import { useStateProvider } from "@/context/StateContext";
 import { BsTelephoneInbound, BsTelephoneX } from "react-icons/bs";
+import { useCallStore } from "@/stores/callStore";
+import { useSocketStore } from "@/stores/socketStore";
 
 function IncomingCall() {
-  const [{ call, socket }] = useStateProvider();
+  const call = useCallStore((s) => s.call);
+  const socket = useSocketStore((s) => s.socket);
   if (!call || call.callType !== "audio") return null;
 
   const acceptCall = () => {

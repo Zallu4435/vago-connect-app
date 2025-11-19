@@ -1,18 +1,17 @@
 import { firebaseAuth } from "@/utils/FirebaseConfig";
-import axios from "axios";
+import { api } from "@/lib/api";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import Image from "next/image";
 import React from "react";
 import { FcGoogle } from "react-icons/fc";
 import { useRouter } from "next/navigation";
 import { CHECK_USER_ROUTE } from "@/utils/ApiRoutes";
-import { useStateProvider } from "@/context/StateContext";
-import { reducerCases } from "@/context/constants";
+import { useAuthStore } from "@/stores/authStore";
+import { showToast } from "@/lib/toast";
 
 function Login() {
   const router = useRouter();
-
-  const [{}, dispatch] = useStateProvider();
+  const setUserInfo = useAuthStore((s) => s.setUserInfo);
   
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
@@ -21,16 +20,30 @@ function Login() {
     } = await signInWithPopup(firebaseAuth, provider);
     try {
       if (email) {
-        const { data } = await axios.post(CHECK_USER_ROUTE, { email });
+        const { data } = await api.post(CHECK_USER_ROUTE, { email });
         console.log(data);
         if (!data.status) {
-          dispatch({ type: reducerCases.SET_NEW_USER, newUser: true })
-          dispatch({ type: reducerCases.SET_USER_INFO, userInfo: { name, email, profileImage, status: "" } })
-          router.push("/onboarding");   
+          setUserInfo({ id: "", name: name || "", email, profileImage: profileImage || "", about: "" });
+          router.push("/onboarding");
+          return;
+        }
+        if (data.user) {
+          setUserInfo({
+            id: String(data.user.id),
+            name: data.user.name,
+            email: data.user.email,
+            profileImage: data.user.image,
+            about: data.user.about,
+          });
+          router.push("/");
         }
       }
     } catch (err) {
       console.log(err);
+      const msg = err?.response?.status === 440 || err?.message?.toLowerCase?.().includes("session")
+        ? "Session expired. Please login again"
+        : "Login failed. Please try again";
+      showToast.error(msg);
     }
   };
   

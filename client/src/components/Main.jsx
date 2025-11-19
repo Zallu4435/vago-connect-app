@@ -4,135 +4,208 @@ import ChatList from "./Chatlist/ChatList";
 import Empty from "./Empty";
 import { onAuthStateChanged } from "firebase/auth";
 import { firebaseAuth } from "@/utils/FirebaseConfig";
-import axios from "axios";
-import { CHECK_USER_ROUTE, GET_MESSAGES_ROUTE, HOST } from "@/utils/ApiRoutes";
-import { useStateProvider } from "@/context/StateContext";
-import { reducerCases } from "@/context/constants";
+import { HOST } from "@/utils/ApiRoutes";
 import { useRouter } from "next/navigation";
 import Chat from "./Chat/Chat";
 import { io } from "socket.io-client";
 import SearchMessages from "./Chat/SearchMessages";
 import VideoCall from "./Call/VideoCall";
 import AudioCall from "./Call/AudioCall";
+import { useAuthStore } from "@/stores/authStore";
+import { useChatStore } from "@/stores/chatStore";
+import { useCallStore } from "@/stores/callStore";
+import { useSocketStore } from "@/stores/socketStore";
+import { useQueryClient } from "@tanstack/react-query";
+import { createSocketQuerySync } from "@/lib/socketQuerySync";
+import { useUser } from "@/hooks/queries/useUser";
+import ErrorMessage from "@/components/common/ErrorMessage";
+import { useMessages } from "@/hooks/queries/useMessages";
+import FullPageError from "@/components/common/FullPageError";
+import { useUpdateMessageStatus } from "@/hooks/mutations/useUpdateMessageStatus";
+import useNetworkStatus from "@/hooks/useNetworkStatus";
+import { showToast } from "@/lib/toast";
 
 function Main() {
-  const [{ userInfo, currentChatUser, messageSearch, audioCall, videoCall, call }, dispatch] = useStateProvider();
+  const isOnline = useNetworkStatus();
+  const userInfo = useAuthStore((s) => s.userInfo);
+  const setUserInfo = useAuthStore((s) => s.setUserInfo);
+
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const setMessages = useChatStore((s) => s.setMessages);
+  const messageSearch = useChatStore((s) => s.messageSearch);
+
+  const audioCall = useCallStore((s) => s.audioCall);
+  const videoCall = useCallStore((s) => s.videoCall);
+  const setCall = useCallStore((s) => s.setCall);
+  const setAudioCall = useCallStore((s) => s.setAudioCall);
+  const setVideoCall = useCallStore((s) => s.setVideoCall);
+
+  const setSocket = useSocketStore((s) => s.setSocket);
+  const socket = useSocketStore((s) => s.socket);
   const router = useRouter();
-  const socket = useRef(null);
+  const socketRef = useRef(null);
+  const connectionToastId = useRef(null);
   const [socketEvent, setSocketEvent] = useState(false);
+  const queryClient = useQueryClient();
+  const socketSync = createSocketQuerySync(queryClient);
+
+  const [authEmail, setAuthEmail] = useState("");
+  const [authDisplayName, setAuthDisplayName] = useState("");
+  const [authPhotoURL, setAuthPhotoURL] = useState("");
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebaseAuth, async (currentUser) => {
-      try {
-        if (!currentUser) {
-          router.push("/login");
-          return;
-        }
-
-        const email = currentUser.email;
-        if (!email) return;
-
-        const { data } = await axios.post(CHECK_USER_ROUTE, { email });
-
-        if (!data?.status) {
-          dispatch({ type: reducerCases.SET_NEW_USER, newUser: true });
-          dispatch({
-            type: reducerCases.SET_USER_INFO,
-            userInfo: {
-              name: currentUser.displayName || "",
-              email,
-              profileImage: currentUser.photoURL || "",
-              status: "",
-            },
-          });
-          router.push("/onboarding");
-          return;
-        }
-
-        // Existing user
-        dispatch({ type: reducerCases.SET_NEW_USER, newUser: false });
-        if (data.user) {
-          dispatch({
-            type: reducerCases.SET_USER_INFO,
-            userInfo: {
-              id: data.user.id,
-              name: data.user.name,
-              email: data.user.email,
-              profileImage: data.user.image,
-              status: data.user.about,
-            },
-          });
-        }
-      } catch (err) {
-        console.log(err);
+    const unsub = onAuthStateChanged(firebaseAuth, (currentUser) => {
+      if (!currentUser) {
+        router.push("/login");
+        return;
       }
+      const email = currentUser.email || "";
+      setAuthEmail(email);
+      setAuthDisplayName(currentUser.displayName || "");
+      setAuthPhotoURL(currentUser.photoURL || "");
     });
     return () => unsub();
-  }, [dispatch, router]);
+  }, [router]);
 
-  // Fetch messages whenever the selected chat changes
+  const { data: foundUser, error: userError, refetch: refetchUser } = useUser(authEmail || undefined);
   useEffect(() => {
-    const fetchMessages = async () => {
-      if (!userInfo?.id || !currentChatUser?.id) return;
-      try {
-        const { data } = await axios.get(
-          `${GET_MESSAGES_ROUTE}/${userInfo.id}/${currentChatUser.id}`
-        );
-        if (data?.messages) {
-          dispatch({ type: reducerCases.SET_MESSAGES, messages: data.messages });
-        }
-      } catch (err) {
-        console.error("getMessages error", err);
-      }
-    };
-    fetchMessages();
-  }, [userInfo?.id, currentChatUser?.id, dispatch]);
+    if (!authEmail) return;
+    if (foundUser === null) {
+      // New user → seed minimal info and go to onboarding
+      setUserInfo({
+        id: "",
+        name: authDisplayName,
+        email: authEmail,
+        profileImage: authPhotoURL,
+        about: "",
+      });
+      router.push("/onboarding");
+    } else if (foundUser) {
+      setUserInfo(foundUser);
+    }
+  }, [authEmail, foundUser, authDisplayName, authPhotoURL, setUserInfo, router]);
+
+  // Fetch messages via React Query and sync to Zustand
+  const { data: queriedMessages, error: messagesError, refetch: refetchMessages } = useMessages(
+    userInfo?.id,
+    currentChatUser?.id
+  );
+  useEffect(() => {
+    if (queriedMessages) setMessages(queriedMessages);
+  }, [queriedMessages, setMessages]);
+
+  // Mark unread messages from the peer as read when the chat loads
+  const updateMsgStatus = useUpdateMessageStatus();
+  useEffect(() => {
+    if (!queriedMessages || !userInfo?.id || !currentChatUser?.id) return;
+    const unreadFromPeer = (queriedMessages || []).filter(
+      (m) => m.senderId === Number(currentChatUser.id) && m.messageStatus !== "read"
+    );
+    unreadFromPeer.slice(0, 50).forEach((m) => {
+      updateMsgStatus.mutate({ messageId: m.id, status: "read" });
+    });
+  }, [queriedMessages, userInfo?.id, currentChatUser?.id]);
 
   useEffect(() => {
     if (userInfo) {
-      socket.current = io(HOST);
-      socket.current.emit("add-user", userInfo.id);
-      dispatch({ type: reducerCases.SET_SOCKET, socket: socket });
+      socketRef.current = io(HOST);
+      // set socket ref in store and emit add-user
+      setSocket(socketRef);
+      socketRef.current.emit("add-user", userInfo.id);
     }
-  }, [userInfo])
+  }, [userInfo, setSocket])
 
   useEffect(() => {
     if (socket.current && !socketEvent) {
       socket.current.on("msg-recieve", (data) => {
-        // Normalize incoming payload to our message shape
         const normalized = {
           id: Date.now(),
           content: data.message,
           type: data.type || "text",
-          senderId: data.from,
-          receiverId: userInfo?.id,
+          senderId: Number(data.from),
+          receiverId: userInfo?.id ? Number(userInfo.id) : undefined,
           timestamp: new Date().toISOString(),
         };
-        dispatch({ type: reducerCases.SET_NEW_MESSAGE, newMessage: normalized });
+        socketSync.onMessageReceive(normalized, userInfo?.id, currentChatUser?.id);
+        useChatStore.getState().addMessage(normalized);
       });
+
+      socket.current.on("message-status-update", ({ messageId, status }) => {
+        socketSync.onMessageStatusUpdate(messageId, status);
+      });
+
       // call signaling
       socket.current.on("incoming-call", (data) => {
-        dispatch({ type: reducerCases.SET_CALL, call: data });
-        if (data?.callType === "audio") dispatch({ type: reducerCases.SET_AUDIO_CALL, audioCall: true });
-        if (data?.callType === "video") dispatch({ type: reducerCases.SET_VIDEO_CALL, videoCall: true });
-        dispatch({ type: reducerCases.SET_CALLING, calling: false });
+        useCallStore.getState().setCall(data);
+        if (data?.callType === "audio") useCallStore.getState().setAudioCall(true);
+        if (data?.callType === "video") useCallStore.getState().setVideoCall(true);
       });
       socket.current.on("call-accepted", () => {
-        dispatch({ type: reducerCases.SET_CALL_ACCEPTED, callAccepted: true });
+        useCallStore.getState().acceptCall();
       });
       socket.current.on("call-rejected", () => {
-        dispatch({ type: reducerCases.SET_CALL_REJECTED, callRejected: true });
-        dispatch({ type: reducerCases.SET_CALL_ENDED });
+        useCallStore.getState().rejectCall();
+        useCallStore.getState().endCall();
       });
       socket.current.on("call-ended", () => {
-        dispatch({ type: reducerCases.SET_CALL_ENDED });
+        useCallStore.getState().endCall();
       });
+      socket.current.on("call-busy", () => {
+        showToast.info("User is busy");
+      });
+      socket.current.on("call-failed", () => {
+        showToast.error("Call failed. Try again");
+      });
+      socket.current.on("online-users", (users) => {
+        useChatStore.getState().setOnlineUsers(users || []);
+        if (Array.isArray(users) && users.length > 0) {
+          socketSync.onUserOnline(users[users.length - 1]);
+        }
+      });
+
+      // Socket connection status toasts
+      socket.current.on("disconnect", () => {
+        connectionToastId.current = showToast.loading("Connecting...");
+      });
+      socket.current.on("connect", () => {
+        if (connectionToastId.current) {
+          showToast.dismiss(connectionToastId.current);
+          connectionToastId.current = null;
+        }
+        showToast.success("Connected");
+      });
+      socket.current.on("connect_error", () => {
+        if (connectionToastId.current) {
+          showToast.dismiss(connectionToastId.current);
+          connectionToastId.current = null;
+        }
+        showToast.error("Connection failed");
+      });
+
       setSocketEvent(true);
     }
-  }, [socket.current, socketEvent, userInfo?.id, dispatch]);
+    return () => {
+      if (socket.current) {
+        socket.current.off("disconnect");
+        socket.current.off("connect");
+        socket.current.off("connect_error");
+        socket.current.off("call-busy");
+        socket.current.off("call-failed");
+      }
+    };
+  }, [socket.current, socketEvent, userInfo?.id, currentChatUser?.id, queryClient, socketSync]);
 
   return (
     <>
+      {authEmail && userError && (
+        <FullPageError
+          title="Failed to load user"
+          message="Please check your connection and try again."
+          onRetry={() => refetchUser()}
+          actionHref="/login"
+          actionLabel="Back to Login"
+        />
+      )}
       {videoCall && <VideoCall />}
       {audioCall && <AudioCall />}
       {!audioCall && !videoCall && (
@@ -140,7 +213,19 @@ function Main() {
           <ChatList />
           {currentChatUser ? (
             <div className={messageSearch ? "grid grid-cols-2" : "grid-cols-2"}>
-              <Chat />
+              {messagesError && (
+                <div className="col-span-2 px-4 py-2 bg-search-input-container-background border-b border-conversation-border flex items-center gap-3">
+                  <ErrorMessage message="Failed to load messages" />
+                  <button
+                    type="button"
+                    className="bg-panel-header-background hover:bg-[#2b3942] text-white text-sm px-3 py-1 rounded"
+                    onClick={() => refetchMessages()}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+              <Chat isOnline={isOnline} />
               {messageSearch && <SearchMessages />}
             </div>
           ) : (

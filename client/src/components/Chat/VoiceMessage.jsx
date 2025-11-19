@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { useStateProvider } from "@/context/StateContext";
 import { FaPlay, FaPause } from "react-icons/fa";
+import { useChatStore } from "@/stores/chatStore";
 
 function formatTime(secs) {
   if (!Number.isFinite(secs)) return "0:00";
@@ -11,7 +11,7 @@ function formatTime(secs) {
 }
 
 function VoiceMessage({ message }) {
-  const [{ currentChatUser }] = useStateProvider();
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);

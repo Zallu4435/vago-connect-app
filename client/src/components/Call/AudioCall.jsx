@@ -1,11 +1,12 @@
 import dynamic from "next/dynamic";
 import React from "react";
-import { useStateProvider } from "@/context/StateContext";
+import { useCallStore } from "@/stores/callStore";
 
 const Container = dynamic(() => import("./Container"), { ssr: false });
 
 function AudioCall() {
-  const [{ audioCall, call }] = useStateProvider();
+  const audioCall = useCallStore((s) => s.audioCall);
+  const call = useCallStore((s) => s.call);
   if (!audioCall || !call) return null;
   return <Container data={call} />;
 }

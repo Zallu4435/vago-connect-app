@@ -1,33 +1,16 @@
 "use client";
-import { GET_ALL_CONTACTS_ROUTE } from "@/utils/ApiRoutes";
-import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import React, { useState, useMemo } from "react";
 import { BiArrowBack, BiSearchAlt2 } from "react-icons/bi";
-import { useStateProvider } from "@/context/StateContext";
-import { reducerCases } from "@/context/constants";
 import ChatListItem from "./ChatLIstItem";
+import { useChatStore } from "@/stores/chatStore";
+import { useAllContacts } from "@/hooks/queries/useAllContacts";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
+import ErrorMessage from "@/components/common/ErrorMessage";
 
 function ContactsList() {
-  const [sections, setSections] = useState({});
   const [search, setSearch] = useState("");
-  const [, dispatch] = useStateProvider();
-
-  useEffect(() => {
-    const getContacts = async () => {
-      try {
-        const { data } = await axios.get(GET_ALL_CONTACTS_ROUTE);
-        // server returns grouped object: { A: [...], B: [...] }
-        if (data?.status && data?.users && typeof data.users === "object") {
-          setSections(data.users);
-        } else {
-          setSections({});
-        }
-      } catch (error) {
-        console.error('Error fetching contacts:', error);
-      }
-    };
-    getContacts()
-  }, []);
+  const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
+  const { data: sections = {}, isLoading, error, refetch } = useAllContacts();
 
   const filteredSections = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -51,9 +34,7 @@ function ContactsList() {
         <div className="flex items-center gap-12 text-white">
           <BiArrowBack
             className="cursor-pointer text-xl"
-            onClick={() =>
-              dispatch({ type: reducerCases.SET_ALL_CONTACTS_PAGE, allContactsPage: false })
-            }
+            onClick={() => setAllContactsPage(false)}
           />
           <span>New Chat</span>
         </div>
@@ -77,27 +58,42 @@ function ContactsList() {
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {Object.keys(filteredSections).length === 0 ? (
+        {isLoading ? (
+          <LoadingSpinner label="Loading contacts..." className="px-4 py-6" />
+        ) : error ? (
+          <div className="px-4 py-6 flex items-center gap-3">
+            <ErrorMessage message="Failed to load contacts" />
+            <button
+              type="button"
+              className="bg-search-input-container-background hover:bg-[#2b3942] text-white text-sm px-3 py-1 rounded"
+              onClick={() => refetch()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : Object.keys(filteredSections).length === 0 ? (
           <div className="text-secondary text-sm px-4 py-6">No contacts found</div>
         ) : (
-          Object.keys(filteredSections).sort().map((letter) => (
-            <div key={letter}>
-              <div className="px-4 py-2 text-xs text-secondary">{letter}</div>
-              <ul>
-                {filteredSections[letter].map((u) => (
-                  <li key={u.id || u.email} className="border-b border-conversation-border/50">
-                    <ChatListItem
-                      isContactsPage
-                      data={{
-                        ...u,
-                        profilePicture: u.image || "/default_avatar.png",
-                      }}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))
+          Object.keys(filteredSections)
+            .sort()
+            .map((letter) => (
+              <div key={letter}>
+                <div className="px-4 py-2 text-xs text-secondary">{letter}</div>
+                <ul>
+                  {filteredSections[letter].map((u) => (
+                    <li key={u.id || u.email} className="border-b border-conversation-border/50">
+                      <ChatListItem
+                        isContactsPage
+                        data={{
+                          ...u,
+                          profilePicture: u.image || "/default_avatar.png",
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
         )}
       </div>
     </div>

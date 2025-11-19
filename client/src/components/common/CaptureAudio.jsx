@@ -2,13 +2,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import { FaMicrophone, FaStop, FaTrash } from "react-icons/fa";
 import { MdSend } from "react-icons/md";
-import { useStateProvider } from "@/context/StateContext";
-import axios from "axios";
-import { ADD_AUDIO_ROUTE } from "@/utils/ApiRoutes";
-import { reducerCases } from "@/context/constants";
+import { useAuthStore } from "@/stores/authStore";
+import { useChatStore } from "@/stores/chatStore";
+import { useSocketStore } from "@/stores/socketStore";
+import { useUploadAudio } from "@/hooks/mutations/useUploadAudio";
+import { showToast } from "@/lib/toast";
 
 function CaptureAudio({ onChange, hide }) {
-  const [{ userInfo, currentChatUser, socket, messages }, dispatch] = useStateProvider();
+  const userInfo = useAuthStore((s) => s.userInfo);
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const messages = useChatStore((s) => s.messages);
+  const setMessages = useChatStore((s) => s.setMessages);
+  const socket = useSocketStore((s) => s.socket);
+  const uploadAudioMutation = useUploadAudio();
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState(null);
@@ -87,29 +93,31 @@ function CaptureAudio({ onChange, hide }) {
   };
 
   const handleSendRecording = async () => {
-    try {
-      if (!recordedBlob || !userInfo?.id || !currentChatUser?.id) return;
-      const form = new FormData();
-      form.append("audio", recordedBlob, "recording.webm");
-      form.append("from", String(userInfo.id));
-      form.append("to", String(currentChatUser.id));
-      const { data } = await axios.post(ADD_AUDIO_ROUTE, form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      socket.current?.emit("send-msg", {
-        to: currentChatUser.id,
-        from: userInfo.id,
-        message: data.content,
-        type: "audio",
-      });
-      dispatch({
-        type: reducerCases.SET_MESSAGES,
-        messages: [...(messages || []), data],
-      });
-      close();
-    } catch (err) {
-      console.error("sendAudio error", err);
-    }
+    if (!recordedBlob || !userInfo?.id || !currentChatUser?.id) return;
+    const form = new FormData();
+    form.append("audio", recordedBlob, "recording.webm");
+    form.append("from", String(userInfo.id));
+    form.append("to", String(currentChatUser.id));
+    const toastId = showToast.loading("Uploading audio...");
+    uploadAudioMutation.mutate(form, {
+      onSuccess: (data) => {
+        showToast.dismiss(toastId);
+        showToast.success("Audio sent");
+        socket.current?.emit("send-msg", {
+          to: currentChatUser.id,
+          from: userInfo.id,
+          message: data.content,
+          type: data.type || "audio",
+        });
+        setMessages([...(messages || []), data]);
+        close();
+      },
+      onError: (err) => {
+        showToast.dismiss(toastId);
+        showToast.error("Upload failed. Try again");
+        console.error("sendAudio error", err);
+      },
+    });
   };
 
   return (
