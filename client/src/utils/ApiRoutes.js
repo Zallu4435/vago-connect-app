@@ -31,6 +31,10 @@ export const REMOVE_GROUP_MEMBERS_ROUTE = (groupId) => `${GROUPS_ROUTE}/${groupI
 export const UPDATE_GROUP_ROLE_ROUTE = (groupId) => `${GROUPS_ROUTE}/${groupId}/roles`
 export const UPDATE_GROUP_SETTINGS_ROUTE = (groupId) => `${GROUPS_ROUTE}/${groupId}/settings`
 
+// Group actions
+export const LEAVE_GROUP_ROUTE = (groupId) => `${GROUPS_ROUTE}/${groupId}/leave`
+export const DELETE_GROUP_ROUTE = (groupId) => `${GROUPS_ROUTE}/${groupId}`
+
 // Chat maintenance
 export const CLEAR_CHAT_ROUTE = (chatId) => `${MESSAGE_ROUTES}/chats/${chatId}/clear`
 export const DELETE_CHAT_ROUTE = (chatId) => `${MESSAGE_ROUTES}/chats/${chatId}`

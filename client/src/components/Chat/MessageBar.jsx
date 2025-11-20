@@ -17,6 +17,7 @@ import { useSendLocation } from "@/hooks/mutations/useSendLocation";
 import { api } from "@/lib/api";
 import { ADD_IMAGE_ROUTE, ADD_VIDEO_ROUTE, ADD_FILE_ROUTE } from "@/utils/ApiRoutes";
 import AttachmentDropdown from "./AttachmentDropdown";
+import ReplyPreview from "./ReplyPreview";
 
 const CaptureAudio = dynamic(() => import("../common/CaptureAudio"), { ssr: false });
 
@@ -25,6 +26,8 @@ function MessageBar({ isOnline = true }) {
   const currentChatUser = useChatStore((s) => s.currentChatUser);
   const messages = useChatStore((s) => s.messages);
   const setMessages = useChatStore((s) => s.setMessages);
+  const replyTo = useChatStore((s) => s.replyTo);
+  const clearReplyTo = useChatStore((s) => s.clearReplyTo);
   const socket = useSocketStore((s) => s.socket);
   const [message, setMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -36,6 +39,7 @@ function MessageBar({ isOnline = true }) {
   const videoInputRef = useRef(null);
   const genericFileInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const inputRef = useRef(null);
   const sendMessageMutation = useSendMessage();
   const uploadImageMutation = useUploadImage();
   const uploadVideoMutation = useUploadVideo();
@@ -51,14 +55,13 @@ function MessageBar({ isOnline = true }) {
     const endpoint = isImage ? ADD_IMAGE_ROUTE : isVideo ? ADD_VIDEO_ROUTE : ADD_FILE_ROUTE;
     const field = isImage ? "image" : isVideo ? "video" : "file";
     const form = new FormData();
-    form.append(field, file);
+    form.append(field, file, file.name || 'upload');
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
     try {
       setUploadingLabel(isImage ? "Invoking ancient image..." : isVideo ? "Conjuring video essence..." : "Transcribing ancient file...");
       setUploadProgress(0);
       const { data } = await api.post(endpoint, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (e) => {
           if (!e.total) return;
           const pct = Math.round((e.loaded * 100) / e.total);
@@ -116,6 +119,14 @@ function MessageBar({ isOnline = true }) {
     };
   }, []);
 
+  // Focus the input when a reply target is set
+  useEffect(() => {
+    if (replyTo && inputRef.current) {
+      try { inputRef.current.focus(); } catch {}
+    }
+  }, [replyTo]);
+
+
   const handleEmojiModal = () => setShowEmojiPicker((v) => !v);
 
   const handleEmojiClick = (_e, emojiObject) => {
@@ -128,7 +139,7 @@ function MessageBar({ isOnline = true }) {
     const text = message.trim();
     if (!text || !currentChatUser?.id || !userInfo?.id) return;
     sendMessageMutation.mutate(
-      { from: userInfo.id, to: currentChatUser.id, content: text, type: "text" },
+      { from: userInfo.id, to: currentChatUser.id, content: text, type: "text", replyToId: replyTo?.id },
       {
         onSuccess: (data) => {
           socket.current?.emit("send-msg", {
@@ -140,6 +151,7 @@ function MessageBar({ isOnline = true }) {
           });
           setMessages([...(messages || []), data]);
           setMessage("");
+          if (replyTo) clearReplyTo();
         },
         onError: (e) => {
           console.error("sendMessage error", e);
@@ -159,7 +171,7 @@ function MessageBar({ isOnline = true }) {
     const file = e.target.files?.[0];
     if (!file || !currentChatUser?.id || !userInfo?.id) return;
     const form = new FormData();
-    form.append("image", file);
+    form.append("image", file, file.name || 'image');
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
     const toastId = showToast.loading("Invoking image...");
@@ -193,7 +205,7 @@ function MessageBar({ isOnline = true }) {
     const file = e.target.files?.[0];
     if (!file || !currentChatUser?.id || !userInfo?.id) return;
     const form = new FormData();
-    form.append("video", file);
+    form.append("video", file, file.name || 'video');
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
     const toastId = showToast.loading("Conjuring video essence...");
@@ -227,7 +239,7 @@ function MessageBar({ isOnline = true }) {
     const file = e.target.files?.[0];
     if (!file || !currentChatUser?.id || !userInfo?.id) return;
     const form = new FormData();
-    form.append("file", file);
+    form.append("file", file, file.name || 'file');
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
     const toastId = showToast.loading("Transcribing ancient file...");
@@ -358,6 +370,8 @@ function MessageBar({ isOnline = true }) {
         </div>
       )}
 
+      <ReplyPreview replyTo={replyTo} currentChatUser={currentChatUser} userInfo={userInfo} onCancel={clearReplyTo} />
+
       {/* Message Input (Center - Full width) */}
       <div className="flex-1 h-12 flex items-center bg-ancient-input-bg border border-ancient-input-border rounded-full px-5 shadow-inner focus-within:border-ancient-icon-glow transition-all duration-300">
         <input
@@ -372,6 +386,12 @@ function MessageBar({ isOnline = true }) {
               sendMessage();
             }
           }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' && replyTo) {
+              clearReplyTo();
+            }
+          }}
+          ref={inputRef}
         />
       </div>
 

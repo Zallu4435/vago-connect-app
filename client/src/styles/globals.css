@@ -3,19 +3,100 @@
 @tailwind utilities;
 
 
+/* Custom scrollbar (vertical and horizontal) */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--ancient-bg-medium);
+  border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #6b7280;
-  border-radius: 4px;
+  background-color: var(--ancient-border-stone);
+  border-radius: 10px;
+  border: 2px solid var(--ancient-bg-medium);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+/* Emoji Picker Ancient Theme Overrides */
+.EmojiPickerReact,
+.EmojiPickerReact.epr-dark-theme {
+  --epr-bg-color: #292b30;            /* ancient-bg-medium */
+  --epr-text-color: #e0e0e0;          /* ancient-text-light */
+  --epr-category-label-bg-color: #1e2024; /* ancient-bg-dark */
+  --epr-picker-border-color: #4b4f57; /* ancient-border-stone */
+  --epr-hover-bg-color: #33363d;      /* ancient-input-bg */
+  --epr-search-bg-color: #33363d;     /* ancient-input-bg */
+  --epr-search-border-color: #444850; /* ancient-input-border */
+  --epr-search-placeholder-color: #a0a0a0; /* ancient-text-muted */
+  --epr-highlight-color: #4ade80;     /* ancient-icon-glow */
+  --epr-scrollbar-color: #4b4f57;     /* ancient-border-stone */
+
+  background-color: var(--epr-bg-color) !important;
+  border: 1px solid var(--epr-picker-border-color) !important;
+  color: var(--epr-text-color) !important;
+}
+
+.EmojiPickerReact .epr-body {
+  background-color: var(--epr-bg-color) !important;
+}
+
+.EmojiPickerReact .epr-emoji-category-label {
+  background-color: var(--epr-category-label-bg-color) !important;
+  color: var(--epr-text-color) !important;
+  border-bottom: 1px solid var(--epr-picker-border-color) !important;
+}
+
+.EmojiPickerReact .epr-search-container input {
+  background-color: var(--epr-search-bg-color) !important;
+  color: var(--epr-text-color) !important;
+  border: 1px solid var(--epr-search-border-color) !important;
+}
+
+.EmojiPickerReact .epr-emoji:hover,
+.EmojiPickerReact .epr-emoji[aria-selected="true"] {
+  background-color: var(--epr-hover-bg-color) !important;
+}
+
+.EmojiPickerReact .epr-preview {
+  background-color: var(--epr-bg-color) !important;
+  border-top: 1px solid var(--epr-picker-border-color) !important;
+}
+
+/* Animations for simulated waves */
+@keyframes pulse-waves {
+  0% { transform: scaleY(1); opacity: 1; }
+  50% { transform: scaleY(1.2); opacity: 0.8; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+
+.animate-pulse-waves div {
+  animation: pulse-waves 1.5s ease-in-out infinite alternate;
+}
+
+/* Theme variables for plain CSS usage */
+:root {
+  --ancient-bg-dark: #1e2024;
+  --ancient-bg-medium: #292b30;
+  --ancient-input-bg: #33363d;
+  --ancient-input-border: #444850;
+  --ancient-border-stone: #4b4f57;
+  --ancient-text-light: #e0e0e0;
+  --ancient-text-muted: #a0a0a0;
+  --ancient-icon-glow: #4ade80;
+  --ancient-bubble-user: #2A5C5A;
+  --ancient-bubble-user-light: #386a6a;
+  --ancient-bubble-incoming: #2e353f;
+}
+
+/* Slide in up animation for bottom trays (e.g., CaptureAudio) */
+@keyframes slide-in-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.3s ease-out forwards;
 }

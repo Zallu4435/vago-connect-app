@@ -5,8 +5,7 @@ import { useCreateGroup } from "@/hooks/mutations/useCreateGroup";
 import { showToast } from "@/lib/toast";
 import Image from "next/image";
 import { IoArrowBack, IoClose } from "react-icons/io5";
-import { GiCrystalBall, GiFeather, GiAncientScroll, GiVisoredHelm } from "react-icons/gi"; // Mystical icons
-import { FaMagic } from "react-icons/fa";
+import { FaMagic, FaScroll, FaFeather, FaUserCircle } from "react-icons/fa";
 
 // Helper for image previews (if not using a dedicated Avatar component for this)
 const GroupIconPreview = ({ iconFile, defaultImage, name }) => {
@@ -30,7 +29,7 @@ const GroupIconPreview = ({ iconFile, defaultImage, name }) => {
         fill
         className="object-cover"
       />
-      {!iconFile && <GiVisoredHelm className="absolute text-5xl text-ancient-text-muted opacity-70" />}
+      {!iconFile && <FaUserCircle className="absolute text-5xl text-ancient-text-muted opacity-70" />}
     </div>
   );
 };
@@ -44,7 +43,7 @@ const ThemedInput = ({ name, state, setState, label = false, placeholder, Icon }
       </label>
     )}
     <div className="relative flex items-center gap-3 bg-ancient-input-bg border border-ancient-input-border rounded-lg px-4 py-3 focus-within:border-ancient-icon-glow transition-all duration-300 shadow-inner">
-      {Icon && <Icon className="text-ancient-icon-inactive text-xl" />}
+      {typeof Icon === 'function' ? <Icon className="text-ancient-icon-inactive text-xl" /> : null}
       <input
         type="text"
         id={name}
@@ -81,7 +80,7 @@ const ThemedAvatarUpload = ({ iconFile, setIconFile, name }) => {
         className={`absolute inset-0 z-10 flex items-center justify-center flex-col text-center gap-1 rounded-full bg-ancient-bg-medium/80 backdrop-blur-sm border-2 border-ancient-icon-glow shadow-lg transition-opacity duration-300
           ${hover ? "opacity-100 visible" : "opacity-0 invisible"}`}
       >
-        <GiAncientScroll className="text-4xl text-ancient-icon-glow drop-shadow-md" />
+        <FaScroll className="text-4xl text-ancient-icon-glow drop-shadow-md" />
         <span className="text-ancient-text-light text-sm font-bold z-20">
           Conjure <br /> Icon
         </span>
@@ -199,7 +198,7 @@ export default function GroupCreateModal({ open, onClose }) {
                 <IoClose className="h-7 w-7" />
               </button>
               <h3 className="text-ancient-text-light text-xl font-bold flex items-center gap-2">
-                <GiCrystalBall className="text-ancient-icon-glow" /> Select Conclave Members
+                <FaMagic className="text-ancient-icon-glow" /> Select Conclave Members
               </h3>
               <div className="w-7"></div> {/* Placeholder for alignment */}
             </div>
@@ -284,7 +283,7 @@ export default function GroupCreateModal({ open, onClose }) {
                 <IoArrowBack className="h-7 w-7" />
               </button>
               <h3 className="text-ancient-text-light text-xl font-bold flex items-center gap-2">
-                <GiAncientScroll className="text-ancient-icon-glow" /> Inscribe Conclave Details
+                <FaScroll className="text-ancient-icon-glow" /> Inscribe Conclave Details
               </h3>
             </div>
 
@@ -297,7 +296,7 @@ export default function GroupCreateModal({ open, onClose }) {
                   state={name}
                   setState={setName}
                   placeholder="E.g., Whispering Circle, Council of Elders"
-                  Icon={GiAncientScroll}
+                  Icon={FaScroll}
                   label
                 />
                 <ThemedInput
@@ -305,7 +304,7 @@ export default function GroupCreateModal({ open, onClose }) {
                   state={description}
                   setState={setDescription}
                   placeholder="Share the purpose of your gathering..."
-                  Icon={GiFeather}
+                  Icon={FaFeather}
                   label
                 />
               </div>

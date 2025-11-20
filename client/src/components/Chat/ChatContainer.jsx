@@ -1,6 +1,6 @@
 "use client";
 import { calculateTime } from "@/utils/CalculateTime";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import MessageStatus from "../common/MessageStatus";
 import dynamic from "next/dynamic";
 import { useChatStore } from "@/stores/chatStore";
@@ -19,6 +19,16 @@ function ChatContainer() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [showForward, setShowForward] = useState(false);
+
+  const setReplyTo = useChatStore((s) => s.setReplyTo);
+  const handleReply = useCallback((message) => {
+    setReplyTo(message);
+  }, [setReplyTo]);
+
+  const handleForward = useCallback((message) => {
+    setSelectedIds([message.id]);
+    setShowForward(true);
+  }, []);
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) => {
@@ -70,7 +80,7 @@ function ChatContainer() {
                           Forwarded Echo
                         </span> // Themed
                       )}
-                      <div className={`px-4 py-2 text-base shadow-md ${messageBubbleClass} text-ancient-text-light flex gap-2 items-end relative`}>
+                      <div className={`px-4 py-2 text-base shadow-md ${messageBubbleClass} text-ancient-text-light flex gap-2 items-end relative group`}>
                         <span className="break-all">{message.content}</span>
                         <div className="flex gap-1 items-end ml-auto">
                           {" "}
@@ -96,7 +106,7 @@ function ChatContainer() {
                             {/* MessageStatus component needs theme updates */}
                           </span>
                         </div>
-                        <MessageActions message={message} />{" "}
+                        <MessageActions message={message} isIncoming={isIncoming} onReply={handleReply} onForward={handleForward} />{" "}
                         {/* This component will need thematic updates */}
                       </div>
                       {/* Reactions summary */}
@@ -130,7 +140,7 @@ function ChatContainer() {
                         </span>
                       )}
                       <div
-                        className={`p-2 rounded-md shadow-md ${messageBubbleClass} flex gap-2 items-end relative`}
+                        className={`p-2 rounded-md shadow-md ${messageBubbleClass} flex gap-2 items-end relative group`}
                       >
                         <img
                           src={message.content}
@@ -158,7 +168,7 @@ function ChatContainer() {
                             )}
                           </span>
                         </div>
-                        <MessageActions message={message} />
+                        <MessageActions message={message} isIncoming={isIncoming} />
                       </div>
                       {/* Reactions summary */}
                       {Array.isArray(message.reactions) && message.reactions.length > 0 && (
@@ -184,7 +194,7 @@ function ChatContainer() {
 
                   {/* Audio message */}
                   {message.type === "audio" && (
-                    <div className="flex flex-col max-w-[65%] gap-1">
+                    <div className="flex flex-col max-w-[65%] gap-1 relative group">
                       {message.isForwarded && (
                         <span className="self-start text-[10px] text-ancient-text-muted italic">
                           Forwarded Echo
@@ -210,7 +220,7 @@ function ChatContainer() {
                           ))}
                         </div>
                       )}
-                      <MessageActions message={message} />
+                      <MessageActions message={message} isIncoming={isIncoming} />
                     </div>
                   )}
                 </div>

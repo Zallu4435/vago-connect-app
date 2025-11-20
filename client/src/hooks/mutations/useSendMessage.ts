@@ -10,6 +10,7 @@ export interface SendMessageInput {
   to: string | number;
   content: string;
   type: 'text' | 'image' | 'audio';
+  replyToId?: string | number;
 }
 
 export function useSendMessage(): UseMutationResult<Message, Error, SendMessageInput> {

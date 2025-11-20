@@ -11,6 +11,7 @@ interface ChatState {
   messageSearch: boolean;
   onlineUsers: number[];
   allContactsPage: boolean;
+  replyTo: Message | null;
 
   setUserContacts: (contacts: Contact[]) => void;
   setFilteredContacts: (contacts: Contact[]) => void;
@@ -22,6 +23,8 @@ interface ChatState {
   setOnlineUsers: (users: number[]) => void;
   clearChat: () => void;
   setAllContactsPage: (value: boolean) => void;
+  setReplyTo: (message: Message | null) => void;
+  clearReplyTo: () => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -35,6 +38,7 @@ export const useChatStore = create<ChatState>()(
       messageSearch: false,
       onlineUsers: [],
       allContactsPage: false,
+      replyTo: null,
 
       setUserContacts: (contacts) => set({ userContacts: contacts }),
       setFilteredContacts: (contacts) => set({ filteredContacts: contacts }),
@@ -47,6 +51,8 @@ export const useChatStore = create<ChatState>()(
       clearChat: () =>
         set({ messages: [], currentChatUser: null, messageSearch: false }),
       setAllContactsPage: (value) => set({ allContactsPage: value }),
+      setReplyTo: (message) => set({ replyTo: message }),
+      clearReplyTo: () => set({ replyTo: null }),
     }),
     { name: "chat-store" }
   )

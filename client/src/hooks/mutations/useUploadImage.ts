@@ -7,9 +7,7 @@ export function useUploadImage(): UseMutationResult<Message, Error, FormData> {
   const qc = useQueryClient();
   return useMutation<Message, Error, FormData>({
     mutationFn: async (form) => {
-      const { data } = await api.post(ADD_IMAGE_ROUTE, form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const { data } = await api.post(ADD_IMAGE_ROUTE, form);
       return data as Message;
     },
     onSuccess: () => {

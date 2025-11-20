@@ -5,6 +5,7 @@ import MessageBar from "./MessageBar";
 import { useChatStore } from "@/stores/chatStore";
 import { useState } from "react";
 import MediaGallery from "./MediaGallery";
+import IncomingCallNotification from "@/components/common/IncomingCallNotification";
 
 function Chat({ isOnline }) {
   const currentChatUser = useChatStore((s) => s.currentChatUser);
@@ -19,6 +20,7 @@ function Chat({ isOnline }) {
       <ChatContainer key={`chat-${currentChatUser.id}-${messages.length}`} />
       <MessageBar isOnline={isOnline} />
       <MediaGallery open={showMedia} onClose={() => setShowMedia(false)} />
+      <IncomingCallNotification />
     </div>
   );
 }

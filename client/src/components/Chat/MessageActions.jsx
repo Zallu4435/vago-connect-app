@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
 import { useStarMessage } from "@/hooks/mutations/useStarMessage";
 import { useDeleteMessage } from "@/hooks/mutations/useDeleteMessage";
 import { useEditMessage } from "@/hooks/mutations/useEditMessage";
@@ -10,27 +10,29 @@ import {
   FaEdit,
   FaTrashAlt,
   FaLaughBeam, // For react icon
-  FaAngleDown, // For dropdown toggle
   FaCheck, // For save edit
   FaTimes, // For cancel edit
-  FaLink, // For forward
-} from "react-icons/fa"; // Imported all necessary icons
+} from "react-icons/fa";
 import { BiReply } from "react-icons/bi"; // For reply icon
+// Replaced FaAngleDown with a more mystical GiScrollUnfurled for the menu toggle
+import { GiScrollUnfurled, GiMagicLamp, GiArchiveRegister, GiSpellBook, GiBookmarklet, GiCrystalBall, GiBroadsword, GiFeather } from "react-icons/gi";
+import { IoShareOutline } from "react-icons/io5"; // For forward icon (more modern share)
 
-const DEFAULT_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "👏", "🔥", "✨", "🙏"]; // Added more emojis
+const DEFAULT_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "👏", "🔥", "✨", "🙏"];
 
-export default function MessageActions({ message, isIncoming = false }) { // Added isIncoming prop
+export default function MessageActions({ message, isIncoming = false, onReply, onForward }) { // Added onReply, onForward props
   const userInfo = useAuthStore((s) => s.userInfo);
   const isMine = useMemo(() => String(message?.senderId) === String(userInfo?.id), [message, userInfo]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message?.content || "");
-  const [showReactionsMenu, setShowReactionsMenu] = useState(false); // Renamed to avoid confusion with reactions displayed on bubble
+  const [showReactionsMenu, setShowReactionsMenu] = useState(false);
   const [showDropdownMenu, setShowDropdownMenu] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false); // For explicit delete confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const dropdownRef = useRef(null);
-  const reactionsRef = useRef(null);
+  const actionButtonsRef = useRef(null); // Ref for the main action buttons container
+  const reactionsMenuRef = useRef(null);
+  const dropdownMenuRef = useRef(null);
 
   const starMutation = useStarMessage();
   const delMutation = useDeleteMessage();
@@ -40,11 +42,14 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
   // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdownMenu(false);
-      }
-      if (reactionsRef.current && !reactionsRef.current.contains(event.target)) {
+      // Check if click is outside the main action buttons and any open menu
+      if (
+        actionButtonsRef.current && !actionButtonsRef.current.contains(event.target) &&
+        reactionsMenuRef.current && !reactionsMenuRef.current.contains(event.target) &&
+        dropdownMenuRef.current && !dropdownMenuRef.current.contains(event.target)
+      ) {
         setShowReactionsMenu(false);
+        setShowDropdownMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -53,49 +58,61 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
     };
   }, []);
 
-  const onStar = () => {
+  const onStar = useCallback(() => {
     const currentlyStarredForUser = Array.isArray(message?.starredBy)
       ? message.starredBy.some((e) => (e?.userId ?? e) === userInfo?.id)
       : false;
     starMutation.mutate({ id: message.id, starred: !currentlyStarredForUser });
     setShowDropdownMenu(false);
-  };
+  }, [message, userInfo, starMutation]);
 
-  const onDeleteClick = () => {
-    setShowDeleteConfirm(true); // Show confirmation
-    setShowDropdownMenu(false); // Close main menu
-  };
+  const onDeleteClick = useCallback(() => {
+    setShowDeleteConfirm(true);
+    setShowDropdownMenu(false);
+  }, []);
 
-  const doDelete = (deleteType) => {
+  const doDelete = useCallback((deleteType) => {
     delMutation.mutate({ id: message.id, deleteType });
     setShowDeleteConfirm(false);
-  };
+  }, [message, delMutation]);
 
-  const onEditClick = () => {
+  const onEditClick = useCallback(() => {
     setIsEditing(true);
     setEditText(message?.content || "");
     setShowDropdownMenu(false);
-  };
+  }, [message]);
 
-  const onSaveEdit = () => {
-    if (!editText.trim() || editText === message.content) return setIsEditing(false); // No change or empty
+  const onSaveEdit = useCallback(() => {
+    if (!editText.trim() || editText === message.content) return setIsEditing(false);
     editMutation.mutate(
       { id: message.id, content: editText.trim() },
       { onSuccess: () => setIsEditing(false) }
     );
-  };
+  }, [editText, message, editMutation]);
 
-  const onReact = (emoji) => {
+  const onReact = useCallback((emoji) => {
     reactMutation.mutate({ id: message.id, emoji });
     setShowReactionsMenu(false);
-    setShowDropdownMenu(false); // Close dropdown too if opened from there
-  };
+    setShowDropdownMenu(false);
+  }, [message, reactMutation]);
+
+  const handleReply = useCallback(() => {
+    onReply?.(message); // Call the provided onReply prop
+    setShowDropdownMenu(false);
+  }, [message, onReply]);
+
+  const handleForward = useCallback(() => {
+    onForward?.(message); // Call the provided onForward prop
+    setShowDropdownMenu(false);
+  }, [message, onForward]);
 
   // Controls
-  const canEdit = isMine && message?.type === "text";
-  const canDelete = true; // allow delete for any message
+  const canEdit = isMine && message?.type === "text" && !message?.isDeleted; // Cannot edit deleted messages
+  const canDelete = !message?.isDeleted; // Cannot delete an already deleted message (though it might show as "deleted")
+  const isStarred = useMemo(() => Array.isArray(message?.starredBy) && message.starredBy.some((e) => (e?.userId ?? e) === userInfo.id), [message, userInfo]);
 
-  // Render inline editor for text messages when editing
+
+  // Inline editor for text messages when editing
   if (isEditing && message.type === "text") {
     return (
       <div className={`absolute ${isIncoming ? "left-0" : "right-0"} top-full mt-1 z-20 bg-ancient-bg-medium border border-ancient-border-stone rounded-lg p-2 flex items-center gap-2 shadow-xl animate-fade-in-up origin-bottom`}>
@@ -129,8 +146,29 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
 
   // Main MessageActions component
   return (
-    <div className={`absolute ${isIncoming ? "-right-2" : "-left-2"} -top-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}>
-      {/* React Button (always visible on hover, like in WhatsApp) */}
+    <div
+      ref={actionButtonsRef} // Ref for the main action buttons container
+      className={`absolute ${isIncoming ? "-right-2" : "-left-2"} -top-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}
+    >
+      {/* Reaction Picker (appears above/below the message bubble) */}
+      {showReactionsMenu && (
+        <div
+          ref={reactionsMenuRef}
+          className={`absolute ${isIncoming ? "left-0" : "right-0"} bottom-full mb-1 z-30 rounded-full bg-ancient-bg-dark border border-ancient-border-stone p-1 flex gap-1 shadow-xl animate-fade-in-up origin-bottom`}
+        >
+          {DEFAULT_EMOJIS.map((e) => (
+            <button
+              key={e}
+              className="p-2 text-xl hover:bg-ancient-bubble-user rounded-full transition-colors duration-150"
+              onClick={() => onReact(e)}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* React Button */}
       <button
         type="button"
         className="relative bg-ancient-bg-medium border border-ancient-border-stone rounded-full p-2 text-ancient-icon-inactive hover:text-ancient-icon-glow shadow-md transition-colors duration-200"
@@ -138,22 +176,6 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
         title="React to Echo"
       >
         <FaLaughBeam className="text-sm" />
-        {showReactionsMenu && (
-          <div
-            ref={reactionsRef}
-            className={`absolute ${isIncoming ? "left-0" : "right-0"} bottom-full mb-1 z-30 rounded-full bg-ancient-bg-dark border border-ancient-border-stone p-1 flex gap-1 shadow-xl animate-fade-in-up origin-bottom`}
-          >
-            {DEFAULT_EMOJIS.map((e) => (
-              <button
-                key={e}
-                className="p-2 text-xl hover:bg-ancient-bubble-user rounded-full transition-colors duration-150"
-                onClick={() => onReact(e)}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        )}
       </button>
 
       {/* Dropdown Menu Toggle */}
@@ -163,37 +185,29 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
         onClick={() => setShowDropdownMenu((v) => !v)}
         title="More Ancient Rites"
       >
-        <FaAngleDown className="text-sm" />
+        <GiScrollUnfurled className="text-sm" /> {/* Mystical scroll icon for menu */}
       </button>
 
       {/* Dropdown Menu */}
       {showDropdownMenu && (
         <div
-          ref={dropdownRef}
+          ref={dropdownMenuRef}
           className={`absolute ${isIncoming ? "left-0" : "right-0"} top-full mt-1 z-20 w-48 bg-ancient-bg-dark border border-ancient-border-stone rounded-md shadow-xl p-2 animate-fade-in-down origin-top-${isIncoming ? "left" : "right"}`}
         >
           {/* Reply */}
           <button
             className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-text-light text-sm rounded-md transition-colors duration-200"
-            onClick={() => {
-              // Add reply logic here, e.g., set message to reply in chat store
-              console.log("Reply to message:", message.id);
-              setShowDropdownMenu(false);
-            }}
+            onClick={handleReply}
           >
-            <BiReply className="text-ancient-icon-glow" /> Reply Echo
+            <BiReply className="text-ancient-icon-glow text-lg" /> Reply Echo
           </button>
 
           {/* Forward */}
           <button
             className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-text-light text-sm rounded-md transition-colors duration-200"
-            onClick={() => {
-              // Add forward logic here, e.g., open forward modal
-              console.log("Forward message:", message.id);
-              setShowDropdownMenu(false);
-            }}
+            onClick={handleForward}
           >
-            <FaLink className="text-ancient-icon-glow" /> Forward Echo
+            <IoShareOutline className="text-ancient-icon-glow text-lg" /> Forward Echo
           </button>
 
           {/* Star */}
@@ -201,8 +215,8 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
             className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-text-light text-sm rounded-md transition-colors duration-200"
             onClick={onStar}
           >
-            <FaStar className={`text-sm ${Array.isArray(message?.starredBy) && message.starredBy.some((e) => (e?.userId ?? e) === userInfo.id) ? "text-yellow-400" : "text-ancient-icon-inactive"}`} />{" "}
-            {Array.isArray(message?.starredBy) && message.starredBy.some((e) => (e?.userId ?? e) === userInfo.id) ? "Unmark Rune" : "Mark with Rune"}
+            <FaStar className={`text-sm ${isStarred ? "text-yellow-400" : "text-ancient-icon-inactive"}`} />{" "}
+            {isStarred ? "Unmark Rune" : "Mark with Rune"}
           </button>
 
           {/* Edit */}
@@ -211,7 +225,7 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
               className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-text-light text-sm rounded-md transition-colors duration-200"
               onClick={onEditClick}
             >
-              <FaEdit className="text-ancient-icon-glow" /> Alter Scroll
+              <GiFeather className="text-ancient-icon-glow text-lg" /> Alter Scroll
             </button>
           )}
 
@@ -221,7 +235,7 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
               className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-warning-text text-sm rounded-md transition-colors duration-200"
               onClick={onDeleteClick}
             >
-              <FaTrashAlt className="text-red-500" /> Banish Echo
+              <FaTrashAlt className="text-red-500 text-lg" /> Banish Echo
             </button>
           )}
         </div>
@@ -231,7 +245,9 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
       {showDeleteConfirm && (
         <div className={`fixed inset-0 bg-ancient-bg-dark/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in`}>
           <div className="bg-ancient-bg-medium border border-ancient-border-stone rounded-lg p-6 shadow-xl w-80 text-center animate-zoom-in">
-            <p className="text-ancient-text-light text-lg font-semibold mb-4">Confirm Banishment</p>
+            <p className="text-ancient-text-light text-lg font-semibold mb-4 flex items-center justify-center gap-2">
+              <GiBroadsword className="text-red-500 text-xl" /> Confirm Banishment
+            </p>
             <p className="text-ancient-text-muted text-sm mb-6">
               Are you sure you wish to banish this echo from existence?
             </p>
@@ -244,12 +260,12 @@ export default function MessageActions({ message, isIncoming = false }) { // Add
               </button>
               <button
                 className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors duration-200 shadow-md"
-                onClick={() => doDelete(isMine ? 'forEveryone' : 'forMe')} // Simplified, check if mine to offer "forEveryone"
+                onClick={() => doDelete(isMine ? 'forEveryone' : 'forMe')}
               >
                 Banish {isMine ? "(for All)" : "(for Me)"}
               </button>
             </div>
-            {isMine && ( // Offer 'forMe' if it's mine and 'forEveryone' is chosen above
+            {isMine && (
               <button
                 className="mt-3 text-ancient-text-muted hover:text-ancient-text-light text-xs underline"
                 onClick={() => { doDelete('forMe'); setShowDeleteConfirm(false); }}
