@@ -1,7 +1,10 @@
-export const HOST = "http://localhost:3005";
+// Relative API prefix so Next.js rewrite proxies to backend in dev
+const API_PREFIX = "/api";
+// Socket server host (configurable via env, fallback for dev)
+export const SOCKET_HOST = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3005";
 
-const AUTH_ROUTES = `${HOST}/api/auth`
-const MESSAGE_ROUTES = `${HOST}/api/messages`
+const AUTH_ROUTES = `${API_PREFIX}/auth`
+const MESSAGE_ROUTES = `${API_PREFIX}/messages`
 
 export const CHECK_USER_ROUTE = `${AUTH_ROUTES}/check-user`
 export const ONBOARD_USER_ROUTE = `${AUTH_ROUTES}/onboard-user`

@@ -1,4 +1,5 @@
 import "@/styles/globals.css";
+import "@/styles/message-bubbles.css";
 import Head from "next/head";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";

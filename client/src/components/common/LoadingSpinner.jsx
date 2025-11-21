@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-function LoadingSpinner({ label = "Loading...", className = "" }) {
+function LoadingSpinner({ label = "Loading...", className = "", size = 20 }) {
   return (
     <div
       className={`flex items-center gap-3 px-4 py-2 rounded-lg bg-ancient-bg-medium/80 text-ancient-icon-glow shadow-inner ${className}`}
@@ -9,10 +9,11 @@ function LoadingSpinner({ label = "Loading...", className = "" }) {
       aria-live="polite"
     >
       <svg
-        className="animate-spin h-5 w-5 text-ancient-icon-glow"
+        className="animate-spin text-ancient-icon-glow"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
+        style={{ width: size, height: size }}
       >
         <circle
           className="opacity-25"

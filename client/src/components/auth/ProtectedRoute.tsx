@@ -2,7 +2,6 @@ import React, { useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '@/stores/authStore';
 import { isTokenExpired } from '@/lib/tokenManager';
-import { refreshAccessToken } from '@/lib/refreshToken';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 
 interface ProtectedRouteProps {
@@ -17,19 +16,14 @@ export default function ProtectedRoute({ children, redirectTo = '/login' }: Prot
 
   useEffect(() => {
     let mounted = true;
-    const checkAuth = async () => {
-      try {
-        if (accessToken && !isTokenExpired(accessToken)) {
-          if (mounted) setIsChecking(false);
-          return;
-        }
-        // try silent refresh (cookie-based)
-        await refreshAccessToken();
+    const checkAuth = () => {
+      if (accessToken && !isTokenExpired(accessToken)) {
         if (mounted) setIsChecking(false);
-      } catch (err) {
-        if (!mounted) return;
-        router.push(redirectTo);
+        return;
       }
+      // No token after _app bootstrap -> redirect
+      setIsChecking(false);
+      router.push(redirectTo);
     };
 
     checkAuth();

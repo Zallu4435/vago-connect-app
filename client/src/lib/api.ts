@@ -3,8 +3,10 @@ import { useAuthStore } from '@/stores/authStore';
 import { refreshAccessToken } from '@/lib/refreshToken';
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005',
+  // Use relative base URL so Next.js rewrite proxies to backend in dev
+  baseURL: '',
   timeout: 10000,
+  withCredentials: true,
 });
 
 // Request interceptor for auth

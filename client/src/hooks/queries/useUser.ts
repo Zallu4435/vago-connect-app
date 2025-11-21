@@ -16,7 +16,7 @@ export function useUser(email?: string): UseQueryResult<User | null, Error> {
           id: String(u.id),
           name: u.name,
           email: u.email,
-          profileImage: u.image,
+          profileImage: u.profileImage,
           about: u.about,
         } as User;
       }

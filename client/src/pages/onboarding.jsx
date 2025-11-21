@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Input from "@/components/common/Input"; // This will need its own thematic update
+import ThemedInput from "@/components/common/ThemedInput";
 import Avatar from "@/components/common/Avatar"; // This will need its own thematic update
 import { useRouter } from "next/router";
 import { useAuthStore } from "@/stores/authStore";
@@ -74,21 +74,21 @@ function Onboarding() {
           <div className="flex flex-col items-center justify-center gap-8">
             <h2 className="text-3xl font-bold text-ancient-text-light mb-2">Inscribe Your True Self</h2>
             
-            <Input 
-              name="Mystic Moniker" // Themed label
-              state={name} 
-              setState={setName} 
+            <ThemedInput 
+              name="Mystic Moniker"
+              state={name}
+              setState={setName}
               label
-              placeholder="Enter your mystical name..." // Themed placeholder
-              Icon={GiScrollQuill} // Themed icon for input
+              placeholder="Enter your mystical name..."
+              Icon={GiScrollQuill}
             />
-            <Input 
-              name="Ancient Saga" // Themed label
-              state={about} 
-              setState={setAbout} 
+            <ThemedInput 
+              name="Ancient Saga"
+              state={about}
+              setState={setAbout}
               label
-              placeholder="Share a whisper of your ancient lore..." // Themed placeholder
-              Icon={GiFeather} // Themed icon for input
+              placeholder="Share a whisper of your ancient lore..."
+              Icon={GiFeather}
             />
             <button 
               onClick={onBoardUserHandle} 

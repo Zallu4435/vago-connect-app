@@ -37,9 +37,17 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
       // Update all message caches with this message ID
       queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
         if (!old) return old;
-        // old can be either an array of messages or something else based on key
+        // Flat array
         if (Array.isArray(old)) {
           return old.map((msg) => (msg?.id === messageId ? { ...msg, messageStatus: status } : msg));
+        }
+        // InfiniteData
+        if (Array.isArray(old.pages)) {
+          const pages = old.pages.map((p: any) => ({
+            ...p,
+            messages: (p.messages || []).map((m: any) => (m?.id === messageId ? { ...m, messageStatus: status } : m)),
+          }));
+          return { ...old, pages };
         }
         return old;
       });
@@ -51,6 +59,13 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
         if (Array.isArray(old)) {
           return old.map((m) => (m?.id === messageId ? { ...m, content: newContent, isEdited: true, editedAt: editedAt || new Date().toISOString() } : m));
         }
+        if (Array.isArray(old.pages)) {
+          const pages = old.pages.map((p: any) => ({
+            ...p,
+            messages: (p.messages || []).map((m: any) => (m?.id === messageId ? { ...m, content: newContent, isEdited: true, editedAt: editedAt || new Date().toISOString() } : m)),
+          }));
+          return { ...old, pages };
+        }
         return old;
       });
     },
@@ -58,12 +73,20 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
     onMessageDeleted: (messageId: number | string, deleteType: 'forMe' | 'forEveryone', payload?: any) => {
       queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
         if (!old) return old;
+        const apply = (m: any) => {
+          if (m?.id !== messageId) return m;
+          if (deleteType === 'forEveryone') return { ...m, content: 'This message was deleted', isDeletedForEveryone: true };
+          return { ...m, deletedBy: payload?.deletedBy || [] };
+        };
         if (Array.isArray(old)) {
-          if (deleteType === 'forEveryone') {
-            return old.map((m) => (m?.id === messageId ? { ...m, content: 'This message was deleted', isDeletedForEveryone: true } : m));
-          }
-          // forMe: attach deletedBy so UI can filter/hide if needed
-          return old.map((m) => (m?.id === messageId ? { ...m, deletedBy: payload?.deletedBy || [] } : m));
+          return old.map(apply);
+        }
+        if (Array.isArray(old.pages)) {
+          const pages = old.pages.map((p: any) => ({
+            ...p,
+            messages: (p.messages || []).map(apply),
+          }));
+          return { ...old, pages };
         }
         return old;
       });
@@ -75,6 +98,13 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
         if (Array.isArray(old)) {
           return old.map((m) => (m?.id === messageId ? { ...m, reactions } : m));
         }
+        if (Array.isArray(old.pages)) {
+          const pages = old.pages.map((p: any) => ({
+            ...p,
+            messages: (p.messages || []).map((m: any) => (m?.id === messageId ? { ...m, reactions } : m)),
+          }));
+          return { ...old, pages };
+        }
         return old;
       });
     },
@@ -82,17 +112,25 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
     onMessageStarred: (messageId: number | string, starred: boolean, userId?: number | string) => {
       queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
         if (!old) return old;
+        const apply = (m: any) => {
+          if (m?.id !== messageId) return m;
+          const arr = Array.isArray(m.starredBy) ? m.starredBy.slice() : [];
+          const uid = Number(userId);
+          const exists = arr.some((e: any) => (e?.userId ?? e) === uid);
+          let next = arr;
+          if (starred && !exists) next = [...arr, { userId: uid, starredAt: new Date().toISOString() }];
+          if (!starred && exists) next = arr.filter((e: any) => (e?.userId ?? e) !== uid);
+          return { ...m, starredBy: next };
+        };
         if (Array.isArray(old)) {
-          return old.map((m) => {
-            if (m?.id !== messageId) return m;
-            const arr = Array.isArray(m.starredBy) ? m.starredBy.slice() : [];
-            const uid = Number(userId);
-            const exists = arr.some((e: any) => (e?.userId ?? e) === uid);
-            let next = arr;
-            if (starred && !exists) next = [...arr, { userId: uid, starredAt: new Date().toISOString() }];
-            if (!starred && exists) next = arr.filter((e: any) => (e?.userId ?? e) !== uid);
-            return { ...m, starredBy: next };
-          });
+          return old.map(apply);
+        }
+        if (Array.isArray(old.pages)) {
+          const pages = old.pages.map((p: any) => ({
+            ...p,
+            messages: (p.messages || []).map(apply),
+          }));
+          return { ...old, pages };
         }
         return old;
       });

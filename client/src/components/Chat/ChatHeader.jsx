@@ -12,6 +12,9 @@ import { useRef, useState, useMemo } from "react";
 import { useContacts } from "@/hooks/queries/useContacts";
 import { useClearChat, useDeleteChat, useArchiveChat, usePinChat, useMuteChat } from "@/hooks/mutations/useChatActions";
 import GroupManageModal from "./GroupManageModal";
+import ActionSheet from "@/components/common/ActionSheet";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import { getAbsoluteUrl } from "@/lib/url";
 
 function ChatHeader({ onOpenMedia }) {
   const currentChatUser = useChatStore((s) => s.currentChatUser);
@@ -22,17 +25,20 @@ function ChatHeader({ onOpenMedia }) {
   const callToastIdRef = useRef(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showGroupManage, setShowGroupManage] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Get conversation ID and type from contacts
   const { data: contacts = [] } = useContacts(userInfo?.id);
-  const conversationId = useMemo(() => {
-    const item = contacts.find((c) => String(c?.user?.id) === String(currentChatUser?.id));
-    return item?.conversationId;
+  const contactEntry = useMemo(() => {
+    return contacts.find((c) => String(c?.id) === String(currentChatUser?.id));
   }, [contacts, currentChatUser?.id]);
-  const conversationType = useMemo(() => {
-    const item = contacts.find((c) => String(c?.user?.id) === String(currentChatUser?.id));
-    return item?.type;
-  }, [contacts, currentChatUser?.id]);
+  const conversationId = contactEntry?.conversationId;
+  const conversationType = contactEntry?.type;
+  const isSelfChat = useMemo(() => {
+    return String(currentChatUser?.id) === String(userInfo?.id) || Boolean(contactEntry?.isSelf);
+  }, [currentChatUser?.id, userInfo?.id, contactEntry?.isSelf]);
+  const isPinned = Boolean(contactEntry?.isPinned);
 
   // Maintenance action hooks
   const clearChat = useClearChat();
@@ -58,7 +64,7 @@ function ChatHeader({ onOpenMedia }) {
     };
     initiateCall(call, "audio");
     socket?.current?.emit?.("call-user", call);
-    setCallToast(() => showToast.info("Summoning via Whisper..."));
+    setCallToast(() => showToast.info("Calling..."));
   };
 
   const handleVideoCall = () => {
@@ -70,7 +76,7 @@ function ChatHeader({ onOpenMedia }) {
     };
     initiateCall(call, "video");
     socket?.current?.emit?.("call-user", call);
-    setCallToast(() => showToast.info("Conjuring Vision Link..."));
+    setCallToast(() => showToast.info("Starting video call..."));
   };
 
   return (
@@ -79,20 +85,20 @@ function ChatHeader({ onOpenMedia }) {
       <div className="flex items-center gap-6">
         <Avatar
           type="sm"
-          image={
-            currentChatUser?.profilePicture ||
-            currentChatUser?.image ||
-            currentChatUser?.profileImage
-          }
+          image={getAbsoluteUrl(
+            isSelfChat
+              ? (userInfo?.profileImage || currentChatUser?.profilePicture || currentChatUser?.image || currentChatUser?.profileImage)
+              : (currentChatUser?.profilePicture || currentChatUser?.image || currentChatUser?.profileImage)
+          )}
         />
         <div className="flex flex-col">
           <span className="text-ancient-text-light text-xl font-bold">
-            {currentChatUser?.name || currentChatUser?.username || "Ancient Echo"}
+            {isSelfChat ? (isPinned ? "Saved messages" : "You") : (currentChatUser?.name || currentChatUser?.username || "Unknown")}
           </span>
           <span className="text-ancient-text-muted text-sm italic">
             {onlineUsers?.some((u) => String(u) === String(currentChatUser?.id))
-              ? "Connected to the Void"
-              : "Lost in the Mists"}
+              ? "Online"
+              : "Offline"}
           </span>
         </div>
       </div>
@@ -100,22 +106,22 @@ function ChatHeader({ onOpenMedia }) {
       <div className="flex items-center gap-7">
         <MdPermMedia
           className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
-          title="Ancient Archive"
+          title="Media"
           onClick={() => onOpenMedia?.()}
         />
         <MdCall
           className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
-          title="Summon via Whisper"
+          title="Voice Call"
           onClick={handleVoiceCall}
         />
         <IoVideocam
           className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
-          title="Conjure Vision Link"
+          title="Video Call"
           onClick={handleVideoCall}
         />
         <BiSearchAlt2
           className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
-          title="Seek Ancient Runes"
+          title="Search"
           onClick={() => {
             useChatStore.setState({ messageSearch: true });
           }}
@@ -124,83 +130,102 @@ function ChatHeader({ onOpenMedia }) {
           <BsThreeDotsVertical
             className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
             onClick={() => setShowMenu((v) => !v)}
-            title="Ancient Rites Menu"
+            title="More options"
           />
-          {/* Dropdown menu */}
-          {showMenu && (
-            <div className="absolute right-0 top-full mt-2 z-30 w-56 bg-ancient-bg-dark border border-ancient-border-stone rounded-xl shadow-xl p-2 animate-fade-in-down origin-top-right">
-              {conversationType === "group" && (
-                <button
-                  className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
-                  onClick={() => {
-                    setShowGroupManage(true);
-                    setShowMenu(false);
-                  }}
-                >
-                  Manage Circle
-                </button>
-              )}
-              <button
-                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
-                disabled={!conversationId || clearChat.isPending}
-                onClick={() => {
+          <ActionSheet
+            open={showMenu}
+            onClose={() => setShowMenu(false)}
+            align="right"
+            items={[
+              ...(conversationType === "group"
+                ? [{
+                    label: "Manage Group",
+                    onClick: () => setShowGroupManage(true),
+                  }]
+                : []),
+              {
+                label: "Clear Chat",
+                disabled: !conversationId || clearChat.isPending,
+                onClick: () => {
                   if (!conversationId) return;
-                  clearChat.mutate({ chatId: conversationId });
-                  setShowMenu(false);
-                }}
-              >
-                Erase Scrolls
-              </button>
-              <button
-                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
-                disabled={!conversationId || deleteChat.isPending}
-                onClick={() => {
+                  setShowClearConfirm(true);
+                },
+              },
+              {
+                label: "Delete Chat",
+                disabled: !conversationId || deleteChat.isPending,
+                onClick: () => {
                   if (!conversationId) return;
-                  deleteChat.mutate({ chatId: conversationId });
-                  setShowMenu(false);
-                }}
-              >
-                Banish Echoes
-              </button>
-              <button
-                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
-                disabled={!conversationId || archiveChat.isPending}
-                onClick={() => {
+                  setShowDeleteConfirm(true);
+                },
+                danger: true,
+              },
+              {
+                label: "Archive Chat",
+                disabled: !conversationId || archiveChat.isPending,
+                onClick: () => {
                   if (!conversationId) return;
                   archiveChat.mutate({ chatId: conversationId, archive: true });
-                  setShowMenu(false);
-                }}
-              >
-                Seal to Archive
-              </button>
-              <button
-                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
-                disabled={!conversationId || pinChat.isPending}
-                onClick={() => {
+                },
+              },
+              {
+                label: "Pin Chat",
+                disabled: !conversationId || pinChat.isPending,
+                onClick: () => {
                   if (!conversationId) return;
                   pinChat.mutate({ chatId: conversationId, pin: true });
-                  setShowMenu(false);
-                }}
-              >
-                Mark with Rune
-              </button>
-              <button
-                className="w-full text-left px-4 py-3 hover:bg-ancient-bubble-user text-ancient-text-light text-base rounded-md"
-                disabled={!conversationId || muteChat.isPending}
-                onClick={() => {
+                },
+              },
+              {
+                label: "Mute for 24 hours",
+                disabled: !conversationId || muteChat.isPending,
+                onClick: () => {
                   if (!conversationId) return;
                   const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
                   muteChat.mutate({ chatId: conversationId, mutedUntil: until });
-                  setShowMenu(false);
-                }}
-              >
-                Silence for a Cycle
-              </button>
-            </div>
-          )}
+                },
+              },
+            ]}
+          />
         </div>
       </div>
       <GroupManageModal open={showGroupManage} onClose={() => setShowGroupManage(false)} groupId={conversationId} />
+
+      {/* Confirm: Clear Chat */}
+      <ConfirmModal
+        open={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={() => {
+          if (!conversationId) return;
+          clearChat.mutate(
+            { chatId: conversationId },
+            { onSuccess: () => setShowClearConfirm(false) }
+          );
+        }}
+        title="Clear this chat?"
+        description="This will remove messages from your device for this conversation. It does not delete for the other participant."
+        confirmText={clearChat.isPending ? "Clearing..." : "Clear"}
+        confirmLoading={clearChat.isPending}
+        variant="warning"
+      />
+
+      {/* Confirm: Delete Chat */}
+      <ConfirmModal
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={() => {
+          if (!conversationId) return;
+          deleteChat.mutate(
+            { chatId: conversationId },
+            { onSuccess: () => setShowDeleteConfirm(false) }
+          );
+        }}
+        title="Delete this chat?"
+        description="This will permanently delete the conversation from your chats list. It does not delete messages for the other participant."
+        confirmText={deleteChat.isPending ? "Deleting..." : "Delete"}
+        confirmLoading={deleteChat.isPending}
+        variant="danger"
+      />
     </div>
   );
 }

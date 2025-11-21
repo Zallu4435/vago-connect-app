@@ -10,6 +10,7 @@ import { useSocketStore } from "@/stores/socketStore";
 import { useUploadAudio } from "@/hooks/mutations/useUploadAudio";
 import { showToast } from "@/lib/toast";
 import Image from "next/image"; // For user avatar
+import BaseVoicePlayer from "@/components/common/BaseVoicePlayer";
 
 // Helper for time formatting
 function formatTime(secs) {
@@ -36,7 +37,7 @@ function CaptureAudio({ onChange, hide }) {
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
-  const audioRef = useRef(null); // For playing back the recorded audio
+  const audioRef = useRef(null); // For legacy playback; BaseVoicePlayer used for UI
   const recordingTimerRef = useRef(null); // For tracking recording duration
   const playbackTimerRef = useRef(null); // For tracking playback duration
 
@@ -152,26 +153,8 @@ function CaptureAudio({ onChange, hide }) {
   }, [isRecording]);
 
   const handleTogglePlayback = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio || !recordedBlob) return;
-
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-      stopPlaybackTimer();
-    } else {
-      audio.play()
-        .then(() => {
-          setIsPlaying(true);
-          startPlaybackTimer();
-        })
-        .catch((err) => {
-          console.error("Playback failed:", err);
-          showToast.error("Failed to play recording.");
-          setIsPlaying(false);
-        });
-    }
-  }, [isPlaying, recordedBlob]);
+    // No-op; playback handled by BaseVoicePlayer
+  }, []);
 
   const handleSendRecording = useCallback(async () => {
     if (!recordedBlob || !userInfo?.id || !currentChatUser?.id) return;
@@ -207,6 +190,18 @@ function CaptureAudio({ onChange, hide }) {
 
 
   const playbackProgress = audioPlaybackDuration ? (audioPlaybackCurrentTime / audioPlaybackDuration) * 100 : 0;
+  const previewUrl = React.useMemo(() => {
+    if (!recordedBlob) return "";
+    const url = URL.createObjectURL(recordedBlob);
+    return url;
+  }, [recordedBlob]);
+  useEffect(() => {
+    return () => {
+      try {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+      } catch {}
+    };
+  }, [previewUrl]);
 
   return (
     <div className="absolute bottom-0 left-0 right-0 z-40 bg-ancient-bg-dark border-t border-ancient-border-stone flex items-center justify-between p-3 gap-4 shadow-2xl animate-slide-in-up">
@@ -233,41 +228,14 @@ function CaptureAudio({ onChange, hide }) {
 
         {/* Recording/Playback Indicator & Timer */}
         {recordedBlob && !isRecording ? ( // Reviewing state
-          <>
-            <button
-              onClick={handleTogglePlayback}
-              className={`p-2 rounded-full text-xl transition-colors duration-200
-                ${isPlaying ? "bg-red-500 text-white" : "bg-ancient-icon-glow text-ancient-bg-dark hover:bg-ancient-bubble-user-light"}`}
-              aria-label={isPlaying ? "Pause Recording" : "Play Recording"}
-            >
-              {isPlaying ? <FaPause /> : <FaPlay />}
-            </button>
-            <div className="flex-1 relative h-2.5 rounded-full bg-ancient-border-stone overflow-hidden">
-                <div className="absolute inset-y-0 left-0 bg-ancient-icon-glow rounded-full" style={{ width: `${playbackProgress}%` }}></div>
-                <div className="relative flex items-center justify-between h-full px-1">
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-0.5 rounded-full bg-ancient-text-muted transition-all duration-100 ease-in-out"
-                      style={{
-                        height: `${Math.max(4, Math.random() * 8)}px`, // Fixed height during review, but can add subtle animation
-                        minHeight: '4px',
-                        backgroundColor: (i / 20 * 100) < playbackProgress ? 'var(--ancient-bg-dark)' : 'var(--ancient-text-muted)',
-                        transition: 'background-color 0.1s',
-                      }}
-                    ></div>
-                  ))}
-                </div>
-            </div>
-            <span className="text-ancient-text-light text-sm ml-2 font-medium">
-              {formatTime(audioPlaybackCurrentTime)} / {formatTime(audioPlaybackDuration)}
-            </span>
-          </>
+          <div className="flex-1">
+            <BaseVoicePlayer src={previewUrl} isIncoming={false} showAvatars={Boolean(userInfo?.profileImage)} leftAvatarUrl={userInfo?.profileImage} />
+          </div>
         ) : ( // Recording or initial idle state
           <>
             <FaWater className={`text-2xl ${isRecording ? 'text-red-500 animate-pulse' : 'text-ancient-text-muted'}`} />
             <span className={`flex-1 text-center text-lg ${isRecording ? 'text-red-500 animate-pulse' : 'text-ancient-text-muted'}`}>
-              {isRecording ? `Conjuring Echo ${formatTime(recordingDuration)}` : 'Tap to Conjure Echo'}
+              {isRecording ? `Recording ${formatTime(recordingDuration)}` : 'Tap to start recording'}
             </span>
           </>
         )}

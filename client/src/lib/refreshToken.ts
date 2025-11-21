@@ -1,34 +1,28 @@
 import { useAuthStore } from '@/stores/authStore';
+import { api } from '@/lib/api';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+let inFlight: Promise<string> | null = null;
 
 export async function refreshAccessToken(): Promise<string> {
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) {
-      throw new Error('Refresh failed');
-    }
-    const data = await res.json();
-    const accessToken = data?.accessToken as string | undefined;
-    if (!accessToken) {
-      throw new Error('No access token in refresh response');
-    }
-    // Update store and (optionally) reschedule refresh via store API
-    useAuthStore.getState().setAccessToken(accessToken);
-    useAuthStore.getState().scheduleRefresh?.(() => {
-      // On scheduled refresh, call refreshAccessToken again
-      refreshAccessToken().catch(() => {
-        // If scheduled refresh fails, clear auth
-        useAuthStore.getState().clearAuth();
+  if (inFlight) return inFlight;
+  inFlight = (async () => {
+    try {
+      const { data } = await api.post('/api/auth/refresh');
+      const accessToken = (data?.accessToken as string) || '';
+      if (!accessToken) throw new Error('No access token in refresh response');
+      useAuthStore.getState().setAccessToken(accessToken);
+      useAuthStore.getState().scheduleRefresh?.(() => {
+        refreshAccessToken().catch(() => {
+          useAuthStore.getState().clearAuth();
+        });
       });
-    });
-    return accessToken;
-  } catch (err) {
-    try { useAuthStore.getState().clearAuth(); } catch {}
-    throw err;
-  }
+      return accessToken;
+    } catch (err) {
+      try { useAuthStore.getState().clearAuth(); } catch {}
+      throw err;
+    } finally {
+      inFlight = null;
+    }
+  })();
+  return inFlight;
 }

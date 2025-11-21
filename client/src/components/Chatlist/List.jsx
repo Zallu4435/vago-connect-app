@@ -1,7 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
-import { useContacts } from "@/hooks/queries/useContacts";
+import { useContactsPaginated } from "@/hooks/queries/useContactsPaginated";
 import ChatListItem from "./ChatLIstItem";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import ErrorMessage from "@/components/common/ErrorMessage";
@@ -9,7 +9,32 @@ import ErrorMessage from "@/components/common/ErrorMessage";
 function List() {
   const userInfo = useAuthStore((s) => s.userInfo);
   const contactsSearch = useChatStore((s) => s.contactsSearch);
-  const { data: contacts = [], isLoading, error, refetch } = useContacts(userInfo?.id);
+  const {
+    data,
+    isFetching,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    error,
+    refetch,
+    fetchNextPage,
+  } = useContactsPaginated(userInfo?.id, { limit: 30, q: (contactsSearch || '').trim() });
+
+  const sentinelRef = useRef(null);
+
+  const contacts = useMemo(() => {
+    const pages = data?.pages || [];
+    const flat = pages.flatMap((p) => p.contacts || []);
+    const sorted = flat.slice().sort((a, b) => {
+      if (a.isPinned && b.isPinned) return (a.pinOrder ?? 0) - (b.pinOrder ?? 0);
+      if (a.isPinned) return -1;
+      if (b.isPinned) return 1;
+      const ta = new Date(a.timestamp || 0).getTime();
+      const tb = new Date(b.timestamp || 0).getTime();
+      return tb - ta;
+    });
+    return sorted;
+  }, [data]);
 
   const filteredContacts = useMemo(() => {
     const term = (contactsSearch || "").trim().toLowerCase();
@@ -20,6 +45,22 @@ function List() {
       return name.includes(term) || msg.includes(term);
     });
   }, [contacts, contactsSearch]);
+
+  useEffect(() => {
+    if (!hasNextPage) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      const e = entries[0];
+      if (e.isIntersecting) {
+        fetchNextPage();
+      }
+    });
+    obs.observe(el);
+    return () => {
+      obs.disconnect();
+    };
+  }, [hasNextPage, fetchNextPage, data]);
 
   let content = null;
 
@@ -57,6 +98,17 @@ function List() {
             <ChatListItem data={contact} />
           </li>
         ))}
+        {hasNextPage && (
+          <li ref={sentinelRef}>
+            {isFetchingNextPage ? (
+              <div className="w-full py-4 flex justify-center items-center">
+                <LoadingSpinner className="text-ancient-text-muted" />
+              </div>
+            ) : (
+              <div className="py-2" />
+            )}
+          </li>
+        )}
       </ul>
     );
   }

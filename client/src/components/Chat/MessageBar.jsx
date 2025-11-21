@@ -2,8 +2,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { BsEmojiSmile } from "react-icons/bs";
 import { MdSend } from "react-icons/md";
 import { FaMicrophone, FaCamera } from "react-icons/fa";
-import EmojiPicker from "emoji-picker-react";
+import { IoVideocam } from "react-icons/io5";
+import { MdInsertDriveFile } from "react-icons/md";
+import { FaLocationArrow } from "react-icons/fa";
 import dynamic from "next/dynamic";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useSocketStore } from "@/stores/socketStore";
@@ -16,10 +19,30 @@ import { useUploadFile } from "@/hooks/mutations/useUploadFile";
 import { useSendLocation } from "@/hooks/mutations/useSendLocation";
 import { api } from "@/lib/api";
 import { ADD_IMAGE_ROUTE, ADD_VIDEO_ROUTE, ADD_FILE_ROUTE } from "@/utils/ApiRoutes";
-import AttachmentDropdown from "./AttachmentDropdown";
+import ActionSheet from "@/components/common/ActionSheet";
 import ReplyPreview from "./ReplyPreview";
+import MediaPreviewModal from "./MediaPreviewModal";
 
 const CaptureAudio = dynamic(() => import("../common/CaptureAudio"), { ssr: false });
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false, loading: () => null });
+
+const normalizeMessage = (raw, fromId, toId, fallbackType = "text") => ({
+  id: Number(raw?.id),
+  senderId: Number(fromId),
+  receiverId: Number(toId),
+  type: raw?.type || fallbackType,
+  content: String(raw?.content ?? ""),
+  message: String(raw?.content ?? ""),
+  messageStatus: (raw?.status || "sent"),
+  status: (raw?.status || "sent"),
+  createdAt: String(raw?.createdAt || new Date().toISOString()),
+  timestamp: String(raw?.createdAt || new Date().toISOString()),
+  isEdited: Boolean(raw?.isEdited),
+  editedAt: raw?.editedAt || undefined,
+  reactions: Array.isArray(raw?.reactions) ? raw.reactions : [],
+  starredBy: Array.isArray(raw?.starredBy) ? raw.starredBy : [],
+  caption: typeof raw?.caption === 'string' ? raw.caption : undefined,
+});
 
 function MessageBar({ isOnline = true }) {
   const userInfo = useAuthStore((s) => s.userInfo);
@@ -35,6 +58,7 @@ function MessageBar({ isOnline = true }) {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [uploadingLabel, setUploadingLabel] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [previewFiles, setPreviewFiles] = useState([]);
   const imageInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const genericFileInputRef = useRef(null);
@@ -45,9 +69,27 @@ function MessageBar({ isOnline = true }) {
   const uploadVideoMutation = useUploadVideo();
   const uploadFileMutation = useUploadFile();
   const sendLocationMutation = useSendLocation();
+  const qc = useQueryClient();
+
+  const addToMessagesCache = (msg) => {
+    // Update any messages queries (flat or infinite) so ChatContainer sees the message immediately
+    qc.setQueriesData({ queryKey: ["messages"] }, (old) => {
+      if (!old) return old;
+      if (Array.isArray(old)) return [...old, msg];
+      if (Array.isArray(old.pages)) {
+        if (old.pages.length === 0) return { ...old, pages: [{ messages: [msg], nextCursor: null }] };
+        const pages = old.pages.slice();
+        const last = pages[pages.length - 1] || { messages: [] };
+        const updatedLast = { ...last, messages: [...(last.messages || []), msg] };
+        pages[pages.length - 1] = updatedLast;
+        return { ...old, pages };
+      }
+      return old;
+    });
+  };
 
   // Drag & drop and paste handlers with progress
-  const uploadWithProgress = async (file) => {
+  const uploadWithProgress = async (file, caption) => {
     if (!file || !currentChatUser?.id || !userInfo?.id) return;
     const mime = file.type || "";
     const isImage = mime.startsWith("image/");
@@ -58,8 +100,9 @@ function MessageBar({ isOnline = true }) {
     form.append(field, file, file.name || 'upload');
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
+    if (caption && caption.trim()) form.append("caption", caption.trim());
     try {
-      setUploadingLabel(isImage ? "Invoking ancient image..." : isVideo ? "Conjuring video essence..." : "Transcribing ancient file...");
+      setUploadingLabel(isImage ? "Uploading image..." : isVideo ? "Uploading video..." : "Uploading file...");
       setUploadProgress(0);
       const { data } = await api.post(endpoint, form, {
         onUploadProgress: (e) => {
@@ -75,9 +118,14 @@ function MessageBar({ isOnline = true }) {
         type: data.type || (isImage ? "image" : isVideo ? "video" : "document"),
         messageId: data.id,
       });
-      setMessages([...(messages || []), data]);
+      {
+        const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, isImage ? "image" : isVideo ? "video" : "document");
+        if (!msg.caption && caption && caption.trim()) msg.caption = caption.trim();
+        setMessages((prev) => ([...(prev || []), msg]));
+        addToMessagesCache(msg);
+      }
     } catch (err) {
-      showToast.error("Invocation failed. Try again.");
+      showToast.error("Upload failed. Try again.");
       console.error("uploadWithProgress error", err);
     } finally {
       setTimeout(() => { setUploadingLabel(""); setUploadProgress(0); }, 400);
@@ -89,7 +137,13 @@ function MessageBar({ isOnline = true }) {
     const files = e.clipboardData?.files;
     if (files && files.length > 0) {
       e.preventDefault();
-      uploadWithProgress(files[0]);
+      const f = files[0];
+      const mime = f?.type || "";
+      if (mime.startsWith("image/") || mime.startsWith("video/")) {
+        setPreviewFiles([f]);
+      } else {
+        uploadWithProgress(f);
+      }
     }
   };
 
@@ -98,7 +152,13 @@ function MessageBar({ isOnline = true }) {
     e.preventDefault();
     const files = e.dataTransfer?.files;
     if (files && files.length > 0) {
-      uploadWithProgress(files[0]);
+      const f = files[0];
+      const mime = f?.type || "";
+      if (mime.startsWith("image/") || mime.startsWith("video/")) {
+        setPreviewFile(f);
+      } else {
+        uploadWithProgress(f);
+      }
     }
   };
   
@@ -149,7 +209,9 @@ function MessageBar({ isOnline = true }) {
             type: data.type || "text",
             messageId: data.id,
           });
-          setMessages([...(messages || []), data]);
+          const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "text");
+          setMessages((prev) => ([...(prev || []), msg]));
+          addToMessagesCache(msg);
           setMessage("");
           if (replyTo) clearReplyTo();
         },
@@ -170,68 +232,20 @@ function MessageBar({ isOnline = true }) {
     if (!isOnline) return;
     const file = e.target.files?.[0];
     if (!file || !currentChatUser?.id || !userInfo?.id) return;
-    const form = new FormData();
-    form.append("image", file, file.name || 'image');
-    form.append("from", String(userInfo.id));
-    form.append("to", String(currentChatUser.id));
-    const toastId = showToast.loading("Invoking image...");
-    uploadImageMutation.mutate(form, {
-      onSuccess: (data) => {
-        showToast.dismiss(toastId);
-        showToast.success("Image echo sent!");
-        socket.current?.emit("send-msg", {
-          to: currentChatUser.id,
-          from: userInfo.id,
-          message: data.content,
-          type: data.type || "image",
-          messageId: data.id,
-        });
-        setMessages([...(messages || []), data]);
-      },
-      onSettled: () => {
-        if (imageInputRef.current) imageInputRef.current.value = "";
-        setShowAttachMenu(false);
-      },
-      onError: (err) => {
-        showToast.dismiss(toastId);
-        showToast.error("Invocation failed. Try again.");
-        console.error("sendImage error", err);
-      },
-    });
+    // open preview instead of immediate upload
+    setPreviewFiles([file]);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    setShowAttachMenu(false);
   };
 
   const handleVideoSelected = async (e) => {
     if (!isOnline) return;
     const file = e.target.files?.[0];
     if (!file || !currentChatUser?.id || !userInfo?.id) return;
-    const form = new FormData();
-    form.append("video", file, file.name || 'video');
-    form.append("from", String(userInfo.id));
-    form.append("to", String(currentChatUser.id));
-    const toastId = showToast.loading("Conjuring video essence...");
-    uploadVideoMutation.mutate(form, {
-      onSuccess: (data) => {
-        showToast.dismiss(toastId);
-        showToast.success("Video essence sent!");
-        socket.current?.emit("send-msg", {
-          to: currentChatUser.id,
-          from: userInfo.id,
-          message: data.content,
-          type: data.type || "video",
-          messageId: data.id,
-        });
-        setMessages([...(messages || []), data]);
-      },
-      onSettled: () => {
-        if (videoInputRef.current) videoInputRef.current.value = "";
-        setShowAttachMenu(false);
-      },
-      onError: (err) => {
-        showToast.dismiss(toastId);
-        showToast.error("Conjuration failed. Try again.");
-        console.error("sendVideo error", err);
-      },
-    });
+    // open preview instead of immediate upload
+    setPreviewFiles([file]);
+    if (videoInputRef.current) videoInputRef.current.value = "";
+    setShowAttachMenu(false);
   };
 
   const handleGenericFileSelected = async (e) => {
@@ -289,7 +303,9 @@ function MessageBar({ isOnline = true }) {
             onSuccess: (data) => {
               showToast.dismiss(toastId);
               showToast.success("Ley-line coordinates sent!");
-              setMessages([...(messages || []), data]);
+              const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "location");
+              setMessages((prev) => ([...(prev || []), msg]));
+              addToMessagesCache(msg);
             },
             onError: () => {
               showToast.dismiss(toastId);
@@ -317,35 +333,24 @@ function MessageBar({ isOnline = true }) {
         <button
           className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-ancient-bg-dark/50 transition-colors duration-200"
           onClick={onAttachmentClick}
-          title="Attach Relic"
+          title="Attach"
         >
           <FaCamera className="text-ancient-icon-inactive text-xl" />
         </button>
 
-        {showAttachMenu && (
-          <AttachmentDropdown
-            onImage={() => {
-              imageInputRef.current?.click();
-              setShowAttachMenu(false);
-            }}
-            onVideo={() => {
-              videoInputRef.current?.click();
-              setShowAttachMenu(false);
-            }}
-            onFile={() => {
-              genericFileInputRef.current?.click();
-              setShowAttachMenu(false);
-            }}
-            onLocation={() => {
-              handleSendLocation();
-              setShowAttachMenu(false);
-            }}
-            onEmoji={() => {
-              setShowEmojiPicker(true);
-              setShowAttachMenu(false);
-            }}
-          />
-        )}
+        <ActionSheet
+          open={showAttachMenu}
+          onClose={() => setShowAttachMenu(false)}
+          align="left"
+          placement="above"
+          items={[
+            { label: "Image", icon: FaCamera, onClick: () => imageInputRef.current?.click() },
+            { label: "Video", icon: IoVideocam, onClick: () => videoInputRef.current?.click() },
+            { label: "File", icon: MdInsertDriveFile, onClick: () => genericFileInputRef.current?.click() },
+            { label: "Location", icon: FaLocationArrow, onClick: () => handleSendLocation() },
+            { label: "Emoji", icon: BsEmojiSmile, onClick: () => setShowEmojiPicker(true) },
+          ]}
+        />
 
         {/* Hidden file inputs */}
         <input type="file" accept="image/*" className="hidden" ref={imageInputRef} onChange={handleImageSelected} />
@@ -358,7 +363,7 @@ function MessageBar({ isOnline = true }) {
         id="emoji-open"
         className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-ancient-bg-dark/50 transition-colors duration-200"
         onClick={handleEmojiModal}
-        title="Invoke Glyph"
+        title="Emoji"
       >
         <BsEmojiSmile className="text-ancient-icon-inactive text-xl" />
       </button>
@@ -376,7 +381,7 @@ function MessageBar({ isOnline = true }) {
       <div className="flex-1 h-12 flex items-center bg-ancient-input-bg border border-ancient-input-border rounded-full px-5 shadow-inner focus-within:border-ancient-icon-glow transition-all duration-300">
         <input
           type="text"
-          placeholder="Invoke message..."
+          placeholder="Type a message..."
           className="bg-transparent text-sm focus:outline-none text-ancient-text-light placeholder:text-ancient-text-muted h-full w-full"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -443,6 +448,54 @@ function MessageBar({ isOnline = true }) {
           <span className="text-ancient-text-light text-xs font-medium">{uploadProgress}%</span>
         </div>
       )}
+
+      {/* Media Preview Modal */}
+      <MediaPreviewModal
+        open={previewFiles.length > 0}
+        files={previewFiles}
+        onClose={() => setPreviewFiles([])}
+        onSend={async (payload) => {
+          // Handle in-modal updates (adding more files)
+          if (payload && payload.__update__ && Array.isArray(payload.files)) {
+            setPreviewFiles(payload.files);
+            return;
+          }
+          let files = [];
+          let captions = [];
+          if (payload && Array.isArray(payload.files)) {
+            files = payload.files;
+            captions = Array.isArray(payload.captions) ? payload.captions : [];
+          } else if (Array.isArray(payload)) {
+            files = payload;
+          } else if (payload) {
+            files = [payload];
+          }
+          for (let i = 0; i < files.length; i++) {
+            const f = files[i];
+            // eslint-disable-next-line no-await-in-loop
+            await uploadWithProgress(f);
+            const cap = captions[i];
+            if (cap && cap.trim() && currentChatUser?.id && userInfo?.id) {
+              // send caption as a separate text message
+              await new Promise((resolve) => {
+                sendMessageMutation.mutate(
+                  { from: userInfo.id, to: currentChatUser.id, content: cap.trim(), type: "text" },
+                  {
+                    onSuccess: (data) => {
+                      const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "text");
+                      setMessages((prev) => ([...(prev || []), msg]));
+                      addToMessagesCache(msg);
+                      resolve();
+                    },
+                    onError: () => resolve(),
+                  }
+                );
+              });
+            }
+          }
+          setPreviewFiles([]);
+        }}
+      />
     </div>
   );
 }

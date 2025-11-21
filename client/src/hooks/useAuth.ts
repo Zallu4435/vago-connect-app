@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '@/stores/authStore';
-import { refreshAccessToken } from '@/lib/refreshToken';
 import { api } from '@/lib/api';
 import { isTokenExpired } from '@/lib/tokenManager';
 
@@ -18,13 +17,8 @@ export function useAuth() {
       try {
         if (accessToken && !isTokenExpired(accessToken)) {
           // ensure refresh is scheduled if not already
-          scheduleRefresh?.(() => {
-            refreshAccessToken().catch(() => clearAuth());
-          });
-          if (mounted) setIsLoading(false);
-          return;
+          scheduleRefresh?.(() => {});
         }
-        await refreshAccessToken();
       } catch {}
       if (mounted) setIsLoading(false);
     };

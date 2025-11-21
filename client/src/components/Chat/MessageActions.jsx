@@ -10,13 +10,15 @@ import {
   FaEdit,
   FaTrashAlt,
   FaLaughBeam, // For react icon
-  FaCheck, // For save edit
-  FaTimes, // For cancel edit
 } from "react-icons/fa";
 import { BiReply } from "react-icons/bi"; // For reply icon
 // Replaced FaAngleDown with a more mystical GiScrollUnfurled for the menu toggle
-import { GiScrollUnfurled, GiMagicLamp, GiArchiveRegister, GiSpellBook, GiBookmarklet, GiCrystalBall, GiBroadsword, GiFeather } from "react-icons/gi";
+import { GiScrollUnfurled, GiFeather } from "react-icons/gi";
 import { IoShareOutline } from "react-icons/io5"; // For forward icon (more modern share)
+import ActionSheet from "@/components/common/ActionSheet";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import InlineEditor from "@/components/common/InlineEditor";
+import ReactionPicker from "@/components/common/ReactionPicker";
 
 const DEFAULT_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "👏", "🔥", "✨", "🙏"];
 
@@ -115,31 +117,13 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
   // Inline editor for text messages when editing
   if (isEditing && message.type === "text") {
     return (
-      <div className={`absolute ${isIncoming ? "left-0" : "right-0"} top-full mt-1 z-20 bg-ancient-bg-medium border border-ancient-border-stone rounded-lg p-2 flex items-center gap-2 shadow-xl animate-fade-in-up origin-bottom`}>
-        <input
-          className="bg-ancient-input-bg outline-none text-ancient-text-light text-sm border border-ancient-border-stone rounded px-3 py-1 min-w-[150px]"
+      <div className={`absolute ${isIncoming ? "left-0" : "right-0"} top-full mt-1 z-20`}>
+        <InlineEditor
           value={editText}
-          onChange={(e) => setEditText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onSaveEdit();
-            if (e.key === "Escape") setIsEditing(false);
-          }}
-          autoFocus
+          onChange={setEditText}
+          onSave={onSaveEdit}
+          onCancel={() => setIsEditing(false)}
         />
-        <button
-          className="text-ancient-icon-glow hover:text-green-400 transition-colors duration-200"
-          onClick={onSaveEdit}
-          title="Save Alteration"
-        >
-          <FaCheck className="text-lg" />
-        </button>
-        <button
-          className="text-ancient-text-muted hover:text-ancient-text-light transition-colors duration-200"
-          onClick={() => setIsEditing(false)}
-          title="Cancel Alteration"
-        >
-          <FaTimes className="text-lg" />
-        </button>
       </div>
     );
   }
@@ -152,19 +136,12 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
     >
       {/* Reaction Picker (appears above/below the message bubble) */}
       {showReactionsMenu && (
-        <div
-          ref={reactionsMenuRef}
-          className={`absolute ${isIncoming ? "left-0" : "right-0"} bottom-full mb-1 z-30 rounded-full bg-ancient-bg-dark border border-ancient-border-stone p-1 flex gap-1 shadow-xl animate-fade-in-up origin-bottom`}
-        >
-          {DEFAULT_EMOJIS.map((e) => (
-            <button
-              key={e}
-              className="p-2 text-xl hover:bg-ancient-bubble-user rounded-full transition-colors duration-150"
-              onClick={() => onReact(e)}
-            >
-              {e}
-            </button>
-          ))}
+        <div ref={reactionsMenuRef} className="relative">
+          <ReactionPicker
+            open={showReactionsMenu}
+            anchorSide={isIncoming ? "left" : "right"}
+            onPick={onReact}
+          />
         </div>
       )}
 
@@ -173,7 +150,7 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
         type="button"
         className="relative bg-ancient-bg-medium border border-ancient-border-stone rounded-full p-2 text-ancient-icon-inactive hover:text-ancient-icon-glow shadow-md transition-colors duration-200"
         onClick={() => setShowReactionsMenu((s) => !s)}
-        title="React to Echo"
+        title="React"
       >
         <FaLaughBeam className="text-sm" />
       </button>
@@ -183,98 +160,47 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
         type="button"
         className="relative bg-ancient-bg-medium border border-ancient-border-stone rounded-full p-2 text-ancient-icon-inactive hover:text-ancient-icon-glow shadow-md transition-colors duration-200"
         onClick={() => setShowDropdownMenu((v) => !v)}
-        title="More Ancient Rites"
+        title="More actions"
       >
         <GiScrollUnfurled className="text-sm" /> {/* Mystical scroll icon for menu */}
       </button>
 
-      {/* Dropdown Menu */}
-      {showDropdownMenu && (
-        <div
-          ref={dropdownMenuRef}
-          className={`absolute ${isIncoming ? "left-0" : "right-0"} top-full mt-1 z-20 w-48 bg-ancient-bg-dark border border-ancient-border-stone rounded-md shadow-xl p-2 animate-fade-in-down origin-top-${isIncoming ? "left" : "right"}`}
-        >
-          {/* Reply */}
-          <button
-            className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-text-light text-sm rounded-md transition-colors duration-200"
-            onClick={handleReply}
-          >
-            <BiReply className="text-ancient-icon-glow text-lg" /> Reply Echo
-          </button>
-
-          {/* Forward */}
-          <button
-            className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-text-light text-sm rounded-md transition-colors duration-200"
-            onClick={handleForward}
-          >
-            <IoShareOutline className="text-ancient-icon-glow text-lg" /> Forward Echo
-          </button>
-
-          {/* Star */}
-          <button
-            className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-text-light text-sm rounded-md transition-colors duration-200"
-            onClick={onStar}
-          >
-            <FaStar className={`text-sm ${isStarred ? "text-yellow-400" : "text-ancient-icon-inactive"}`} />{" "}
-            {isStarred ? "Unmark Rune" : "Mark with Rune"}
-          </button>
-
-          {/* Edit */}
-          {canEdit && (
-            <button
-              className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-text-light text-sm rounded-md transition-colors duration-200"
-              onClick={onEditClick}
-            >
-              <GiFeather className="text-ancient-icon-glow text-lg" /> Alter Scroll
-            </button>
-          )}
-
-          {/* Delete */}
-          {canDelete && (
-            <button
-              className="flex items-center gap-3 w-full text-left px-4 py-2 hover:bg-ancient-bubble-user text-ancient-warning-text text-sm rounded-md transition-colors duration-200"
-              onClick={onDeleteClick}
-            >
-              <FaTrashAlt className="text-red-500 text-lg" /> Banish Echo
-            </button>
-          )}
-        </div>
-      )}
+      {/* Dropdown Menu via ActionSheet */}
+      <div ref={dropdownMenuRef} className="relative">
+        <ActionSheet
+          open={showDropdownMenu}
+          onClose={() => setShowDropdownMenu(false)}
+          align={isIncoming ? "left" : "right"}
+          items={[
+            { label: "Reply", icon: BiReply, onClick: handleReply },
+            { label: "Forward", icon: IoShareOutline, onClick: handleForward },
+            { label: isStarred ? "Unstar" : "Star", icon: FaStar, onClick: onStar },
+            ...(canEdit ? [{ label: "Edit", icon: GiFeather, onClick: onEditClick }] : []),
+            ...(canDelete ? [{ label: "Delete", icon: FaTrashAlt, onClick: onDeleteClick, danger: true }] : []),
+          ]}
+        />
+      </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className={`fixed inset-0 bg-ancient-bg-dark/70 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in`}>
-          <div className="bg-ancient-bg-medium border border-ancient-border-stone rounded-lg p-6 shadow-xl w-80 text-center animate-zoom-in">
-            <p className="text-ancient-text-light text-lg font-semibold mb-4 flex items-center justify-center gap-2">
-              <GiBroadsword className="text-red-500 text-xl" /> Confirm Banishment
-            </p>
-            <p className="text-ancient-text-muted text-sm mb-6">
-              Are you sure you wish to banish this echo from existence?
-            </p>
-            <div className="flex justify-center gap-4">
-              <button
-                className="bg-ancient-bubble-user hover:bg-ancient-bubble-user-light text-ancient-text-light px-4 py-2 rounded-md transition-colors duration-200 shadow-md"
-                onClick={() => setShowDeleteConfirm(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-md transition-colors duration-200 shadow-md"
-                onClick={() => doDelete(isMine ? 'forEveryone' : 'forMe')}
-              >
-                Banish {isMine ? "(for All)" : "(for Me)"}
-              </button>
-            </div>
-            {isMine && (
-              <button
-                className="mt-3 text-ancient-text-muted hover:text-ancient-text-light text-xs underline"
-                onClick={() => { doDelete('forMe'); setShowDeleteConfirm(false); }}
-              >
-                Banish only for my Sight
-              </button>
-            )}
-          </div>
-        </div>
+        <ConfirmModal
+          open={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={() => doDelete(isMine ? 'forEveryone' : 'forMe')}
+          title="Confirm Delete"
+          description="Are you sure you want to delete this message?"
+          confirmText={isMine ? "Delete (for Everyone)" : "Delete (for Me)"}
+          confirmLoading={delMutation.isPending}
+          variant="danger"
+          extra={isMine ? (
+            <button
+              className="mt-1 text-ancient-text-muted hover:text-ancient-text-light text-xs underline"
+              onClick={() => doDelete('forMe')}
+            >
+              Delete only for me
+            </button>
+          ) : null}
+        />
       )}
     </div>
   );

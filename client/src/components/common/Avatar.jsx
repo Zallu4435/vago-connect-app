@@ -1,17 +1,22 @@
 import Image from "next/image";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FaCamera, FaMagic, FaCircle, FaUserCircle } from "react-icons/fa"; // Reliable icons
 import ContextMenu from "./ContextMenu"; // These will also need thematic updates
 import PhotoPicker from "./PhotoPicker"; // These will also need thematic updates
 import PhotoLibrary from "./PhotoLibrary"; // These will also need thematic updates
 import CapturePhoto from "./CapturePhoto"; // These will also need thematic updates
 
-function Avatar({ type, image, setImage, defaultImage = "/default_mystical_avatar.png" }) { // Added defaultImage prop
+function Avatar({ type, image, setImage, defaultImage = "/default_avatar.png" }) { // Default to bundled avatar
   const [hover, setHover] = useState(false);
   const [isContextMenuVisible, setIsContextMenuVisible] = useState(false);
   const [contextMenuCoordinates, setContextMenuCoordinates] = useState({ x: 0, y: 0 });
   const [showLibrary, setShowLibrary] = useState(false);
   const [showCapture, setShowCapture] = useState(false);
+  const [src, setSrc] = useState(image || defaultImage);
+
+  useEffect(() => {
+    setSrc(image || defaultImage);
+  }, [image, defaultImage]);
 
   const showContextMenu = (e) => {
     e.preventDefault();
@@ -55,7 +60,13 @@ function Avatar({ type, image, setImage, defaultImage = "/default_mystical_avata
       <div className="flex items-center justify-center">
         {["sm", "lg"].includes(type) && (
           <div className={`relative ${sizeClasses[type]} cursor-pointer overflow-hidden rounded-full border border-ancient-border-stone bg-ancient-input-bg flex items-center justify-center group`}>
-            <Image src={image || defaultImage} alt="avatar" className="rounded-full object-cover" fill />
+            <Image
+              src={src || defaultImage}
+              alt="avatar"
+              className="rounded-full object-cover"
+              fill
+              onError={() => setSrc(defaultImage)}
+            />
             {/* Subtle hover effect for smaller avatars */}
             <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <FaCamera className="text-ancient-icon-glow text-xl" />
@@ -82,7 +93,13 @@ function Avatar({ type, image, setImage, defaultImage = "/default_mystical_avata
             </div>
             {/* Main Avatar Image */}
             <div className={`relative z-0 ${sizeClasses.xl} flex items-center justify-center overflow-hidden rounded-full border-4 border-ancient-icon-glow shadow-xl`}>
-              <Image src={image || defaultImage} alt="avatar" className="rounded-full object-cover" fill />
+              <Image
+                src={src || defaultImage}
+                alt="avatar"
+                className="rounded-full object-cover"
+                fill
+                onError={() => setSrc(defaultImage)}
+              />
             </div>
           </div>
         )}

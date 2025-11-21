@@ -1,6 +1,9 @@
+/* Firefox-specific fixes */
+@-moz-document url-prefix() { .message-bubble { word-break: break-word; } }
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 
 
 /* Custom scrollbar (vertical and horizontal) */
@@ -9,16 +12,19 @@
   height: 8px;
 }
 
+
 .custom-scrollbar::-webkit-scrollbar-track {
   background: var(--ancient-bg-medium);
   border-radius: 10px;
 }
+
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: var(--ancient-border-stone);
   border-radius: 10px;
   border: 2px solid var(--ancient-bg-medium);
 }
+
 
 /* Emoji Picker Ancient Theme Overrides */
 .EmojiPickerReact,
@@ -34,14 +40,17 @@
   --epr-highlight-color: #4ade80;     /* ancient-icon-glow */
   --epr-scrollbar-color: #4b4f57;     /* ancient-border-stone */
 
+
   background-color: var(--epr-bg-color) !important;
   border: 1px solid var(--epr-picker-border-color) !important;
   color: var(--epr-text-color) !important;
 }
 
+
 .EmojiPickerReact .epr-body {
   background-color: var(--epr-bg-color) !important;
 }
+
 
 .EmojiPickerReact .epr-emoji-category-label {
   background-color: var(--epr-category-label-bg-color) !important;
@@ -49,21 +58,25 @@
   border-bottom: 1px solid var(--epr-picker-border-color) !important;
 }
 
+
 .EmojiPickerReact .epr-search-container input {
   background-color: var(--epr-search-bg-color) !important;
   color: var(--epr-text-color) !important;
   border: 1px solid var(--epr-search-border-color) !important;
 }
 
+
 .EmojiPickerReact .epr-emoji:hover,
 .EmojiPickerReact .epr-emoji[aria-selected="true"] {
   background-color: var(--epr-hover-bg-color) !important;
 }
 
+
 .EmojiPickerReact .epr-preview {
   background-color: var(--epr-bg-color) !important;
   border-top: 1px solid var(--epr-picker-border-color) !important;
 }
+
 
 /* Animations for simulated waves */
 @keyframes pulse-waves {
@@ -72,9 +85,11 @@
   100% { transform: scaleY(1); opacity: 1; }
 }
 
+
 .animate-pulse-waves div {
   animation: pulse-waves 1.5s ease-in-out infinite alternate;
 }
+
 
 /* Theme variables for plain CSS usage */
 :root {
@@ -89,7 +104,9 @@
   --ancient-bubble-user: #2A5C5A;
   --ancient-bubble-user-light: #386a6a;
   --ancient-bubble-incoming: #2e353f;
+  --ancient-warning-text: #ef4444;
 }
+
 
 /* Slide in up animation for bottom trays (e.g., CaptureAudio) */
 @keyframes slide-in-up {
@@ -97,6 +114,31 @@
   to { transform: translateY(0); opacity: 1; }
 }
 
+
 .animate-slide-in-up {
   animation: slide-in-up 0.3s ease-out forwards;
+}
+
+
+/* Sidebar slide-in (from left) */
+@keyframes slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}
+
+
+/* Backdrop fade-in */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
 }
