@@ -25,8 +25,9 @@ export default function ContactSearchList({
   }, [contacts, searchTerm]);
 
   return (
-    <div className={wrapperClassName}>
-      <div className="p-4 border-b border-ancient-border-stone bg-ancient-input-bg">
+    <div className={`flex flex-col w-full max-w-full ${wrapperClassName}`}>
+      {/* Search Bar */}
+      <div className="p-2 sm:p-4 border-b border-ancient-border-stone bg-ancient-input-bg">
         <ThemedInput
           name="Search Contacts"
           state={searchTerm}
@@ -36,14 +37,15 @@ export default function ContactSearchList({
         />
       </div>
 
-      <div className={listClassName}>
+      {/* Search Results */}
+      <div className={`flex-1 overflow-y-auto p-2 sm:p-4 min-h-[120px] ${listClassName}`}>
         {loading && (
-          <div className="text-ancient-text-muted text-center py-8">
-            Summoning spirits from the ethereal plane...
+          <div className="text-ancient-text-muted text-center py-8 text-base sm:text-lg">
+            Loading contacts...
           </div>
         )}
-        {!loading && filtered.length === 0 && (
-          <div className="text-ancient-text-muted text-center py-8">{emptyText}</div>
+        {(!loading && filtered.length === 0) && (
+          <div className="text-ancient-text-muted text-center py-8 text-base sm:text-lg">{emptyText || "No contacts found."}</div>
         )}
         {!loading && filtered.map((contact) => (
           <ContactSelectorItem

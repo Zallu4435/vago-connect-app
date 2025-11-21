@@ -1,3 +1,30 @@
+/* ===== Utility animations and helpers ===== */
+/* Fade in up animation */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 0.6s ease-out; }
+
+/* Pulse light animation */
+@keyframes pulse-light {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.animate-pulse-light { animation: pulse-light 3s ease-in-out infinite; }
+
+/* Slow spin animation */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow { animation: spin-slow 2s linear infinite; }
+
+/* Delay utility */
+.delay-500 { animation-delay: 500ms; }
+
+/* Safe area bottom padding */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 /* Firefox-specific fixes */
 @-moz-document url-prefix() { .message-bubble { word-break: break-word; } }
 @tailwind base;

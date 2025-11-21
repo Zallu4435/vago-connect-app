@@ -1,49 +1,38 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import List from "./List"; // This component will need its own thematic update
-import SearchBar from "./SearchBar"; // This component will need its own thematic update
-import ChatListHeader from "./ChatListHeader"; // This component will need its own thematic update
-import ContactsList from "./ContactsList"; // This component will need its own thematic update
+import List from "./List";
+import SearchBar from "./SearchBar";
+import ChatListHeader from "./ChatListHeader";
+import ContactsList from "./ContactsList";
 import { useChatStore } from "@/stores/chatStore";
 
 function ChatList() {
   const allContactsPage = useChatStore((s) => s.allContactsPage);
-  const [pageType, setPageType] = useState("default"); // "default" for chat list, "contacts" for contacts list
+  const [pageType, setPageType] = useState("default");
 
-  // Sync pageType with allContactsPage from store
   useEffect(() => {
-    if (allContactsPage) {
-      setPageType("contacts");
-    } else {
-      setPageType("default");
-    }
+    setPageType(allContactsPage ? "contacts" : "default");
   }, [allContactsPage]);
 
   return (
-    <div
-      className="bg-ancient-bg-dark flex flex-col h-screen max-h-screen w-full lg:w-[400px] overflow-hidden border-r border-ancient-border-stone z-20 shadow-xl"
-      // Added max-width for large screens for better sidebar appearance, similar to Telegram/WhatsApp
-    >
-      {/* Conditionally render based on pageType */}
+    <div className="
+      bg-ancient-bg-dark flex flex-col
+      h-[55dvh] sm:h-screen max-h-screen w-full
+      md:w-[320px] lg:w-[400px]
+      overflow-hidden border-r border-ancient-border-stone z-20 shadow-xl
+      transition-all
+    ">
       {pageType === "default" && (
         <>
-          {/* Header for the chat list, needs thematic update */}
           <ChatListHeader />
-          {/* Search bar for chats, needs thematic update */}
           <SearchBar />
-
           {/* Main scrollable area for chat list */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            {/* The List component itself will render the chat previews and will need thematic adjustments */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
             <List pageType={pageType} />
-            {/* Optional: Add a themed empty state if no chats in the List component */}
-            {/* <div className="text-ancient-text-muted text-center p-4">No active ancient whispers.</div> */}
           </div>
         </>
       )}
-
       {pageType === "contacts" && (
-        // The ContactsList component will handle its own header and search, and needs thematic adjustments
         <ContactsList />
       )}
     </div>

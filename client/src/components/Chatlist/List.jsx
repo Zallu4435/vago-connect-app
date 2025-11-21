@@ -67,26 +67,26 @@ function List() {
   if (isLoading) {
     content = (
       <div className="w-full py-8 flex justify-center items-center">
-        <LoadingSpinner label="Decoding ancient messages..." className="text-ancient-text-muted" />
+        <LoadingSpinner label="Loading chats..." className="text-ancient-text-muted" />
       </div>
     );
   } else if (error) {
     content = (
-      <div className="mx-4 my-6 px-5 py-6 flex flex-col gap-4 rounded-xl shadow-xl bg-ancient-warning-bg text-ancient-text-light">
-        <ErrorMessage message="Failed to retrieve ancient archives." />
+      <div className="mx-2 sm:mx-4 my-3 sm:my-6 px-4 sm:px-5 py-4 sm:py-6 flex flex-col gap-3 sm:gap-4 rounded-lg sm:rounded-xl shadow-xl bg-ancient-warning-bg text-ancient-text-light">
+        <ErrorMessage message="Failed to load chats." />
         <button
           type="button"
-          className="self-start bg-ancient-bubble-user hover:bg-ancient-bubble-user-light text-ancient-text-light text-sm px-4 py-2 rounded shadow-md transition-colors"
+          className="self-start bg-ancient-bubble-user hover:bg-ancient-bubble-user-light text-ancient-text-light text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded shadow-md transition-colors"
           onClick={() => refetch()}
         >
-          Re-read the Runes
+          Retry
         </button>
       </div>
     );
   } else if (contactsSearch && filteredContacts.length === 0) {
     content = (
-      <div className="w-full py-8 text-center text-base text-ancient-text-muted">
-        No matching echoes found.
+      <div className="w-full py-8 text-center text-sm sm:text-base text-ancient-text-muted">
+        No results found.
       </div>
     );
   } else {
@@ -114,7 +114,10 @@ function List() {
   }
 
   return (
-    <div className="bg-ancient-bg-dark flex-auto overflow-auto max-h-full custom-scrollbar border-r border-ancient-border-stone">
+    <div className="
+      bg-ancient-bg-dark flex-auto overflow-auto max-h-full custom-scrollbar border-r border-ancient-border-stone
+      w-full h-full min-w-0
+    ">
       {content}
     </div>
   );

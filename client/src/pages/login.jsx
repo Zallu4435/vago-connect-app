@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import React from "react";
 import { FcGoogle } from "react-icons/fc";
-import { FaMagic, FaScroll } from "react-icons/fa"; // Reliable icons
+import { FaMagic, FaScroll } from "react-icons/fa";
 import { useRouter } from "next/router";
 import { useAuthStore } from "@/stores/authStore";
 import { showToast } from "@/lib/toast";
@@ -33,7 +33,7 @@ function Login() {
         { withCredentials: true }
       );
       const { accessToken: at, user } = data || {};
-      if (!at || !user) throw new Error("Invalid login response from the ancient servers.");
+      if (!at || !user) throw new Error("Invalid login response from the server.");
       setAccessToken(at);
       setUserInfo({
         id: String(user.id),
@@ -45,38 +45,57 @@ function Login() {
       router.push("/");
     } catch (err) {
       console.error(err);
-      showToast.error("The ancient login ritual has failed. Please consult the spirits again."); // Themed error message
+      showToast.error("Login failed. Please try again.");
     }
   };
 
   return (
-    <div className="flex justify-center items-center bg-ancient-bg-dark h-screen w-screen flex-col gap-10"> {/* Increased gap for more breathing room */}
+    <div className="
+      flex justify-center items-center 
+      bg-ancient-bg-dark 
+      min-h-screen h-screen w-screen 
+      flex-col gap-6 sm:gap-10 
+      px-4 sm:px-6 
+      overflow-y-auto
+      pb-safe
+    ">
       {/* Themed Logo and Title */}
-      <div className="flex flex-col items-center justify-center gap-6 text-ancient-text-light animate-fade-in-up">
-        <FaScroll className="text-9xl text-ancient-icon-glow drop-shadow-lg animate-pulse-light" /> {/* Mystical Scroll Icon */}
-        <span className="text-7xl font-bold font-serif select-none text-center tracking-wide drop-shadow-xl">
+      <div className="flex flex-col items-center justify-center gap-4 sm:gap-6 text-ancient-text-light animate-fade-in-up">
+        <FaScroll className="text-6xl sm:text-8xl md:text-9xl text-ancient-icon-glow drop-shadow-lg animate-pulse-light" />
+        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold font-serif select-none text-center tracking-wide drop-shadow-xl px-4">
           Ethereal Whispers
-        </span>
-        <p className="text-ancient-text-muted text-lg italic text-center max-w-md">
-          Unfurl the ancient scrolls and join the sacred communion.
+        </h1>
+        <p className="text-ancient-text-muted text-sm sm:text-lg text-center max-w-xs sm:max-w-md px-4">
+          Sign in to continue.
         </p>
       </div>
 
       {/* Themed Login Button */}
       <button
-        className="flex items-center justify-center gap-8 bg-ancient-bg-medium p-6 rounded-xl hover:bg-ancient-bubble-user-light transition-all duration-300 shadow-2xl border border-ancient-border-stone hover:border-ancient-icon-glow group transform hover:scale-105" // Enhanced styling
+        className="
+          flex items-center justify-center gap-4 sm:gap-6 md:gap-8 
+          bg-ancient-bg-medium p-4 sm:p-6 
+          rounded-xl hover:bg-ancient-bubble-user-light 
+          transition-all duration-300 
+          shadow-2xl border border-ancient-border-stone 
+          hover:border-ancient-icon-glow group 
+          transform hover:scale-105 
+          active:scale-95
+          max-w-[90vw] sm:max-w-xl
+          w-full sm:w-auto
+        "
         onClick={handleLogin}
       >
-        <FcGoogle className="text-5xl transition-transform duration-300 group-hover:scale-125 group-hover:rotate-6 drop-shadow-md" /> {/* Larger Google Icon with more pronounced hover */}
-        <span className="text-ancient-text-light text-3xl font-bold select-none tracking-wider group-hover:text-ancient-icon-glow"> {/* Larger, bolder text */}
-          Conjure with Google
+        <FcGoogle className="text-3xl sm:text-4xl md:text-5xl transition-transform duration-300 group-hover:scale-125 group-hover:rotate-6 drop-shadow-md flex-shrink-0" />
+        <span className="text-ancient-text-light text-lg sm:text-2xl md:text-3xl font-bold select-none tracking-wider group-hover:text-ancient-icon-glow">
+          Sign in with Google
         </span>
-        <FaMagic className="text-5xl text-ancient-icon-glow opacity-0 group-hover:opacity-100 transition-opacity duration-300 group-hover:animate-spin-slow" /> {/* Mystical magic icon on hover */}
+        <FaMagic className="hidden sm:block text-3xl sm:text-4xl md:text-5xl text-ancient-icon-glow opacity-0 group-hover:opacity-100 transition-opacity duration-300 group-hover:animate-spin-slow flex-shrink-0" />
       </button>
 
-      {/* Optional: Add a subtle footer */}
-      <p className="absolute bottom-8 text-ancient-text-muted text-sm animate-fade-in delay-500">
-        By proceeding, you agree to decipher the ancient rites.
+      {/* Footer */}
+      <p className="text-ancient-text-muted text-xs sm:text-sm text-center animate-fade-in delay-500 px-4 max-w-md">
+        By continuing, you agree to our terms and privacy policy.
       </p>
     </div>
   );

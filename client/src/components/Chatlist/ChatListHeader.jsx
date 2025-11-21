@@ -1,65 +1,66 @@
 import Avatar from "../common/Avatar";
 import { BsFillChatLeftTextFill } from "react-icons/bs";
-import { IoSettingsOutline, IoPersonCircleOutline, IoPeopleOutline, IoCallOutline, IoLogOutOutline } from "react-icons/io5";
+import { IoSettingsOutline } from "react-icons/io5";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useState } from "react";
 import GroupCreateModal from "./GroupCreateModal";
-import ActionSheet from "@/components/common/ActionSheet";
-import { getAbsoluteUrl } from "@/lib/url";
-import ModalShell from "@/components/common/ModalShell";
-import ModalHeader from "@/components/common/ModalHeader";
 import SidebarMenu from "./SidebarMenu";
+import { getAbsoluteUrl } from "@/lib/url";
 
 function ChatListHeader() {
   const userInfo = useAuthStore((s) => s.userInfo);
   const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
-  const [showMenu, setShowMenu] = useState(false);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showSidebarMenu, setShowSidebarMenu] = useState(false);
 
-  const handleAllContactsPage = () => {
-    setAllContactsPage(true);
-  };
+  const handleAllContactsPage = () => setAllContactsPage(true);
 
   return (
-    <div className="h-16 px-5 py-3 flex items-center justify-between bg-ancient-bg-medium border-b border-ancient-border-stone shadow-md">
-      {/* Left: User Avatar, clickable */}
+    <div className="
+      h-14 sm:h-16 px-3 sm:px-5 py-2 sm:py-3
+      flex items-center justify-between
+      bg-ancient-bg-medium border-b border-ancient-border-stone shadow-md
+      ">
+      {/* Left: User Avatar */}
       <button className="focus:outline-none rounded-full overflow-hidden" type="button">
         <Avatar type="sm" image={getAbsoluteUrl(userInfo?.profileImage || userInfo?.image)} />
       </button>
 
-      {/* Right: Main actions, spaced */}
-      <div className="flex items-center gap-8">
+      {/* Right: Main actions */}
+      <div className="flex items-center gap-4 sm:gap-8">
         <BsFillChatLeftTextFill
-          className="text-ancient-icon-inactive cursor-pointer text-[22px] hover:text-ancient-icon-glow transition-colors duration-200"
+          className="
+            text-ancient-icon-inactive cursor-pointer
+            text-lg sm:text-[22px]
+            hover:text-ancient-icon-glow transition-colors duration-200
+          "
           title="Start chat"
           onClick={handleAllContactsPage}
         />
         <button
           type="button"
-          className="w-9 h-9 flex items-center justify-center rounded hover:bg-ancient-input-bg"
+          className="
+            w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded
+            hover:bg-ancient-input-bg transition
+          "
           title="Settings"
           onClick={() => setShowSidebarMenu(true)}
         >
-          <IoSettingsOutline className="text-ancient-icon-inactive text-[22px] hover:text-ancient-icon-glow transition-colors duration-200" />
+          <IoSettingsOutline className="text-ancient-icon-inactive text-lg sm:text-[22px] hover:text-ancient-icon-glow transition-colors duration-200" />
         </button>
       </div>
-      
-      {/* Modal for creating group */}
-      <GroupCreateModal open={showGroupCreate} onClose={() => setShowGroupCreate(false)} />
 
-      {/* Sidebar menu overlay (Telegram-like) */}
+      <GroupCreateModal open={showGroupCreate} onClose={() => setShowGroupCreate(false)} />
       <SidebarMenu
         open={showSidebarMenu}
         onClose={() => setShowSidebarMenu(false)}
         user={userInfo}
         onNewGroup={() => { setShowSidebarMenu(false); setShowGroupCreate(true); }}
-        onProfile={() => { /* route to profile */ setShowSidebarMenu(false); }}
-        onCalls={() => { /* open calls */ setShowSidebarMenu(false); }}
-        onSettings={() => { /* open settings */ setShowSidebarMenu(false); }}
-        onLogout={() => { /* logout */ setShowSidebarMenu(false); }}
+        onProfile={() => { setShowSidebarMenu(false); }}
+        onCalls={() => { setShowSidebarMenu(false); }}
+        onSettings={() => { setShowSidebarMenu(false); }}
+        onLogout={() => { setShowSidebarMenu(false); }}
       />
     </div>
   );

@@ -15,7 +15,7 @@ import { FaScroll } from "react-icons/fa"; // Reliable scroll icon
 
 export default function App({ Component, pageProps }) {
   const handleError = (error, errorInfo) => {
-    console.error("The Ethereal Plane experienced a disturbance:", error, errorInfo); // Themed error message
+    console.error("App error:", error, errorInfo);
   };
 
   const [authChecked, setAuthChecked] = useState(false);
@@ -26,9 +26,9 @@ export default function App({ Component, pageProps }) {
     const initAuth = async () => {
       try {
         await refreshAccessToken();
-        console.log("Ancient wards refreshed, connection re-established."); // Themed log
+        console.log("Session refreshed.");
       } catch (err) {
-        console.log("No valid arcane signature found, user must re-attune."); // Themed log
+        console.log("No valid session found. Proceeding unauthenticated.");
       } finally {
         if (mounted) setAuthChecked(true);
       }
@@ -40,20 +40,15 @@ export default function App({ Component, pageProps }) {
   }, []);
 
   if (!authChecked) {
-    // Themed Loading Screen
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-ancient-bg-dark text-ancient-text-light animate-fade-in">
         <div className="relative mb-6">
           <GiCrystalBall className="text-9xl text-ancient-icon-glow drop-shadow-lg animate-pulse-light-slow" />
           <FaScroll className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl text-ancient-text-light animate-spin-slow" />
         </div>
-        <div className="mb-4 text-4xl font-bold font-serif drop-shadow-lg text-center tracking-wide">
-          Ethereal Whispers
-        </div>
+        <div className="mb-4 text-4xl font-bold font-serif drop-shadow-lg text-center tracking-wide">Chat App</div>
         <LoadingSpinner /> {/* Use your existing spinner, assuming it's okay */}
-        <div className="mt-4 text-ancient-text-muted text-lg italic animate-fade-in delay-700">
-          Awakening the ancient network...
-        </div>
+        <div className="mt-4 text-ancient-text-muted text-lg animate-fade-in delay-700">Loading...</div>
       </div>
     );
   }
@@ -62,8 +57,8 @@ export default function App({ Component, pageProps }) {
     <ErrorBoundary onError={handleError}>
       <QueryClientProvider client={queryClient}>
         <Head>
-          <title>Ethereal Whispers</title> {/* Themed Title */}
-          <link rel="shortcut icon" href="/favicon_mystical.png" /> {/* Themed Favicon */}
+          <title>Chat App</title>
+          <link rel="shortcut icon" href="/favicon.ico" />
         </Head>
         <Component {...pageProps} />
         <Toaster

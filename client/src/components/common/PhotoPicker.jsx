@@ -7,7 +7,6 @@ function PhotoPicker({ onChange, accept = "image/*" }) {
 
   useEffect(() => {
     setMounted(true);
-    // Ensure the target element for the portal exists
     let el = document.getElementById("photo-picker-element");
     if (!el) {
       el = document.createElement("div");
@@ -16,10 +15,11 @@ function PhotoPicker({ onChange, accept = "image/*" }) {
     }
     setTarget(el);
 
-    // Clean up the element if component unmounts
     return () => {
+      // Only remove if this component created it
       if (el && document.body.contains(el)) {
-        document.body.removeChild(el);
+        // Remove input, but only if it has no children other than our own (defensive)
+        el.innerHTML = "";
       }
     };
   }, []);
@@ -27,7 +27,15 @@ function PhotoPicker({ onChange, accept = "image/*" }) {
   if (!mounted || !target) return null;
 
   return ReactDOM.createPortal(
-    <input type="file" hidden id="photo-picker" accept={accept} onChange={onChange} />,
+    <input
+      type="file"
+      hidden
+      id="photo-picker"
+      accept={accept}
+      onChange={onChange}
+      tabIndex={-1}
+      aria-label="Select photo"
+    />,
     target
   );
 }

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAllContacts } from "@/hooks/queries/useAllContacts";
 import { useCreateGroup } from "@/hooks/mutations/useCreateGroup";
 import { showToast } from "@/lib/toast";
@@ -10,8 +10,6 @@ import ThemedInput from "@/components/common/ThemedInput";
 import AvatarUpload from "@/components/common/AvatarUpload";
 import ContactSelectorItem from "@/components/common/ContactSelectorItem";
 import ModalShell from "@/components/common/ModalShell";
-
-// Inline components removed; using shared components from common/
 
 export default function GroupCreateModal({ open, onClose }) {
   const { data: sections = {}, isLoading } = useAllContacts();
@@ -25,7 +23,6 @@ export default function GroupCreateModal({ open, onClose }) {
 
   useEffect(() => {
     if (!open) {
-      // Reset state when modal closes
       setStep(1);
       setName("");
       setDescription("");
@@ -36,7 +33,11 @@ export default function GroupCreateModal({ open, onClose }) {
   }, [open]);
 
   const flatContacts = useMemo(() => {
-    return Object.values(sections).flat().map((u) => ({ id: u.id, name: u.name, image: u.profileImage }));
+    return Object.values(sections).flat().map((u) => ({
+      id: u.id,
+      name: u.name,
+      image: u.profileImage,
+    }));
   }, [sections]);
 
   const filteredContacts = useMemo(() => {
@@ -49,7 +50,9 @@ export default function GroupCreateModal({ open, onClose }) {
   }, [flatContacts, searchTerm]);
 
   const toggleContactSelection = (uid) =>
-    setSelected((prev) => (prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid]));
+    setSelected((prev) =>
+      prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid]
+    );
 
   const canProceedToStep2 = selected.length > 0;
   const canFinalizeGroup = name.trim().length > 0 && selected.length > 0;
@@ -80,24 +83,24 @@ export default function GroupCreateModal({ open, onClose }) {
     <ModalShell open={open} onClose={onClose} maxWidth="max-w-lg">
       {/* Step 1: Add Participants */}
       {step === 1 && (
-        <div className="flex flex-col h-[600px] sm:h-[700px] animate-slide-in-right">
+        <div className="flex flex-col h-[60vh] sm:h-[70vh] animate-slide-in-right">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 bg-ancient-bg-medium border-b border-ancient-border-stone">
+          <div className="flex items-center justify-between p-3 sm:p-4 bg-ancient-bg-medium border-b border-ancient-border-stone">
             <button
               onClick={onClose}
               className="text-ancient-text-muted hover:text-red-400 transition-colors duration-200"
               aria-label="Close"
             >
-              <IoClose className="h-7 w-7" />
+              <IoClose className="h-6 w-6 sm:h-7 sm:w-7" />
             </button>
-            <h3 className="text-ancient-text-light text-xl font-bold flex items-center gap-2">
+            <h3 className="text-ancient-text-light text-lg sm:text-xl font-bold flex items-center gap-2">
               <FaMagic className="text-ancient-icon-glow" /> Select Conclave Members
             </h3>
-            <div className="w-7"></div> {/* Placeholder for alignment */}
+            <div className="w-6 sm:w-7" /> {/* Alignment placeholder */}
           </div>
 
           {/* Search Input */}
-          <div className="p-4 border-b border-ancient-border-stone bg-ancient-input-bg">
+          <div className="p-2 sm:p-4 border-b border-ancient-border-stone bg-ancient-input-bg">
             <ThemedInput
               name="Search Contacts"
               state={searchTerm}
@@ -109,67 +112,118 @@ export default function GroupCreateModal({ open, onClose }) {
 
           {/* Selected Contacts Preview (horizontal scroll) */}
           {selected.length > 0 && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-ancient-input-bg border-b border-ancient-border-stone overflow-x-auto custom-scrollbar-horizontal">
+            <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-ancient-input-bg border-b border-ancient-border-stone overflow-x-auto custom-scrollbar-horizontal">
               {selected.map((uid) => {
                 const contact = flatContacts.find((c) => c.id === uid);
                 if (!contact) return null;
                 return (
-                  <div key={uid} className="relative flex-shrink-0 flex flex-col items-center group cursor-pointer" onClick={() => toggleContactSelection(uid)}>
-                    <div className="relative h-12 w-12 rounded-full overflow-hidden border-2 border-ancient-icon-glow">
-                      <Image src={contact.image || "/default_mystical_avatar.png"} alt={contact.name} fill className="object-cover" />
+                  <div
+                    key={uid}
+                    className="relative flex-shrink-0 flex flex-col items-center group cursor-pointer"
+                    onClick={() => toggleContactSelection(uid)}
+                  >
+                    <div className="relative h-10 w-10 rounded-full overflow-hidden border-2 border-ancient-icon-glow">
+                      <Image
+                        src={contact.image || "/default_mystical_avatar.png"}
+                        alt={contact.name}
+                        fill
+                        className="object-cover"
+                        priority
+                      />
                       <div className="absolute inset-0 bg-red-700/70 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <IoClose className="text-white text-xl" />
                       </div>
                     </div>
-                    <span className="text-ancient-text-light text-xs mt-1 truncate max-w-[50px]">{contact.name.split(" ")[0]}</span>
+                    <span className="text-ancient-text-light text-xs mt-1 truncate max-w-[56px] sm:max-w-[72px]">
+                      {contact.name.split(" ")[0]}
+                    </span>
                   </div>
                 );
               })}
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-4 space-y-2">
             {isLoading && (
-              <div className="text-ancient-text-muted text-center py-8">Summoning spirits from the ethereal plane...</div>
+              <div className="text-ancient-text-muted text-center py-8 text-base sm:text-lg">
+                Summoning spirits from the ethereal plane...
+              </div>
             )}
             {!isLoading && filteredContacts.length === 0 && (
-              <div className="text-ancient-text-muted text-center py-8">No spirits found matching your incantation.</div>
+              <div className="text-ancient-text-muted text-center py-8 text-base sm:text-lg">
+                No spirits found matching your incantation.
+              </div>
             )}
-            {!isLoading && filteredContacts.map((contact) => (
-              <ContactSelectorItem key={contact.id} contact={contact} isSelected={selected.includes(contact.id)} onToggle={toggleContactSelection} />
-            ))}
+            {!isLoading &&
+              filteredContacts.map((contact) => (
+                <ContactSelectorItem
+                  key={contact.id}
+                  contact={contact}
+                  isSelected={selected.includes(contact.id)}
+                  onToggle={toggleContactSelection}
+                />
+              ))}
           </div>
 
-          <div className="flex justify-end p-4 bg-ancient-bg-medium border-t border-ancient-border-stone">
-            <button onClick={() => setStep(2)} disabled={!canProceedToStep2} className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold text-base px-6 py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-              Next Ritual ({selected.length}) <IoArrowBack className="rotate-180" />
+          <div className="flex justify-end p-3 sm:p-4 bg-ancient-bg-medium border-t border-ancient-border-stone">
+            <button
+              onClick={() => setStep(2)}
+              disabled={!canProceedToStep2}
+              className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold text-base sm:text-lg px-5 py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              Next Ritual ({selected.length}){" "}
+              <IoArrowBack className="rotate-180 h-5 w-5 sm:h-6 sm:w-6" />
             </button>
           </div>
         </div>
       )}
 
+      {/* Step 2: Group Details */}
       {step === 2 && (
-        <div className="flex flex-col h-[600px] sm:h-[700px] animate-slide-in-right">
-          <div className="flex items-center p-4 bg-ancient-bg-medium border-b border-ancient-border-stone">
-            <button onClick={() => setStep(1)} className="text-ancient-text-muted hover:text-ancient-icon-glow transition-colors duration-200 mr-4" aria-label="Back">
-              <IoArrowBack className="h-7 w-7" />
+        <div className="flex flex-col h-[60vh] sm:h-[70vh] animate-slide-in-right">
+          <div className="flex items-center p-3 sm:p-4 bg-ancient-bg-medium border-b border-ancient-border-stone">
+            <button
+              onClick={() => setStep(1)}
+              className="text-ancient-text-muted hover:text-ancient-icon-glow transition-colors duration-200 mr-4"
+              aria-label="Back"
+            >
+              <IoArrowBack className="h-6 w-6 sm:h-7 sm:w-7" />
             </button>
-            <h3 className="text-ancient-text-light text-xl font-bold flex items-center gap-2">
+            <h3 className="text-ancient-text-light text-lg sm:text-xl font-bold flex items-center gap-2">
               <FaScroll className="text-ancient-icon-glow" /> Inscribe Conclave Details
             </h3>
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6 flex flex-col items-center">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-6 flex flex-col items-center">
             <AvatarUpload iconFile={iconFile} setIconFile={setIconFile} name={name} />
-            <div className="w-full max-w-sm space-y-4">
-              <ThemedInput name="Conclave Name" state={name} setState={setName} placeholder="E.g., Whispering Circle, Council of Elders" Icon={FaScroll} label />
-              <ThemedInput name="Conclave Purpose" state={description} setState={setDescription} placeholder="Share the purpose of your gathering..." Icon={FaFeather} label />
+            <div className="w-full max-w-xs sm:max-w-sm space-y-4">
+              <ThemedInput
+                name="Conclave Name"
+                state={name}
+                setState={setName}
+                placeholder="E.g., Whispering Circle, Council of Elders"
+                Icon={FaScroll}
+                label
+              />
+              <ThemedInput
+                name="Conclave Purpose"
+                state={description}
+                setState={setDescription}
+                placeholder="Share the purpose of your gathering..."
+                Icon={FaFeather}
+                label
+              />
             </div>
           </div>
 
-          <div className="flex justify-end p-4 bg-ancient-bg-medium border-t border-ancient-border-stone">
-            <button onClick={onSubmitGroup} disabled={!canFinalizeGroup || createGroup.isPending} className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold text-base px-6 py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-              {createGroup.isPending ? "Forging Conclave..." : "Forge Conclave"} <FaMagic />
+          <div className="flex justify-end p-3 sm:p-4 bg-ancient-bg-medium border-t border-ancient-border-stone">
+            <button
+              onClick={onSubmitGroup}
+              disabled={!canFinalizeGroup || createGroup.isPending}
+              className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold text-base sm:text-lg px-6 py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {createGroup.isPending ? "Forging Conclave..." : "Forge Conclave"}{" "}
+              <FaMagic />
             </button>
           </div>
         </div>

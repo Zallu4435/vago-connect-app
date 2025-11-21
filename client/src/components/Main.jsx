@@ -1,21 +1,20 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import ChatList from "./Chatlist/ChatList";
-import Empty from "./Empty"; // This component will need a thematic update
+import Empty from "./Empty";
 import { onAuthStateChanged } from "firebase/auth";
 import { firebaseAuth } from "@/utils/FirebaseConfig";
 import { useRouter } from "next/navigation";
-import Chat from "./Chat/Chat"; // This component will need a thematic update
-import SearchMessages from "./Chat/SearchMessages"; // This component has been themed
-import VideoCall from "./Call/VideoCall"; // These call components will need thematic updates
-import AudioCall from "./Call/AudioCall"; // These call components will need thematic updates
+import Chat from "./Chat/Chat";
+import SearchMessages from "./Chat/SearchMessages";
+import VideoCall from "./Call/VideoCall";
+import AudioCall from "./Call/AudioCall";
 import { useAuthStore } from "@/stores/authStore";
 import { useSocketStore } from "@/stores/socketStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useCallStore } from "@/stores/callStore";
 import { useUser } from "@/hooks/queries/useUser";
-import ErrorMessage from "@/components/common/ErrorMessage"; // This component will need a thematic update
-import FullPageError from "@/components/common/FullPageError"; // This component will need a thematic update
+import FullPageError from "@/components/common/FullPageError";
 import useNetworkStatus from "@/hooks/useNetworkStatus";
 import { useSocketConnection } from "@/hooks/useSocketConnection";
 import { useCallSocketHandlers } from "@/hooks/useCallSocketHandlers";
@@ -27,16 +26,11 @@ function Main() {
   const isOnline = useNetworkStatus();
   const userInfo = useAuthStore((s) => s.userInfo);
   const setUserInfo = useAuthStore((s) => s.setUserInfo);
-
   const currentChatUser = useChatStore((s) => s.currentChatUser);
-  const setMessages = useChatStore((s) => s.setMessages);
   const messageSearch = useChatStore((s) => s.messageSearch);
 
   const audioCall = useCallStore((s) => s.audioCall);
   const videoCall = useCallStore((s) => s.videoCall);
-  const setCall = useCallStore((s) => s.setCall);
-  const setAudioCall = useCallStore((s) => s.setAudioCall);
-  const setVideoCall = useCallStore((s) => s.setVideoCall);
 
   const router = useRouter();
   useSocketConnection();
@@ -44,7 +38,6 @@ function Main() {
   useMessageSocketHandlers();
   usePresenceSocketHandlers();
 
-  // Opt-in to socket connection for this page
   const setShouldConnect = useSocketStore((s) => s.setShouldConnect);
   useEffect(() => {
     setShouldConnect(true);
@@ -70,6 +63,7 @@ function Main() {
   }, [router]);
 
   const { data: foundUser, error: userError, refetch: refetchUser, isPending: isUserLoading } = useUser(authEmail || undefined);
+
   useEffect(() => {
     if (!authEmail) return;
     if (foundUser === null) {
@@ -88,9 +82,6 @@ function Main() {
     }
   }, [authEmail, foundUser, authDisplayName, authPhotoURL, setUserInfo, router, userInfo?.id]);
 
-  // Removed non-paginated messages fetching and mark-read loop to avoid duplicate API calls.
-  // ChatContainer uses useMessagesPaginated with markRead on initial page.
-
   return (
     <>
       {/* SVG filter defs for organic message bubble effect */}
@@ -105,11 +96,11 @@ function Main() {
       {/* Full Page Error for User Loading */}
       {authEmail && userError && (
         <FullPageError
-          title="Failed to decipher ancient prophecy" // Themed title
-          message="The sacred scrolls are unreadable. Verify your connection to the ethereal plane and attempt again." // Themed message
+          title="Failed to decipher ancient prophecy"
+          message="The sacred scrolls are unreadable. Verify your connection to the ethereal plane and attempt again."
           onRetry={() => refetchUser()}
           actionHref="/login"
-          actionLabel="Return to Login Ritual" // Themed button
+          actionLabel="Return to Login Ritual"
         />
       )}
 
@@ -119,42 +110,50 @@ function Main() {
 
       {/* Main Chat Layout */}
       {!audioCall && !videoCall && (
-        <div className="grid grid-cols-main h-screen w-screen max-h-screen max-w-full overflow-hidden bg-ancient-bg-dark text-ancient-text-light">
-          {/* Chat List Sidebar */}
-          {/* Defer ChatList until CHECK_USER completes so protected contacts endpoint has auth */}
-          {isUserLoading ? (
-            <div className="bg-ancient-bg-dark flex flex-col h-screen max-h-screen w-full lg:w-[400px] overflow-hidden border-r border-ancient-border-stone z-20 shadow-xl items-center justify-center text-ancient-text-muted">
-              <LoadingSpinner label="Preparing your chats…" />
-            </div>
-          ) : (
-            <ChatList />
-          )}
-
+        <div className="
+          flex flex-col-reverse md:flex-row
+          h-dvh w-dvw max-h-screen max-w-full overflow-hidden
+          bg-ancient-bg-dark text-ancient-text-light
+        ">
+          {/* Sidebar/Chat List */}
+          <div className="
+            flex-shrink-0 w-full md:w-[340px] lg:w-[400px] 
+            h-[55dvh] md:h-screen max-h-[50vh] md:max-h-full
+            border-b md:border-b-0 md:border-r border-ancient-border-stone 
+            shadow-xl z-20 bg-ancient-bg-dark
+            relative
+            transition-all
+            md:sticky md:top-0
+          ">
+            {isUserLoading ? (
+              <div className="flex flex-col h-full w-full items-center justify-center text-ancient-text-muted">
+                <LoadingSpinner label="Preparing your chats…" />
+              </div>
+            ) : (
+              <ChatList />
+            )}
+          </div>
           {/* Main Chat Area or Empty State */}
-          {currentChatUser ? (
-            <div className={`flex flex-col flex-1 ${messageSearch ? 'lg:mr-[400px]' : ''}`}>
-              {/* Message Loading Error */}
-              {false && (
-                <div className="col-span-full px-6 py-3 bg-ancient-bg-medium border-b border-ancient-border-stone flex items-center gap-4 text-ancient-warning-text shadow-inner">
-                  <ErrorMessage message="Failed to retrieve ancient whispers." />
-                  <button
-                    type="button"
-                    className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark text-sm px-4 py-2 rounded-lg transition-colors shadow-md"
-                    onClick={() => {}}
-                  >
-                    Retry Invocation
-                  </button>
-                </div>
-              )}
-              {/* Chat Window */}
-              <Chat isOnline={isOnline} />
-              {/* Message Search Panel */}
-              {messageSearch && <SearchMessages />}
-            </div>
-          ) : (
-            // Empty State
-            <Empty />
-          )}
+          <div className="flex-1 min-w-0 flex flex-col">
+            {currentChatUser ? (
+              <div className={`flex flex-col flex-1 w-full max-w-full h-full`}>
+                {/* Message Loading Error Placeholder */}
+                {/* ... */}
+                <Chat isOnline={isOnline} />
+                {/* Search panel overlays chat, if active */}
+                {messageSearch && (
+                  <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-lg animate-fade-in">
+                    <div className="max-w-2xl w-full mx-auto my-12 md:my-20">
+                      <SearchMessages />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Empty State
+              <Empty />
+            )}
+          </div>
         </div>
       )}
     </>

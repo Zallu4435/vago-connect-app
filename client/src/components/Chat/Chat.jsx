@@ -17,18 +17,11 @@ function Chat({ isOnline }) {
     <div className="
       flex flex-col
       h-full max-h-full
-      w-full
+      w-full max-w-none
       bg-conversation-panel-background
       relative
       overflow-hidden
-      rounded-lg
-      shadow-lg
       transition-all
-      md:rounded-xl
-      md:shadow-2xl
-      lg:max-w-[60vw]
-      xl:max-w-[750px]
-      mx-auto
     ">
       {/* Header fixed on top on mobile for better navigation */}
       <div className="flex-shrink-0 sticky top-0 z-30">

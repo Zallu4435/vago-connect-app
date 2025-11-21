@@ -256,11 +256,11 @@ function MessageBar({ isOnline = true }) {
     form.append("file", file, file.name || 'file');
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
-    const toastId = showToast.loading("Transcribing ancient file...");
+    const toastId = showToast.loading("Uploading file...");
     uploadFileMutation.mutate(form, {
       onSuccess: (data) => {
         showToast.dismiss(toastId);
-        showToast.success("Ancient file inscribed!");
+        showToast.success("File sent.");
         socket.current?.emit("send-msg", {
           to: currentChatUser.id,
           from: userInfo.id,
@@ -276,7 +276,7 @@ function MessageBar({ isOnline = true }) {
       },
       onError: (err) => {
         showToast.dismiss(toastId);
-        showToast.error("Transcription failed. Try again.");
+        showToast.error("Upload failed. Try again.");
         console.error("sendFile error", err);
       },
     });
@@ -285,16 +285,16 @@ function MessageBar({ isOnline = true }) {
   const handleSendLocation = () => {
     if (!isOnline || !currentChatUser?.id || !userInfo?.id) return;
     if (!navigator.geolocation) {
-      showToast.error("Ancient geomancy not supported by your device.");
+      showToast.error("Location is not supported on this device.");
       return;
     }
-    const toastId = showToast.loading("Divining ley-line coordinates...");
+    const toastId = showToast.loading("Getting location...");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords || {};
         if (typeof latitude !== 'number' || typeof longitude !== 'number') {
           showToast.dismiss(toastId);
-          showToast.error("Failed to divine location.");
+          showToast.error("Failed to get location.");
           return;
         }
         sendLocationMutation.mutate(
@@ -302,21 +302,21 @@ function MessageBar({ isOnline = true }) {
           {
             onSuccess: (data) => {
               showToast.dismiss(toastId);
-              showToast.success("Ley-line coordinates sent!");
+              showToast.success("Location sent.");
               const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "location");
               setMessages((prev) => ([...(prev || []), msg]));
               addToMessagesCache(msg);
             },
             onError: () => {
               showToast.dismiss(toastId);
-              showToast.error("Failed to send ley-line coordinates.");
+              showToast.error("Failed to send location.");
             },
           }
         );
       },
       () => {
         showToast.dismiss(toastId);
-        showToast.error("Permission to access ley-lines denied.");
+        showToast.error("Location permission denied.");
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );

@@ -2,12 +2,16 @@ import React from 'react';
 import toast, { type Renderable, type ValueOrFunction } from 'react-hot-toast';
 
 const baseStyle: React.CSSProperties = {
-  fontSize: 14,
-  padding: '12px 24px',
+  fontSize: 'clamp(13px, 4vw, 16px)', // Scales for mobile
+  padding: '12px 6vw', // Responsive horizontal padding
   borderRadius: 8,
   color: '#ffffff',
   background: '#1f2c33',
   fontFamily: 'inherit',
+  maxWidth: '96vw',
+  width: 'fit-content',
+  minWidth: '200px',
+  boxSizing: 'border-box',
 };
 
 const positions = { position: 'top-center' as const };
@@ -38,7 +42,6 @@ export const showToast = {
   },
 
   loading(message: string) {
-    // Manual dismiss; user should call dismiss with returned id
     return toast.loading(message, {
       ...positions,
       duration: Infinity,
@@ -56,22 +59,23 @@ export const showToast = {
   },
 
   networkStatus(message: string, isError: boolean) {
-    // Full-width banner look using custom renderer without JSX
+    // Full-width mobile-friendly banner
     return toast.custom(
       () =>
         React.createElement(
           'div',
           {
             style: {
-              width: '100%',
-              maxWidth: '100%',
+              width: '100vw',
+              maxWidth: '100vw',
               borderRadius: 0,
               background: isError ? '#dc3545' : '#00a884',
               color: '#ffffff',
-              fontSize: 14,
+              fontSize: 'clamp(13px, 4vw, 16px)',
               fontFamily: 'inherit',
-              padding: '12px 24px',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+              padding: '12px 6vw',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.13)',
+              boxSizing: 'border-box',
             },
           },
           message,
@@ -95,11 +99,15 @@ export const showToast = {
               gap: 12,
               background: '#1f2c33',
               color: '#ffffff',
-              fontSize: 14,
+              fontSize: 'clamp(13px, 4vw, 16px)',
               fontFamily: 'inherit',
-              padding: '12px 24px',
+              padding: '12px 6vw',
               borderRadius: 8,
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.10)',
+              maxWidth: '96vw',
+              minWidth: '200px',
+              boxSizing: 'border-box',
+              flexWrap: 'wrap',
             },
           },
           React.createElement('span', null, message),
@@ -107,21 +115,20 @@ export const showToast = {
             'button',
             {
               onClick: () => {
-                try {
-                  onAction();
-                } finally {
-                  toast.dismiss(t.id);
-                }
+                try { onAction(); } finally { toast.dismiss(t.id); }
               },
               style: {
-                marginLeft: 8,
-                padding: '6px 12px',
+                marginLeft: 6,
+                padding: '8px 14px',
                 borderRadius: 6,
                 border: 'none',
                 background: '#00a884',
-                color: '#ffffff',
+                color: '#fff',
                 cursor: 'pointer',
-                fontSize: 13,
+                minWidth: 'auto',
+                fontSize: '15px',
+                flexShrink: 0,
+                marginTop: 6,
               },
             },
             actionLabel,

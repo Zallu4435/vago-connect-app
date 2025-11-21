@@ -158,7 +158,7 @@ function ChatContainer() {
     <div
       ref={containerRef}
       onScroll={onScroll}
-      className="h-[80vh] w-full flex-grow relative overflow-auto custom-scrollbar bg-ancient-bg-dark text-ancient-text-light"
+      className="h-full w-full flex-1 relative overflow-auto custom-scrollbar bg-transparent text-ancient-text-light"
     >
       {/* Optional: floating background visuals */}
       <div className="bg-chat-background bg-fixed h-full w-full opacity-[0.04] fixed left-0 top-0 z-0 pointer-events-none"></div>

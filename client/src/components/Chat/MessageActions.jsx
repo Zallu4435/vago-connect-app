@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useStarMessage } from "@/hooks/mutations/useStarMessage";
 import { useDeleteMessage } from "@/hooks/mutations/useDeleteMessage";
 import { useEditMessage } from "@/hooks/mutations/useEditMessage";
@@ -9,12 +9,11 @@ import {
   FaStar,
   FaEdit,
   FaTrashAlt,
-  FaLaughBeam, // For react icon
+  FaLaughBeam,
 } from "react-icons/fa";
-import { BiReply } from "react-icons/bi"; // For reply icon
-// Replaced FaAngleDown with a more mystical GiScrollUnfurled for the menu toggle
+import { BiReply } from "react-icons/bi";
 import { GiScrollUnfurled, GiFeather } from "react-icons/gi";
-import { IoShareOutline } from "react-icons/io5"; // For forward icon (more modern share)
+import { IoShareOutline } from "react-icons/io5";
 import ActionSheet from "@/components/common/ActionSheet";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import InlineEditor from "@/components/common/InlineEditor";
@@ -22,7 +21,12 @@ import ReactionPicker from "@/components/common/ReactionPicker";
 
 const DEFAULT_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "👏", "🔥", "✨", "🙏"];
 
-export default function MessageActions({ message, isIncoming = false, onReply, onForward }) { // Added onReply, onForward props
+export default function MessageActions({
+  message,
+  isIncoming = false,
+  onReply,
+  onForward,
+}) {
   const userInfo = useAuthStore((s) => s.userInfo);
   const isMine = useMemo(() => String(message?.senderId) === String(userInfo?.id), [message, userInfo]);
 
@@ -32,7 +36,7 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
   const [showDropdownMenu, setShowDropdownMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const actionButtonsRef = useRef(null); // Ref for the main action buttons container
+  const actionButtonsRef = useRef(null);
   const reactionsMenuRef = useRef(null);
   const dropdownMenuRef = useRef(null);
 
@@ -41,10 +45,8 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
   const editMutation = useEditMessage();
   const reactMutation = useReactToMessage();
 
-  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Check if click is outside the main action buttons and any open menu
       if (
         actionButtonsRef.current && !actionButtonsRef.current.contains(event.target) &&
         reactionsMenuRef.current && !reactionsMenuRef.current.contains(event.target) &&
@@ -99,25 +101,22 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
   }, [message, reactMutation]);
 
   const handleReply = useCallback(() => {
-    onReply?.(message); // Call the provided onReply prop
+    onReply?.(message);
     setShowDropdownMenu(false);
   }, [message, onReply]);
 
   const handleForward = useCallback(() => {
-    onForward?.(message); // Call the provided onForward prop
+    onForward?.(message);
     setShowDropdownMenu(false);
   }, [message, onForward]);
 
-  // Controls
-  const canEdit = isMine && message?.type === "text" && !message?.isDeleted; // Cannot edit deleted messages
-  const canDelete = !message?.isDeleted; // Cannot delete an already deleted message (though it might show as "deleted")
+  const canEdit = isMine && message?.type === "text" && !message?.isDeleted;
+  const canDelete = !message?.isDeleted;
   const isStarred = useMemo(() => Array.isArray(message?.starredBy) && message.starredBy.some((e) => (e?.userId ?? e) === userInfo.id), [message, userInfo]);
 
-
-  // Inline editor for text messages when editing
   if (isEditing && message.type === "text") {
     return (
-      <div className={`absolute ${isIncoming ? "left-0" : "right-0"} top-full mt-1 z-20`}>
+      <div className={`absolute ${isIncoming ? "left-0" : "right-0"} top-full mt-1 z-20 w-[260px] sm:w-[350px]`}>
         <InlineEditor
           value={editText}
           onChange={setEditText}
@@ -128,19 +127,24 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
     );
   }
 
-  // Main MessageActions component
   return (
     <div
-      ref={actionButtonsRef} // Ref for the main action buttons container
-      className={`absolute ${isIncoming ? "-right-2" : "-left-2"} -top-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200`}
+      ref={actionButtonsRef}
+      className={`
+        absolute ${isIncoming ? "-right-4" : "-left-4"} -top-2 z-20 flex items-center gap-1 opacity-0 group-hover:opacity-100
+        transition-opacity duration-200
+        max-w-[calc(100vw-48px)]
+      `}
     >
-      {/* Reaction Picker (appears above/below the message bubble) */}
+      {/* Reaction Picker */}
       {showReactionsMenu && (
-        <div ref={reactionsMenuRef} className="relative">
+        <div ref={reactionsMenuRef} className="relative z-30">
           <ReactionPicker
             open={showReactionsMenu}
             anchorSide={isIncoming ? "left" : "right"}
             onPick={onReact}
+            className="text-base sm:text-lg"
+            containerClassName="p-1 sm:p-2"
           />
         </div>
       )}
@@ -148,25 +152,43 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
       {/* React Button */}
       <button
         type="button"
-        className="relative bg-ancient-bg-medium border border-ancient-border-stone rounded-full p-2 text-ancient-icon-inactive hover:text-ancient-icon-glow shadow-md transition-colors duration-200"
+        aria-label="React to message"
+        className="
+          relative bg-ancient-bg-medium border border-ancient-border-stone
+          rounded-full p-1.5 sm:p-2
+          text-ancient-icon-inactive hover:text-ancient-icon-glow
+          shadow-md transition-colors duration-200
+          flex items-center justify-center
+          text-lg sm:text-xl
+          cursor-pointer
+          focus:outline-2 focus:outline-ancient-icon-glow
+        "
         onClick={() => setShowReactionsMenu((s) => !s)}
-        title="React"
       >
-        <FaLaughBeam className="text-sm" />
+        <FaLaughBeam />
       </button>
 
-      {/* Dropdown Menu Toggle */}
+      {/* Dropdown Toggle */}
       <button
         type="button"
-        className="relative bg-ancient-bg-medium border border-ancient-border-stone rounded-full p-2 text-ancient-icon-inactive hover:text-ancient-icon-glow shadow-md transition-colors duration-200"
+        aria-label="More message actions"
+        className="
+          relative bg-ancient-bg-medium border border-ancient-border-stone
+          rounded-full p-1.5 sm:p-2
+          text-ancient-icon-inactive hover:text-ancient-icon-glow
+          shadow-md transition-colors duration-200
+          flex items-center justify-center
+          text-lg sm:text-xl
+          cursor-pointer
+          focus:outline-2 focus:outline-ancient-icon-glow
+        "
         onClick={() => setShowDropdownMenu((v) => !v)}
-        title="More actions"
       >
-        <GiScrollUnfurled className="text-sm" /> {/* Mystical scroll icon for menu */}
+        <GiScrollUnfurled />
       </button>
 
-      {/* Dropdown Menu via ActionSheet */}
-      <div ref={dropdownMenuRef} className="relative">
+      {/* Dropdown Menu */}
+      <div ref={dropdownMenuRef} className="relative z-40">
         <ActionSheet
           open={showDropdownMenu}
           onClose={() => setShowDropdownMenu(false)}
@@ -181,25 +203,28 @@ export default function MessageActions({ message, isIncoming = false, onReply, o
         />
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation */}
       {showDeleteConfirm && (
         <ConfirmModal
           open={showDeleteConfirm}
           onClose={() => setShowDeleteConfirm(false)}
-          onConfirm={() => doDelete(isMine ? 'forEveryone' : 'forMe')}
+          onConfirm={() => doDelete(isMine ? "forEveryone" : "forMe")}
           title="Confirm Delete"
           description="Are you sure you want to delete this message?"
           confirmText={isMine ? "Delete (for Everyone)" : "Delete (for Me)"}
           confirmLoading={delMutation.isPending}
           variant="danger"
-          extra={isMine ? (
-            <button
-              className="mt-1 text-ancient-text-muted hover:text-ancient-text-light text-xs underline"
-              onClick={() => doDelete('forMe')}
-            >
-              Delete only for me
-            </button>
-          ) : null}
+          extra={
+            isMine ? (
+              <button
+                className="mt-2 text-ancient-text-muted hover:text-ancient-text-light text-xs underline"
+                onClick={() => doDelete("forMe")}
+                type="button"
+              >
+                Delete only for me
+              </button>
+            ) : null
+          }
         />
       )}
     </div>

@@ -1,11 +1,14 @@
 "use client";
 import React, { useEffect } from "react";
-import Avatar from "../common/Avatar"; // Assuming Avatar component is already themed
+import Avatar from "../common/Avatar";
 import { getAbsoluteUrl } from "@/lib/url";
-import { IoSettingsOutline, IoLogOutOutline } from "react-icons/io5"; // Keep some Io5
-import { GiCrystalBall, GiMagicLamp, GiMoon } from "react-icons/gi"; // Mystical icons (trimmed to used ones)
+import { IoSettingsOutline, IoLogOutOutline } from "react-icons/io5";
+import { GiCrystalBall, GiMagicLamp, GiMoon } from "react-icons/gi";
 
-export default function SidebarMenu({ open, onClose, user, onNewGroup, onProfile, onCalls, onSettings, onLogout }) {
+export default function SidebarMenu({
+  open, onClose, user,
+  onNewGroup, onProfile, onCalls, onSettings, onLogout
+}) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
     if (open) document.addEventListener("keydown", onKey);
@@ -17,67 +20,74 @@ export default function SidebarMenu({ open, onClose, user, onNewGroup, onProfile
   return (
     <div className="fixed inset-0 z-50">
       {/* Backdrop with blur */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+        aria-label="Close sidebar"
+        tabIndex={-1}
+      />
 
       {/* Panel */}
-      <div className="absolute left-0 top-0 h-full w-[340px] max-w-[90vw] bg-ancient-bg-dark border-r border-ancient-border-stone shadow-2xl animate-slide-in">
+      <aside
+        className="
+          absolute left-0 top-0 h-full w-[94vw] max-w-[340px] sm:w-[340px] 
+          bg-ancient-bg-dark border-r border-ancient-border-stone shadow-2xl
+          animate-slide-in flex flex-col
+          transition-all ease-in-out
+        "
+        style={{ maxHeight: "100svh", paddingBottom: "env(safe-area-inset-bottom,0px)" }}
+        tabIndex={0}
+        aria-modal="true"
+        role="dialog"
+      >
         {/* Header/Profile */}
-        <div className="p-6 bg-ancient-bg-medium border-b border-ancient-border-stone flex flex-col items-center justify-center">
-          <Avatar type="lg" image={getAbsoluteUrl(user?.profileImage || user?.image)} /> {/* Larger avatar */}
+        <div className="p-5 sm:p-6 bg-ancient-bg-medium border-b border-ancient-border-stone flex flex-col items-center">
+          <Avatar type="lg" image={getAbsoluteUrl(user?.profileImage || user?.image)} />
           <div className="flex flex-col items-center mt-3">
-            <span className="text-ancient-text-light font-bold text-lg">{user?.name || "User"}</span>
-            <span className="text-ancient-text-muted text-sm">{user?.email || "unknown@example.com"}</span>
+            <span className="text-ancient-text-light font-bold text-base sm:text-lg">{user?.name || "User"}</span>
+            <span className="text-ancient-text-muted text-xs sm:text-sm text-center">{user?.email || "unknown@example.com"}</span>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="p-4 flex flex-col gap-1">
-          {/* Profile */}
+        <nav className="flex-1 overflow-y-auto p-3 sm:p-4 flex flex-col gap-1">
           <button
             className="flex items-center gap-4 px-4 py-3 text-ancient-text-light hover:bg-ancient-input-bg rounded-lg transition-colors duration-200"
             onClick={onProfile}
           >
-            <GiCrystalBall className="text-ancient-icon-glow text-2xl" />
-            <span className="text-base font-medium">Profile</span>
+            <GiCrystalBall className="text-ancient-icon-glow text-xl sm:text-2xl" />
+            <span className="text-sm sm:text-base font-medium">Profile</span>
           </button>
-
-          {/* New Group */}
           <button
             className="flex items-center gap-4 px-4 py-3 text-ancient-text-light hover:bg-ancient-input-bg rounded-lg transition-colors duration-200"
             onClick={onNewGroup}
           >
-            <GiMoon className="text-ancient-icon-glow text-2xl" />
-            <span className="text-base font-medium">New Group</span>
+            <GiMoon className="text-ancient-icon-glow text-xl sm:text-2xl" />
+            <span className="text-sm sm:text-base font-medium">New Group</span>
           </button>
-
-          {/* Calls */}
           <button
             className="flex items-center gap-4 px-4 py-3 text-ancient-text-light hover:bg-ancient-input-bg rounded-lg transition-colors duration-200"
             onClick={onCalls}
           >
-            <GiMagicLamp className="text-ancient-icon-glow text-2xl" />
-            <span className="text-base font-medium">Calls</span>
+            <GiMagicLamp className="text-ancient-icon-glow text-xl sm:text-2xl" />
+            <span className="text-sm sm:text-base font-medium">Calls</span>
           </button>
-
-          {/* Settings */}
           <button
             className="flex items-center gap-4 px-4 py-3 text-ancient-text-light hover:bg-ancient-input-bg rounded-lg transition-colors duration-200"
             onClick={onSettings}
           >
-            <IoSettingsOutline className="text-ancient-icon-glow text-2xl" />
-            <span className="text-base font-medium">Settings</span>
+            <IoSettingsOutline className="text-ancient-icon-glow text-xl sm:text-2xl" />
+            <span className="text-sm sm:text-base font-medium">Settings</span>
           </button>
-
-          {/* Logout */}
           <button
-            className="flex items-center gap-4 px-4 py-3 text-ancient-warning-text hover:bg-red-700/20 rounded-lg transition-colors duration-200 mt-4"
+            className="flex items-center gap-4 px-4 py-3 text-ancient-warning-text hover:bg-red-700/20 rounded-lg transition-colors duration-200 mt-3 sm:mt-4"
             onClick={onLogout}
           >
-            <IoLogOutOutline className="text-ancient-warning-text text-2xl" />
-            <span className="text-base font-medium">Logout</span>
+            <IoLogOutOutline className="text-ancient-warning-text text-xl sm:text-2xl" />
+            <span className="text-sm sm:text-base font-medium">Logout</span>
           </button>
-        </div>
-      </div>
+        </nav>
+      </aside>
     </div>
   );
 }

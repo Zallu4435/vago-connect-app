@@ -27,51 +27,51 @@ function LogoutPage() { // Renamed component to follow Next.js page conventions
         // Emit socket signout if connected and then disconnect
         if (socket?.current && userInfo?.id) {
           try {
-            console.log("Severing ethereal cord...");
+            console.log("Signing out socket...");
             socket.current.emit("signout", userInfo.id);
           } catch (e) {
             console.warn("Socket signout emission failed:", e);
           }
           try {
             socket.current.disconnect();
-            console.log("Ethereal cord severed.");
+            console.log("Socket disconnected.");
           } catch (e) {
             console.warn("Socket disconnection failed:", e);
           }
         }
 
-        // Backend logout to clear refresh cookie (Breaking the ancient pact)
+        // Backend logout to clear refresh cookie
         try {
           await api.post("/api/auth/logout", undefined, { withCredentials: true });
-          console.log("Ancient pact with server dissolved.");
+          console.log("Server session cleared.");
         } catch (e) {
           console.warn("Backend logout failed:", e);
         }
 
-        // Clear client stores and caches (Wiping the slate clean)
+        // Clear client stores and caches
         clearAuth();
         try { clearChat?.(); } catch (e) { console.warn("Clearing chat history failed:", e); }
         try { resetCallState?.(); } catch (e) { console.warn("Resetting call state failed:", e); }
         try { queryClient.clear(); } catch (e) { console.warn("Clearing query cache failed:", e); }
-        console.log("Echoes of current session dispelled.");
+        console.log("Local session cleared.");
 
-        // Firebase sign out (Extinguishing the sacred flame)
+        // Firebase sign out
         try {
           await signOut(firebaseAuth);
-          console.log("Sacred flame of authentication extinguished.");
+          console.log("Firebase sign out complete.");
         } catch (e) {
           console.warn("Firebase sign out failed:", e);
         }
 
         // Feedback
-        showToast.info("You have departed the ethereal plane."); // Themed info toast
+        showToast.info("Signed out successfully.");
 
         // Redirect
         router.push("/login");
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.error("The dispelling ritual encountered an anomaly:", error); // Themed error message
-        showToast.error("A disturbance prevented a clean departure."); // Themed error toast
+        console.error("Logout error:", error);
+        showToast.error("Could not sign out cleanly. Redirecting to login.");
         router.push("/login"); // Ensure redirect even on error
       }
     };
@@ -84,12 +84,9 @@ function LogoutPage() { // Renamed component to follow Next.js page conventions
         <div className="relative mb-4">
           <FaMagic className="text-6xl text-ancient-icon-glow drop-shadow-lg animate-pulse-light-slow" />
         </div>
-        <div className="mb-3 text-2xl font-bold font-serif drop-shadow-lg text-center tracking-wide">
-          Severing Ethereal Link
-        </div>
+        <div className="mb-3 text-2xl font-bold font-serif drop-shadow-lg text-center tracking-wide">Signing out</div>
         <LoadingSpinner label="Signing you out..." />
-        <div className="mt-3 text-ancient-text-muted text-sm italic animate-fade-in delay-700">Safely dispelling session wards.</div>
-        <div className="text-ancient-text-muted text-lg italic animate-fade-in delay-700">Severing your ties to the Ethereal Whispers.</div>
+        <div className="mt-3 text-ancient-text-muted text-sm animate-fade-in delay-700">Please wait...</div>
       </div>
     </ProtectedRoute>
   );

@@ -28,7 +28,7 @@ function ChatHeader({ onOpenMedia }) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Get conversation ID and type from contacts
+  // Get conversation details
   const { data: contacts = [] } = useContacts(userInfo?.id);
   const contactEntry = useMemo(() => {
     return contacts.find((c) => String(c?.id) === String(currentChatUser?.id));
@@ -40,7 +40,7 @@ function ChatHeader({ onOpenMedia }) {
   }, [currentChatUser?.id, userInfo?.id, contactEntry?.isSelf]);
   const isPinned = Boolean(contactEntry?.isPinned);
 
-  // Maintenance action hooks
+  // Chat actions
   const clearChat = useClearChat();
   const deleteChat = useDeleteChat();
   const archiveChat = useArchiveChat();
@@ -80,9 +80,17 @@ function ChatHeader({ onOpenMedia }) {
   };
 
   return (
-    <div className="h-20 px-6 py-3 flex items-center justify-between bg-ancient-bg-medium border-b border-ancient-border-stone shadow-md">
+    <div className="
+      w-full
+      flex items-center justify-between
+      h-16 sm:h-20
+      px-3 sm:px-6
+      py-2 sm:py-3
+      bg-ancient-bg-medium border-b border-ancient-border-stone shadow-md
+      transition-all
+      ">
       {/* Left: Avatar and name/status */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3 sm:gap-6 min-w-0">
         <Avatar
           type="sm"
           image={getAbsoluteUrl(
@@ -91,36 +99,36 @@ function ChatHeader({ onOpenMedia }) {
               : (currentChatUser?.profilePicture || currentChatUser?.image || currentChatUser?.profileImage)
           )}
         />
-        <div className="flex flex-col">
-          <span className="text-ancient-text-light text-xl font-bold">
+        <div className="flex flex-col min-w-0">
+          <span className="text-ancient-text-light text-base sm:text-xl font-bold truncate max-w-[120px] sm:max-w-[220px]">
             {isSelfChat ? (isPinned ? "Saved messages" : "You") : (currentChatUser?.name || currentChatUser?.username || "Unknown")}
           </span>
-          <span className="text-ancient-text-muted text-sm italic">
+          <span className="text-ancient-text-muted text-xs sm:text-sm italic truncate max-w-[100px] sm:max-w-[180px]">
             {onlineUsers?.some((u) => String(u) === String(currentChatUser?.id))
               ? "Online"
               : "Offline"}
           </span>
         </div>
       </div>
-      {/* Right: Controls */}
-      <div className="flex items-center gap-7">
+      {/* Right: Responsive control row */}
+      <div className="flex items-center gap-2 sm:gap-6 overflow-x-auto max-w-[73vw] sm:max-w-none flex-nowrap">
         <MdPermMedia
-          className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+          className="text-ancient-icon-inactive cursor-pointer text-xl sm:text-2xl hover:text-ancient-icon-glow transition"
           title="Media"
           onClick={() => onOpenMedia?.()}
         />
         <MdCall
-          className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+          className="text-ancient-icon-inactive cursor-pointer text-xl sm:text-2xl hover:text-ancient-icon-glow transition"
           title="Voice Call"
           onClick={handleVoiceCall}
         />
         <IoVideocam
-          className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+          className="text-ancient-icon-inactive cursor-pointer text-xl sm:text-2xl hover:text-ancient-icon-glow transition"
           title="Video Call"
           onClick={handleVideoCall}
         />
         <BiSearchAlt2
-          className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+          className="text-ancient-icon-inactive cursor-pointer text-xl sm:text-2xl hover:text-ancient-icon-glow transition"
           title="Search"
           onClick={() => {
             useChatStore.setState({ messageSearch: true });
@@ -128,7 +136,7 @@ function ChatHeader({ onOpenMedia }) {
         />
         <div className="relative">
           <BsThreeDotsVertical
-            className="text-ancient-icon-inactive cursor-pointer text-2xl hover:text-ancient-icon-glow transition"
+            className="text-ancient-icon-inactive cursor-pointer text-xl sm:text-2xl hover:text-ancient-icon-glow transition"
             onClick={() => setShowMenu((v) => !v)}
             title="More options"
           />

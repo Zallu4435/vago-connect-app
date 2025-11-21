@@ -92,9 +92,9 @@ export default function GroupManageModal({ open, onClose, groupId }) {
 
     updateSettings.mutate(formData, {
       onSuccess: () => {
-        showToast.success("Conclave details re-inscribed!");
+        showToast.success("Group details updated.");
       },
-      onError: () => showToast.error("Failed to re-inscribe conclave details."),
+      onError: () => showToast.error("Failed to update group details."),
     });
   };
 
@@ -102,10 +102,10 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     if (!groupId || membersToAdd.length === 0) return;
     addMembers.mutate({ groupId, members: membersToAdd }, {
       onSuccess: () => {
-        showToast.success("New disciples entrusted to the conclave!");
+        showToast.success("Members added.");
         setShowAddParticipantsModal(false);
       },
-      onError: () => showToast.error("Failed to entrust new disciples."),
+      onError: () => showToast.error("Failed to add members."),
     });
   }, [addMembers, groupId]);
 
@@ -113,16 +113,16 @@ export default function GroupManageModal({ open, onClose, groupId }) {
   const handleRemoveMember = (memberId) => {
     if (!groupId || !memberId) return;
     removeMembers.mutate({ groupId, members: [memberId] }, {
-      onSuccess: () => showToast.success("Disciple banished from the conclave."),
-      onError: () => showToast.error("Failed to banish disciple."),
+      onSuccess: () => showToast.success("Member removed."),
+      onError: () => showToast.error("Failed to remove member."),
     });
   };
 
   const handleChangeMemberRole = (userId, role) => {
     if (!groupId || !userId) return;
     updateRole.mutate({ groupId, userId, role }, {
-      onSuccess: () => showToast.success("Disciple's rank changed."),
-      onError: () => showToast.error("Failed to change disciple's rank."),
+      onSuccess: () => showToast.success("Role updated."),
+      onError: () => showToast.error("Failed to update role."),
     });
   };
 
@@ -135,11 +135,11 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     if (!groupId) return;
     leaveGroup.mutate(groupId, {
       onSuccess: () => {
-        showToast.info("You have abandoned the conclave.");
+        showToast.info("You left the group.");
         setShowLeaveConfirm(false);
         onClose?.();
       },
-      onError: () => showToast.error("Failed to abandon the conclave."),
+      onError: () => showToast.error("Failed to leave the group."),
     });
   };
 
@@ -152,11 +152,11 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     if (!groupId) return;
     deleteGroup.mutate(groupId, {
       onSuccess: () => {
-        showToast.info("The conclave has been utterly dissolved.");
+        showToast.info("Group deleted.");
         setShowDeleteConfirm(false);
         onClose?.();
       },
-      onError: () => showToast.error("Failed to dissolve the conclave."),
+      onError: () => showToast.error("Failed to delete group."),
     });
   };
 
@@ -166,7 +166,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     <div className="fixed inset-0 z-50 flex flex-col bg-ancient-bg-dark text-ancient-text-light animate-fade-in">
       {/* Header */}
       <ModalHeader
-        title="Conclave Grimoire"
+        title="Group settings"
         Icon={FaTabletAlt}
         onBack={onClose}
       />
@@ -185,19 +185,19 @@ export default function GroupManageModal({ open, onClose, groupId }) {
           />
           <div className="w-full max-w-sm space-y-4">
             <ThemedInput
-              name="Conclave Name"
+              name="Group name"
               state={localGroupName}
               setState={setLocalGroupName}
-              placeholder="E.g., Whispering Circle, Council of Elders"
+              placeholder="Enter a group name"
               Icon={FaScroll}
               label
               isEditable={currentUserIsAdmin}
             />
             <ThemedInput
-              name="Conclave Purpose"
+              name="Description"
               state={localGroupDescription}
               setState={setLocalGroupDescription}
-              placeholder="Share the purpose of your gathering..."
+              placeholder="Add a description (optional)"
               Icon={FaFeather}
               label
               isEditable={currentUserIsAdmin}
@@ -209,7 +209,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
               disabled={updateSettings.isPending}
               className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold text-base px-6 py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {updateSettings.isPending ? "Re-inscribing..." : "Re-inscribe Details"} <FaMagic />
+              {updateSettings.isPending ? "Saving..." : "Save changes"} <FaMagic />
             </button>
           )}
         </div>
@@ -218,7 +218,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         <div className="bg-ancient-bg-medium rounded-xl p-6 border border-ancient-border-stone shadow-xl">
           <div className="flex items-center justify-between mb-4 pb-4 border-b border-ancient-input-border">
             <h4 className="text-ancient-text-light text-2xl font-bold flex items-center gap-3">
-              <FaUsers className="text-ancient-icon-glow" /> Conclave Disciples ({groupData.members?.length || 0})
+              <FaUsers className="text-ancient-icon-glow" /> Members ({groupData.members?.length || 0})
             </h4>
             {currentUserIsAdmin && (
               <button
@@ -232,7 +232,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
           </div>
           <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
             {groupData.members?.length === 0 && (
-              <div className="text-ancient-text-muted text-center py-4">No disciples yet.</div>
+              <div className="text-ancient-text-muted text-center py-4">No members yet.</div>
             )}
             {groupData.members?.map((member) => (
               <ThemedMemberListItem
@@ -251,19 +251,19 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         {currentUserIsAdmin && (
           <div className="bg-ancient-bg-medium rounded-xl p-6 border border-ancient-border-stone shadow-xl">
             <h4 className="text-ancient-text-light text-2xl font-bold flex items-center gap-3 mb-4 pb-4 border-b border-ancient-input-border">
-              <FaLock className="text-ancient-icon-glow" /> Conclave Edicts
+              <FaLock className="text-ancient-icon-glow" /> Settings
             </h4>
             <div className="space-y-4">
               <ThemedSwitch
-                label="Ephemeral Whispers (Disappearing Messages)"
+                label="Disappearing messages"
                 checked={groupData.ephemeralMessages || false} // Placeholder for actual group setting
-                onChange={() => showToast.info("Feature not yet implemented for this ancient scroll.")} // Placeholder
+                onChange={() => showToast.info("Not implemented yet.")} // Placeholder
                 isEditable={currentUserIsAdmin}
               />
               {/* Add more settings here */}
               <div className="flex items-center justify-between p-4 bg-ancient-input-bg rounded-lg border border-ancient-input-border shadow-inner cursor-pointer hover:bg-ancient-bubble-user-light transition-all duration-200">
                 <span className="text-ancient-text-light text-lg flex items-center gap-2">
-                    <FaShieldAlt className="text-ancient-text-muted" /> Battleground Rules
+                  <FaShieldAlt className="text-ancient-text-muted" /> Group rules
                 </span>
                 <IoChevronForward className="text-ancient-text-muted text-xl" />
               </div>
@@ -272,27 +272,27 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         )}
 
 
-        {/* Danger Zone */}
+        {/* Danger zone */}
         <div className="bg-red-900/20 rounded-xl p-6 border border-red-700 shadow-xl space-y-4">
-            <h4 className="text-red-400 text-2xl font-bold flex items-center gap-3 mb-4 pb-4 border-b border-red-700">
-              <FaFire className="text-red-400" /> Forbidden Edicts
-            </h4>
+          <h4 className="text-red-400 text-2xl font-bold flex items-center gap-3 mb-4 pb-4 border-b border-red-700">
+            <FaFire className="text-red-400" /> Danger zone
+          </h4>
+          <button
+            onClick={handleLeaveGroup}
+            className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/50 rounded-lg text-red-300 font-bold flex items-center justify-between transition-colors duration-200"
+          >
+            <span>Leave group</span>
+            <IoExitOutline className="text-red-300 text-2xl" />
+          </button>
+          {currentUserIsAdmin && ( // Only admin can delete group
             <button
-                onClick={handleLeaveGroup}
-                className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/50 rounded-lg text-red-300 font-bold flex items-center justify-between transition-colors duration-200"
+              onClick={handleDeleteGroup}
+              className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/70 rounded-lg text-red-400 font-bold flex items-center justify-between transition-colors duration-200"
             >
-                <span>Abandon Conclave</span>
-                <IoExitOutline className="text-red-300 text-2xl" />
+              <span>Delete group</span>
+              <IoTrash className="text-red-400 text-2xl" />
             </button>
-            {currentUserIsAdmin && ( // Only admin can delete group
-                <button
-                    onClick={handleDeleteGroup}
-                    className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/70 rounded-lg text-red-400 font-bold flex items-center justify-between transition-colors duration-200"
-                >
-                    <span>Utterly Dissolve Conclave</span>
-                    <IoTrash className="text-red-400 text-2xl" />
-                </button>
-            )}
+          )}
         </div>
 
       </div>
@@ -313,8 +313,8 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         open={showLeaveConfirm}
         onClose={() => setShowLeaveConfirm(false)}
         onConfirm={confirmLeaveGroup}
-        title="Abandon Conclave?"
-        description="You will leave this group. You can be re‑added by an elder later."
+        title="Leave group?"
+        description="You will leave this group. You can be re‑added later."
         confirmText="Leave"
         cancelText="Cancel"
         confirmLoading={leaveGroup.isPending}
@@ -326,8 +326,8 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         open={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDeleteGroup}
-        title="Utterly Dissolve Conclave?"
-        description="This will permanently delete the group and its records for all members. This action cannot be undone."
+        title="Delete group?"
+        description="This will permanently delete the group for all members. This action cannot be undone."
         confirmText="Delete"
         cancelText="Cancel"
         confirmLoading={deleteGroup.isPending}

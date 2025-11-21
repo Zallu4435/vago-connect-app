@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Avatar from "../common/Avatar";
 import { calculateTime } from "@/utils/CalculateTime";
 import MessageStatus from "../common/MessageStatus";
@@ -16,6 +16,7 @@ function ChatListItem({ data, isContactsPage = false }) {
   const setCurrentChatUser = useChatStore((s) => s.setCurrentChatUser);
   const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuBtnRef = useRef(null);
 
   const handleContactClick = () => {
     setCurrentChatUser(data);
@@ -38,26 +39,10 @@ function ChatListItem({ data, isContactsPage = false }) {
     setMenuOpen(false);
   };
 
-  const onArchive = (e) => {
-    e.stopPropagation();
-    showToast.info("Archive coming soon");
-    setMenuOpen(false);
-  };
-  const onDelete = (e) => {
-    e.stopPropagation();
-    showToast.info("Delete coming soon");
-    setMenuOpen(false);
-  };
-  const onBlock = (e) => {
-    e.stopPropagation();
-    showToast.info("Block coming soon");
-    setMenuOpen(false);
-  };
-  const onExit = (e) => {
-    e.stopPropagation();
-    showToast.info("Exit coming soon");
-    setMenuOpen(false);
-  };
+  const onArchive = (e) => { e.stopPropagation(); showToast.info("Archive coming soon"); setMenuOpen(false); };
+  const onDelete = (e) => { e.stopPropagation(); showToast.info("Delete coming soon"); setMenuOpen(false); };
+  const onBlock = (e) => { e.stopPropagation(); showToast.info("Block coming soon"); setMenuOpen(false); };
+  const onExit = (e) => { e.stopPropagation(); showToast.info("Exit coming soon"); setMenuOpen(false); };
 
   const displayName = data?.isSelf
     ? (data?.isPinned ? "Saved messages" : "You")
@@ -65,43 +50,53 @@ function ChatListItem({ data, isContactsPage = false }) {
 
   return (
     <div
-      className="flex items-center py-3 px-4 cursor-pointer bg-ancient-bg-dark hover:bg-ancient-input-bg border-b border-ancient-border-stone transition-colors duration-200 min-h-[76px]"
+      className="
+        flex items-center py-3 px-2 sm:px-4 cursor-pointer
+        bg-ancient-bg-dark hover:bg-ancient-input-bg border-b border-ancient-border-stone
+        transition-colors duration-200 min-h-[72px] sm:min-h-[76px] gap-0 sm:gap-1
+      "
       onClick={handleContactClick}
     >
       {/* Avatar (left) */}
-      <div className="min-w-[56px] pr-4">
+      <div className="min-w-[48px] sm:min-w-[56px] pr-2 sm:pr-4">
         <Avatar
           type="lg"
           image={getAbsoluteUrl(data?.profilePicture || data?.image || data?.profileImage)}
         />
       </div>
       {/* Content (center/right) */}
-      <div className="flex-1 flex flex-col justify-center min-h-full">
-        <div className="flex justify-between items-center mb-1">
-          <div className="flex items-center gap-2">
+      <div className="flex-1 flex flex-col justify-center min-h-full overflow-hidden">
+        <div className="flex justify-between items-center mb-1 gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 max-w-[65vw] truncate">
             {data?.isPinned && (
-              <FaThumbtack className="text-ancient-icon-glow text-xs -rotate-12" />
+              <FaThumbtack className="text-ancient-icon-glow text-xs -rotate-12 shrink-0" />
             )}
-            <span className="text-ancient-text-light font-bold text-base">
+            <span className="text-ancient-text-light font-bold text-sm sm:text-base truncate">
               {displayName}
             </span>
           </div>
-          <div className="flex items-center gap-2 relative">
-            <span className="text-ancient-text-muted text-xs">{lastTime}</span>
+          <div className="flex items-center gap-1 sm:gap-2 relative">
+            <span className="text-ancient-text-muted text-xs whitespace-nowrap">{lastTime}</span>
             <button
               type="button"
-              className="w-7 h-7 flex items-center justify-center rounded hover:bg-ancient-input-bg text-ancient-text-muted"
+              className="
+                w-7 h-7 flex items-center justify-center rounded
+                hover:bg-ancient-input-bg text-ancient-text-muted
+                transition
+              "
               onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
+              ref={menuBtnRef}
             >
-              <IoChevronDown className="text-lg" />
+              <IoChevronDown className="text-base sm:text-lg" />
             </button>
             <ActionSheet
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               align="right"
               placement="below"
+              anchorRef={menuBtnRef}
               items={[
                 { label: "Archive", onClick: onArchive },
                 { label: data?.isPinned ? "Unpin" : "Pin", onClick: onTogglePin },
@@ -119,12 +114,15 @@ function ChatListItem({ data, isContactsPage = false }) {
                 <MessageStatus MessageStatus={data?.messageStatus} />
               </span>
             )}
-            <span className="text-ancient-text-muted line-clamp-1 text-sm break-all w-full">
+            <span className="text-ancient-text-muted line-clamp-1 text-xs sm:text-sm break-all w-full">
               {preview}
             </span>
           </div>
           {data?.totalUnreadMessages > 0 && (
-            <span className="ml-2 px-2.5 py-0.5 rounded-full bg-ancient-icon-glow text-ancient-bg-dark text-xs font-semibold flex items-center justify-center min-w-[24px] shadow-sm animate-pulse-glow h-6">
+            <span className="
+              ml-2 px-2 py-0.5 sm:px-2.5 rounded-full bg-ancient-icon-glow text-ancient-bg-dark text-xs font-semibold
+              flex items-center justify-center min-w-[20px] sm:min-w-[24px] shadow-sm animate-pulse-glow h-5 sm:h-6
+            ">
               {data.totalUnreadMessages}
             </span>
           )}
