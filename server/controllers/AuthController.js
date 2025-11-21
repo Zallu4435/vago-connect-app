@@ -37,7 +37,10 @@ export const checkUser = async (req, res, next) => {
 
         const prisma = getPrismaInstance()
 
-        const user = await prisma.user.findUnique({ where: { email } })
+        const user = await prisma.user.findUnique({
+          where: { email },
+          select: { id: true, name: true, email: true, about: true, profileImage: true },
+        })
 
         if (!user) {
             return res.status(200).json({ message: "User not found", status: false })
@@ -61,41 +64,79 @@ export const onBoardUser = async (req, res, next) => {
 
         const prisma = getPrismaInstance()
 
-        const user = await prisma.user.create({ data: { name, email, about: about || undefined, profileImage: finalProfileImage || undefined } })
+        const created = await prisma.user.create({ data: { name, email, about: about || undefined, profileImage: finalProfileImage || undefined } })
+        const user = {
+          id: created.id,
+          name: created.name,
+          email: created.email,
+          about: created.about,
+          profileImage: created.profileImage,
+        }
 
-        return res.status(200).json({ message: "User created", status: true, user })
+        return res.status(201).json({ message: "User created", status: true, user })
     } catch (error) {
         next(error)
     }
 }
 
 export const getAllUser = async (req, res, next) => {
-    try {
-        const prisma = getPrismaInstance()
-        const users = await prisma.user.findMany({
-            orderBy: { name: "asc" },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                about: true,
-                profileImage: true,
-            }
-        })
+  try {
+    const prisma = getPrismaInstance();
 
-        const usersGroupByInitialLetters = users.reduce((acc, user) => {
-            const initial = user.name.charAt(0).toUpperCase();
-            if (!acc[initial]) {
-                acc[initial] = [];
-            }
-            acc[initial].push(user);
-            return acc;
-        }, {});
+    // Query params: q, limit, cursor, sort
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const rawLimit = Number(req.query.limit);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 200) : 50;
+    const cursorId = req.query.cursor ? Number(req.query.cursor) : undefined;
+    const sort = req.query.sort === 'name_desc' ? 'desc' : 'asc';
 
-        return res.status(200).json({ message: "Users found", status: true, users: usersGroupByInitialLetters });
-    } catch (error) {
-        next(error)
+    const where = q
+      ? {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { email: { contains: q, mode: 'insensitive' } },
+          ],
+        }
+      : undefined;
+
+    const rows = await prisma.user.findMany({
+      where,
+      orderBy: { name: sort },
+      take: limit + 1,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        about: true,
+        profileImage: true,
+      },
+    });
+
+    let nextCursor = null;
+    let list = rows;
+    if (rows.length > limit) {
+      const next = rows.pop();
+      nextCursor = next?.id ? String(next.id) : null;
+      list = rows;
     }
+
+    const usersGroupByInitialLetters = list.reduce((acc, user) => {
+      const initial = (user?.name || '').charAt(0).toUpperCase() || '#';
+      if (!acc[initial]) acc[initial] = [];
+      acc[initial].push(user);
+      return acc;
+    }, {});
+
+    return res.status(200).json({
+      message: 'Users found',
+      status: true,
+      users: usersGroupByInitialLetters,
+      nextCursor,
+    });
+  } catch (error) {
+    next(error);
+  }
 }
 
 // New: Login -> validate firebase token (basic presence), issue JWTs, set refresh cookie
@@ -107,7 +148,7 @@ export const login = async (req, res, next) => {
     }
     // TODO: Optionally verify firebaseToken with Firebase Admin SDK.
     const prisma = getPrismaInstance();
-    let user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, email: true, about: true, profileImage: true } });
     // If user doesn't exist yet, allow client to onboard later; return minimal user shape
     if (!user) {
       user = { id: "", name: email.split("@")[0], email, about: "", profileImage: "" };
@@ -142,8 +183,8 @@ export const refresh = async (req, res, next) => {
 export const logout = async (_req, res, _next) => {
   try {
     res.clearCookie("refreshToken", { path: "/" });
-    return res.status(200).json({ message: "Logged out" });
+    return res.status(204).send();
   } catch {
-    return res.status(200).json({ message: "Logged out" });
+    return res.status(204).send();
   }
 };

@@ -22,6 +22,21 @@ function buildMediaFileData(messageId, cld, file, extra = {}) {
   };
 }
 
+function toMinimalMessage(m) {
+  if (!m) return m;
+  return {
+    id: m.id,
+    conversationId: m.conversationId,
+    senderId: m.senderId,
+    type: m.type,
+    content: m.content,
+    caption: m.caption || undefined,
+    status: m.status,
+    createdAt: m.createdAt,
+    ...(m.replyToMessageId ? { replyToMessageId: m.replyToMessageId } : {}),
+  };
+}
+
 async function prepareReply(prisma, convoId, replyToMessageId, requesterId) {
   if (!replyToMessageId) return { replyToMessageId: undefined, quotedMessage: undefined };
   const replyId = Number(replyToMessageId);
@@ -77,7 +92,7 @@ export const addMessage = async (req, res, next) => {
       },
     });
     emitMessageSent(convo, newMessage);
-    return res.status(201).json(newMessage);
+    return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
     const status = error?.status || 500;
     res.status(status).json({ message: error.message || "Internal error" });
@@ -87,7 +102,7 @@ export const addMessage = async (req, res, next) => {
 export const addVideo = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, replyToMessageId } = req.body;
+    const { from, to, replyToMessageId, caption } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -123,7 +138,7 @@ export const addVideo = async (req, res, next) => {
     });
     try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) }); } catch (_) {}
     emitMessageSent(convo, newMessage);
-    return res.status(201).json(newMessage);
+    return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
     next(error);
   }
@@ -131,20 +146,59 @@ export const addVideo = async (req, res, next) => {
 export const addImage = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, replyToMessageId } = req.body;
+    const { from, to, replyToMessageId, caption } = req.body;
+    try {
+      console.log('[Image:addImage] start', {
+        from,
+        to,
+        replyToMessageId,
+        hasFile: Boolean(req.file),
+        fileMeta: req.file
+          ? {
+              originalname: req.file.originalname,
+              mimetype: req.file.mimetype,
+              size: req.file.size,
+              bufferLen: req.file.buffer ? req.file.buffer.length : 0,
+            }
+          : null,
+        ts: Date.now(),
+      });
+    } catch (_) {}
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
     const recipientOnline = global.onlineUsers?.get?.(to);
+    try {
+      console.log('[Image:addImage] uploading to Cloudinary', {
+        mimetype: req.file?.mimetype,
+        bufferLen: req.file?.buffer?.length,
+      });
+    } catch (_) {}
     const cld = await uploadBuffer(req.file.buffer, {
       folder: process.env.CLOUDINARY_FOLDER || undefined,
       resource_type: 'image',
     });
+    try {
+      console.log('[Image:addImage] upload success', {
+        public_id: cld?.public_id,
+        url: cld?.secure_url,
+        bytes: cld?.bytes,
+        width: cld?.width,
+        height: cld?.height,
+      });
+    } catch (_) {}
     const contentUrl = cld.secure_url;
     const blocked = await isBlockedBetweenUsers(prisma, from, to);
     if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
     const convo = await getOrCreateDirectConversation(prisma, from, to);
     const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
+    try {
+      console.log('[Image:addImage] creating message', {
+        conversationId: convo?.id,
+        senderId: Number(from),
+        hasUrl: Boolean(contentUrl),
+      });
+    } catch (_) {}
     const newMessage = await prisma.message.create({
       data: {
         conversationId: convo.id,
@@ -152,14 +206,24 @@ export const addImage = async (req, res, next) => {
         type: "image",
         content: contentUrl,
         status: recipientOnline ? "delivered" : "sent",
+        caption: caption && String(caption).trim() ? String(caption).trim() : null,
         replyToMessageId: replyData.replyToMessageId,
         quotedMessage: replyData.quotedMessage,
       },
     });
-    try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) }); } catch (_) {}
+    try {
+      await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) });
+      try { console.log('[Image:addImage] mediaFile persisted'); } catch (_) {}
+    } catch (e) {
+      try { console.warn('[Image:addImage] mediaFile persist failed', { message: e?.message }); } catch (_) {}
+    }
     emitMessageSent(convo, newMessage);
-    return res.status(201).json(newMessage);
+    try { console.log('[Image:addImage] done', { messageId: newMessage?.id }); } catch (_) {}
+    return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
+    try {
+      console.error('[Image:addImage] error', { message: error?.message, stack: error?.stack });
+    } catch (_) {}
     next(error);
   }
 };
@@ -188,6 +252,7 @@ export const addAudio = async (req, res, next) => {
         type: "audio",
         content: contentUrl,
         status: recipientOnline ? "delivered" : "sent",
+        caption: caption && String(caption).trim() ? String(caption).trim() : null,
         replyToMessageId: replyData.replyToMessageId,
         quotedMessage: replyData.quotedMessage,
       },
@@ -213,7 +278,7 @@ export const addAudio = async (req, res, next) => {
       });
     } catch (_) {}
     emitMessageSent(convo, newMessage);
-    return res.status(201).json(newMessage);
+    return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
     next(error);
   }
@@ -222,7 +287,7 @@ export const addAudio = async (req, res, next) => {
 export const addFile = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, replyToMessageId } = req.body;
+    const { from, to, replyToMessageId, caption } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -251,6 +316,7 @@ export const addFile = async (req, res, next) => {
         type: inferredType,
         content: contentUrl,
         status: recipientOnline ? "delivered" : "sent",
+        caption: caption && String(caption).trim() ? String(caption).trim() : null,
         replyToMessageId: replyData.replyToMessageId,
         quotedMessage: replyData.quotedMessage,
       },
@@ -276,7 +342,7 @@ export const addFile = async (req, res, next) => {
       });
     } catch (_) {}
     emitMessageSent(convo, newMessage);
-    return res.status(201).json(newMessage);
+    return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
     next(error);
   }
@@ -320,7 +386,7 @@ export const addLocation = async (req, res, next) => {
       },
     });
     emitMessageSent(convo, newMessage);
-    return res.status(201).json(newMessage);
+    return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
     next(error);
   }

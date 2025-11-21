@@ -11,7 +11,7 @@ export const deleteChatForMe = async (req, res, next) => {
       where: { conversationId, userId },
     });
     if (!participant) return res.status(403).json({ message: "Not a participant" });
-    if (participant.isDeleted) return res.status(200).json({ success: true }); // idempotent
+    if (participant.isDeleted) return res.status(204).send(); // idempotent
 
     const now = new Date();
     await prisma.conversationParticipant.update({
@@ -26,7 +26,7 @@ export const deleteChatForMe = async (req, res, next) => {
       }
     } catch (_) {}
 
-    return res.status(200).json({ success: true });
+    return res.status(204).send();
   } catch (error) {
     next(error);
   }

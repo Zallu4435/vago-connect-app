@@ -53,7 +53,7 @@ export const editMessage = async (req, res, next) => {
       }
     } catch (_) {}
 
-    return res.status(200).json(updated);
+    return res.status(200).json({ id: updated.id, content: updated.content, editedAt: updated.editedAt });
   } catch (error) {
     next(error);
   }

@@ -61,7 +61,7 @@ export const reactToMessage = async (req, res, next) => {
       }
     } catch (_) {}
 
-    return res.status(200).json({ reactions });
+    return res.status(200).json({ id, reactions });
   } catch (error) {
     next(error);
   }

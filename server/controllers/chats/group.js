@@ -66,11 +66,31 @@ export const createGroup = async (req, res, next) => {
           ],
         },
       },
-      include: { participants: { include: { user: true } } },
+      include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
 
-    emitToUsers(conversation.participants.map((p) => p.userId), "group-created", { conversation });
-    return res.status(201).json(conversation);
+    emitToUsers(conversation.participants.map((p) => p.userId), "group-created", {
+      conversation: {
+        id: conversation.id,
+        type: conversation.type,
+        groupName: conversation.groupName,
+        groupDescription: conversation.groupDescription,
+        groupIcon: conversation.groupIcon,
+        createdAt: conversation.createdAt,
+        participants: conversation.participants.map((p) => ({
+          user: p.user,
+          role: p.role,
+        })),
+      },
+    });
+    return res.status(201).json({
+      id: conversation.id,
+      groupName: conversation.groupName,
+      groupDescription: conversation.groupDescription,
+      groupIcon: conversation.groupIcon,
+      createdAt: conversation.createdAt,
+      participants: conversation.participants.map((p) => ({ user: p.user, role: p.role })),
+    });
   } catch (error) {
     next(error);
   }
@@ -129,11 +149,12 @@ export const addGroupMembers = async (req, res, next) => {
 
     const updated = await prisma.conversation.findUnique({
       where: { id: groupId },
-      include: { participants: { include: { user: true } } },
+      include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
 
-    emitToUsers(updated.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: updated.participants });
-    return res.status(200).json({ participants: updated.participants });
+    const minimalParts = updated.participants.map(p => ({ user: p.user, role: p.role }));
+    emitToUsers(updated.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+    return res.status(200).json({ conversationId: groupId, participants: minimalParts });
   } catch (error) {
     next(error);
   }
@@ -184,10 +205,11 @@ export const removeGroupMembers = async (req, res, next) => {
 
     const updated = await prisma.conversation.findUnique({
       where: { id: groupId },
-      include: { participants: { include: { user: true } } },
+      include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
-    emitToUsers(updated.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: updated.participants });
-    return res.status(200).json({ participants: updated.participants });
+    const minimalParts = updated.participants.map(p => ({ user: p.user, role: p.role }));
+    emitToUsers(updated.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+    return res.status(200).json({ conversationId: groupId, participants: minimalParts });
   } catch (error) {
     next(error);
   }
@@ -219,11 +241,19 @@ export const updateGroupSettings = async (req, res, next) => {
     const updatedConversation = await prisma.conversation.update({ where: { id: groupId }, data });
     const full = await prisma.conversation.findUnique({
       where: { id: groupId },
-      include: { participants: { include: { user: true } } },
+      include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
 
-    emitToUsers(full.participants.map((p) => p.userId), 'group-updated', { conversation: full });
-    return res.status(200).json(full);
+    const minimal = {
+      id: full.id,
+      groupName: full.groupName,
+      groupDescription: full.groupDescription,
+      groupIcon: full.groupIcon,
+      updatedAt: full.updatedAt,
+      participants: full.participants.map(p => ({ user: p.user, role: p.role })),
+    };
+    emitToUsers(full.participants.map((p) => p.userId), 'group-updated', { conversation: minimal });
+    return res.status(200).json(minimal);
   } catch (error) {
     next(error);
   }
@@ -268,11 +298,11 @@ export const updateGroupRole = async (req, res, next) => {
 
     const updated = await prisma.conversation.findUnique({
       where: { id: groupId },
-      include: { participants: { include: { user: true } } },
+      include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
 
     emitToUsers(updated.participants.map((p) => p.userId), 'group-role-updated', { conversationId: groupId, userId: Number(userId), role });
-    return res.status(200).json({ participant: updatedPart });
+    return res.status(200).json({ conversationId: groupId, userId: Number(userId), role });
   } catch (error) {
     next(error);
   }

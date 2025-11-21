@@ -24,8 +24,8 @@ export const deleteMessage = async (req, res, next) => {
         return res.status(403).json({ message: "Only sender can delete for everyone" });
       }
       if (message.isDeletedForEveryone) {
-        // idempotent
-        return res.status(200).json(message);
+        // idempotent: already deleted for everyone
+        return res.status(200).json({ id: message.id, deleteType: "forEveryone" });
       }
       const createdAt = new Date(message.createdAt).getTime();
       const fortyEightHours = 48 * 60 * 60 * 1000;
@@ -53,7 +53,7 @@ export const deleteMessage = async (req, res, next) => {
         }
       } catch (_) {}
 
-      return res.status(200).json(updated);
+      return res.status(200).json({ id: updated.id, deleteType: "forEveryone" });
     }
 
     // deleteType === "forMe"

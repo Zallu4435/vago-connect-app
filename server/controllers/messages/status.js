@@ -25,7 +25,7 @@ export const updateMessageStatus = async (req, res, next) => {
       }
     } catch (_) { }
 
-    return res.status(200).json({ status: true, data: updated });
+    return res.status(200).json({ id: updated.id, status });
   } catch (error) {
     next(error);
   }

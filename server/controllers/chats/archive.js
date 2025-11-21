@@ -33,7 +33,11 @@ export const archiveChat = async (req, res, next) => {
       }
     } catch (_) {}
 
-    return res.status(200).json(updated);
+    return res.status(200).json({
+      conversationId,
+      isArchived: updated.isArchived,
+      archivedAt: updated.archivedAt,
+    });
   } catch (error) {
     next(error);
   }

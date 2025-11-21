@@ -104,14 +104,22 @@ export const forwardMessages = async (req, res, next) => {
           }
         }
 
-        created.push({ ...newMsg, conversationId: c.id });
+        created.push({
+          id: newMsg.id,
+          conversationId: c.id,
+          senderId: requesterId,
+          type: newMsg.type,
+          content: newMsg.content,
+          status: newMsg.status,
+          createdAt: newMsg.createdAt,
+        });
 
-        // Emit to destination participants
+        // Emit to destination participants (minimal payload)
         try {
           if (global?.io && global?.onlineUsers) {
             c.participants.forEach((p) => {
               const sid = global.onlineUsers.get(String(p.userId)) || global.onlineUsers.get(p.userId);
-              if (sid) global.io.to(sid).emit("message-forwarded", { message: newMsg, conversationId: c.id });
+              if (sid) global.io.to(sid).emit("message-forwarded", { messageId: newMsg.id, conversationId: c.id });
             });
           }
         } catch (_) {}

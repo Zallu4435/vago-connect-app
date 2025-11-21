@@ -44,7 +44,11 @@ export const muteChat = async (req, res, next) => {
       }
     } catch (_) {}
 
-    return res.status(200).json(updated);
+    return res.status(200).json({
+      conversationId,
+      muted: updated.isMuted,
+      mutedUntil: updated.mutedUntil,
+    });
   } catch (error) {
     next(error);
   }

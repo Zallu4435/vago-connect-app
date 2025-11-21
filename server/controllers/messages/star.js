@@ -43,7 +43,7 @@ export const starMessage = async (req, res, next) => {
       }
     } catch (_) {}
 
-    return res.status(200).json(updated);
+    return res.status(200).json({ id: updated.id, starred });
   } catch (error) {
     next(error);
   }

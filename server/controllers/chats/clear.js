@@ -29,7 +29,7 @@ export const clearChat = async (req, res, next) => {
       }
     } catch (_) {}
 
-    return res.status(200).json({ success: true });
+    return res.status(204).send();
   } catch (error) {
     next(error);
   }

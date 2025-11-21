@@ -51,7 +51,11 @@ export const pinChat = async (req, res, next) => {
       }
     } catch (_) {}
 
-    return res.status(200).json(updated);
+    return res.status(200).json({
+      conversationId,
+      isPinned: updated.isPinned,
+      pinOrder: updated.pinOrder,
+    });
   } catch (error) {
     next(error);
   }
