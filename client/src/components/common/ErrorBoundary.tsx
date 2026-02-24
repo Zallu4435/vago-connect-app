@@ -66,7 +66,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             Something went wrong
           </h1>
           <p className="text-base sm:text-lg text-ancient-text-muted mb-4">
-            We're sorry for the inconvenience. The app ran into an unexpected error.
+            We&apos;re sorry for the inconvenience. The app ran into an unexpected error.
           </p>
 
           {isDev && error && (

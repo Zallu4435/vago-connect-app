@@ -10,7 +10,9 @@ import LoadingSpinner from "@/components/common/LoadingSpinner";
 import ErrorMessage from "@/components/common/ErrorMessage";
 import { useAuthStore } from "@/stores/authStore";
 import { getAbsoluteUrl } from "@/lib/url";
-import GroupCreateModal from "./GroupCreateModal";
+import dynamic from "next/dynamic";
+
+const GroupCreateModal = dynamic(() => import("./GroupCreateModal"), { ssr: false });
 
 function ContactsList() {
   const [search, setSearch] = useState("");
@@ -65,7 +67,7 @@ function ContactsList() {
   }, [sections, search]);
 
   useEffect(() => {
-    if (!hasNextPage || isLoading || isFetchingNextPage) return;
+    if (!hasNextPage || isFetchingNextPage || isLoading) return;
     const el = sentinelRef.current;
     if (!el) return;
     const obs = new IntersectionObserver((entries) => {
@@ -74,7 +76,7 @@ function ContactsList() {
     }, { rootMargin: "200px" });
     obs.observe(el);
     return () => obs.disconnect();
-  }, [hasNextPage, fetchNextPage, isLoading, isFetchingNextPage]);
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage, isLoading]);
 
   const handleCloseGroupCreate = useCallback(() => setShowGroupCreate(false), []);
 
@@ -132,9 +134,11 @@ function ContactsList() {
       {/* Contacts List */}
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
         {isLoading && !data?.pages?.length ? (
-          <LoadingSpinner label="Loading contacts..." className="px-4 py-8 text-ancient-text-muted" />
+          <div className="flex w-full justify-center mt-8">
+            <LoadingSpinner key="loading" label="Loading contacts..." className="px-4 py-8 text-ancient-text-muted" />
+          </div>
         ) : error ? (
-          <div className="mx-3 sm:mx-6 my-6 px-4 sm:px-6 py-5 sm:py-6 flex flex-col items-start gap-4 bg-ancient-warning-bg rounded-lg sm:rounded-xl shadow-xl">
+          <div key="error" className="mx-3 sm:mx-6 my-6 px-4 sm:px-6 py-5 sm:py-6 flex flex-col items-start gap-4 bg-ancient-warning-bg rounded-lg sm:rounded-xl shadow-xl">
             <ErrorMessage message="Failed to load contacts." />
             <button
               type="button"
@@ -145,38 +149,40 @@ function ContactsList() {
             </button>
           </div>
         ) : Object.keys(filteredSections).length === 0 ? (
-          <div className="w-full py-8 text-center text-base text-ancient-text-muted">
+          <div key="no-results" className="w-full py-8 text-center text-base text-ancient-text-muted">
             No contacts found.
           </div>
         ) : (
-          Object.keys(filteredSections)
-            .sort()
-            .map((letter) => (
-              <div key={letter}>
-                <div className="sticky top-0 z-10 px-3 sm:px-6 py-1 sm:py-2 text-sm sm:text-base font-bold text-ancient-icon-glow bg-ancient-bg-dark/80 backdrop-blur-sm border-b border-ancient-border-stone/50">
-                  {letter}
+          <div key="contacts-grid">
+            {Object.keys(filteredSections)
+              .sort()
+              .map((letter) => (
+                <div key={letter}>
+                  <div className="sticky top-0 z-10 px-3 sm:px-6 py-1 sm:py-2 text-sm sm:text-base font-bold text-ancient-icon-glow bg-ancient-bg-dark/80 backdrop-blur-sm border-b border-ancient-border-stone/50">
+                    {letter}
+                  </div>
+                  <ul>
+                    {filteredSections[letter].map((u) => (
+                      <li key={u.id || u.email}>
+                        <ChatListItem
+                          isContactsPage
+                          data={{
+                            ...u,
+                            name: u?.name || u?.username || "Unknown user",
+                            isSelf: String(u?.id) === String(userInfo?.id),
+                            profilePicture: getAbsoluteUrl(u?.image || u?.profileImage) || "/default_avatar.png",
+                          }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul>
-                  {filteredSections[letter].map((u) => (
-                    <li key={u.id || u.email}>
-                      <ChatListItem
-                        isContactsPage
-                        data={{
-                          ...u,
-                          name: String(u?.id) === String(userInfo?.id) ? "You" : (u?.name || u?.username || "Unknown user"),
-                          isSelf: String(u?.id) === String(userInfo?.id),
-                          profilePicture: getAbsoluteUrl(u?.image || u?.profileImage) || "/default_avatar.png",
-                        }}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))
+              ))}
+          </div>
         )}
         {hasNextPage && (
           <div ref={sentinelRef} className="w-full py-4 flex justify-center items-center">
-            {isFetchingNextPage ? <LoadingSpinner label="Loading more contacts…" /> : null}
+            {isFetchingNextPage ? <LoadingSpinner key="loading-more" label="Loading more contacts…" /> : null}
           </div>
         )}
       </div>

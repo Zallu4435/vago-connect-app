@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import ChatHeader from "./ChatHeader";
 import ChatContainer from "./ChatContainer";
 import MessageBar from "./MessageBar";
+import dynamic from "next/dynamic";
 import { useChatStore } from "@/stores/chatStore";
-import MediaGallery from "./MediaGallery";
-import IncomingCallNotification from "@/components/common/IncomingCallNotification";
+
+const MediaGallery = dynamic(() => import("./MediaGallery"), { ssr: false });
+const IncomingCallNotification = dynamic(() => import("@/components/common/IncomingCallNotification"), { ssr: false });
 
 function Chat({ isOnline }) {
   const currentChatUser = useChatStore((s) => s.currentChatUser);
@@ -30,7 +32,7 @@ function Chat({ isOnline }) {
 
       {/* Scrollable, grows with available space (ChatContainer handles scrolling) */}
       <div className="flex-1 min-h-0 relative overflow-hidden bg-transparent">
-        <ChatContainer key={`chat-${currentChatUser.id}-${messages.length}`} />
+        <ChatContainer key={`chat-${currentChatUser.id}`} />
       </div>
 
       {/* Message bar sticks to bottom, never overflows */}

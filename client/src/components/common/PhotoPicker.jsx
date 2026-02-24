@@ -15,13 +15,8 @@ function PhotoPicker({ onChange, accept = "image/*" }) {
     }
     setTarget(el);
 
-    return () => {
-      // Only remove if this component created it
-      if (el && document.body.contains(el)) {
-        // Remove input, but only if it has no children other than our own (defensive)
-        el.innerHTML = "";
-      }
-    };
+    // React handles portal cleanup, so we don't need manual DOM manipulation here
+    return () => {};
   }, []);
 
   if (!mounted || !target) return null;

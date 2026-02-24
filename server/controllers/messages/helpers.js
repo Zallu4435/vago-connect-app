@@ -1,13 +1,19 @@
 export async function getOrCreateDirectConversation(prisma, userAId, userBId) {
   const a = Number(userAId);
   const b = Number(userBId);
-  let convo = await prisma.conversation.findFirst({
+  let convoList = await prisma.conversation.findMany({
     where: {
       type: "direct",
       participants: { some: { userId: a } },
       AND: [{ participants: { some: { userId: b } } }],
     },
     include: { participants: true },
+  });
+
+  // Filter for exact match to prevent a===b returning chats with c
+  let convo = convoList.find(c => {
+    if (a === b) return c.participants.length === 1 && c.participants[0].userId === a;
+    return c.participants.length === 2 && c.participants.some(p => p.userId === a) && c.participants.some(p => p.userId === b);
   });
   if (!convo) {
     // Create the conversation first to avoid nested participant unique conflicts

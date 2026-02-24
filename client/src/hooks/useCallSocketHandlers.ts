@@ -13,38 +13,45 @@ export function useCallSocketHandlers() {
   const endCall = useCallStore((s) => s.endCall);
 
   useEffect(() => {
-    if (!socket.current) return;
+    const s = socket.current;
+    if (!s) return;
 
-    socket.current.on('incoming-call', (data: any) => {
+    const onIncomingCall = (data: any) => {
       setCall(data);
       if (data?.callType === 'audio') setAudioCall(true);
       if (data?.callType === 'video') setVideoCall(true);
-    });
-    socket.current.on('call-accepted', () => {
+    };
+    const onCallAccepted = () => {
       acceptCall();
-    });
-    socket.current.on('call-rejected', () => {
+    };
+    const onCallRejected = () => {
       rejectCall();
       endCall();
-    });
-    socket.current.on('call-ended', () => {
+    };
+    const onCallEnded = () => {
       endCall();
-    });
-    socket.current.on('call-busy', () => {
+    };
+    const onCallBusy = () => {
       showToast.info('User is busy with another ritual.');
-    });
-    socket.current.on('call-failed', () => {
+    };
+    const onCallFailed = () => {
       showToast.error('Call failed. The spirits are not listening.');
-    });
+    };
+
+    s.on('incoming-call', onIncomingCall);
+    s.on('call-accepted', onCallAccepted);
+    s.on('call-rejected', onCallRejected);
+    s.on('call-ended', onCallEnded);
+    s.on('call-busy', onCallBusy);
+    s.on('call-failed', onCallFailed);
 
     return () => {
-      if (!socket.current) return;
-      socket.current.off('incoming-call');
-      socket.current.off('call-accepted');
-      socket.current.off('call-rejected');
-      socket.current.off('call-ended');
-      socket.current.off('call-busy');
-      socket.current.off('call-failed');
+      s.off('incoming-call', onIncomingCall);
+      s.off('call-accepted', onCallAccepted);
+      s.off('call-rejected', onCallRejected);
+      s.off('call-ended', onCallEnded);
+      s.off('call-busy', onCallBusy);
+      s.off('call-failed', onCallFailed);
     };
-  }, [socket.current, setCall, setAudioCall, setVideoCall, acceptCall, rejectCall, endCall]);
+  }, [socket, setCall, setAudioCall, setVideoCall, acceptCall, rejectCall, endCall]);
 }

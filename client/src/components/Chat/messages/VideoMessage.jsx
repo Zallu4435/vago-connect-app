@@ -4,7 +4,11 @@ import { calculateTime } from "@/utils/CalculateTime";
 import MessageStatus from "@/components/common/MessageStatus";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
-import MediaCarouselView from "../MediaGallery/MediaCarouselView";
+import dynamic from "next/dynamic";
+
+const MediaCarouselView = dynamic(() => import("../MediaGallery/MediaCarouselView"), {
+  ssr: false,
+});
 import { FaPlay, FaVideo } from "react-icons/fa";
 
 function VideoMessage({ message, isIncoming }) {
@@ -23,8 +27,8 @@ function VideoMessage({ message, isIncoming }) {
 
   const chatMessages = useChatStore((s) => s.messages) || [];
   const mediaItems = React.useMemo(() => {
-    const list = Array.isArray(chatMessages) ? chatMessages : [];
-    return list
+    const list = chatMessages;
+    return (Array.isArray(list) ? list : [])
       .filter((m) => {
         const t = String(m?.type || "");
         return t.startsWith("image") || t.startsWith("video");
@@ -59,8 +63,8 @@ function VideoMessage({ message, isIncoming }) {
       <div className={`message-bubble message-bubble-video ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} max-w-[480px]`}>
         <div
           className={`relative rounded-xl overflow-hidden shadow-xl cursor-pointer transition-all duration-200 hover:shadow-2xl group max-w-[480px] ${isIncoming
-              ? "bg-ancient-bubble-user border border-ancient-input-border"
-              : "bg-ancient-bubble-other border border-ancient-icon-glow/30"
+            ? "bg-ancient-bubble-user border border-ancient-input-border"
+            : "bg-ancient-bubble-other border border-ancient-icon-glow/30"
             }`}
           role="button"
           tabIndex={0}
@@ -131,8 +135,8 @@ function VideoMessage({ message, isIncoming }) {
           {/* Time and status overlay */}
           <div
             className={`absolute ${hasCaption ? 'bottom-12' : 'bottom-2'} right-2 flex items-center gap-1.5 px-2 py-1 rounded-md backdrop-blur-sm transition-opacity z-10 ${hasCaption
-                ? 'bg-black/40'
-                : 'bg-black/50 group-hover:bg-black/70'
+              ? 'bg-black/40'
+              : 'bg-black/50 group-hover:bg-black/70'
               }`}
           >
             <FaVideo className="text-[10px] text-white/80" />

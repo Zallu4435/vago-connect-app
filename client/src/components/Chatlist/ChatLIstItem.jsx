@@ -45,8 +45,8 @@ function ChatListItem({ data, isContactsPage = false }) {
   const onExit = (e) => { e.stopPropagation(); showToast.info("Exit coming soon"); setMenuOpen(false); };
 
   const displayName = data?.isSelf
-    ? (data?.isPinned ? "Saved messages" : "You")
-    : (data?.name || "Unknown User");
+    ? (data?.isPinned ? "Saved messages" : ((data?.name || data?.username || userInfo?.name) ? `${data?.name || data?.username || userInfo?.name} (You)` : "You"))
+    : (data?.name || data?.username || "Unknown User");
 
   return (
     <div
@@ -111,7 +111,7 @@ function ChatListItem({ data, isContactsPage = false }) {
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {isSenderLast && (
               <span className="text-ancient-text-muted text-xs">
-                <MessageStatus MessageStatus={data?.messageStatus} />
+                <MessageStatus status={data?.messageStatus} />
               </span>
             )}
             <span className="text-ancient-text-muted line-clamp-1 text-xs sm:text-sm break-all w-full">

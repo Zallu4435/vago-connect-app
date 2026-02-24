@@ -1,14 +1,16 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import ChatList from "./Chatlist/ChatList";
-import Empty from "./Empty";
+import dynamic from "next/dynamic";
 import { onAuthStateChanged } from "firebase/auth";
 import { firebaseAuth } from "@/utils/FirebaseConfig";
 import { useRouter } from "next/navigation";
-import Chat from "./Chat/Chat";
-import SearchMessages from "./Chat/SearchMessages";
-import VideoCall from "./Call/VideoCall";
-import AudioCall from "./Call/AudioCall";
+
+const ChatList = dynamic(() => import("./Chatlist/ChatList"));
+const Chat = dynamic(() => import("./Chat/Chat"));
+const SearchMessages = dynamic(() => import("./Chat/SearchMessages"));
+const Empty = dynamic(() => import("./Empty"));
+const VideoCall = dynamic(() => import("./Call/VideoCall"));
+const AudioCall = dynamic(() => import("./Call/AudioCall"));
 import { useAuthStore } from "@/stores/authStore";
 import { useSocketStore } from "@/stores/socketStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -137,13 +139,13 @@ function Main() {
           {/* Main Chat Area or Empty State */}
           <div className={`flex-1 min-w-0 flex flex-col ${currentChatUser ? 'block' : 'hidden'} md:block`}>
             {currentChatUser ? (
-              <div className={`flex flex-col flex-1 w-full max-w-full h-full`}>
+              <div key="active-chat" className={`flex flex-col flex-1 w-full max-w-full h-full`}>
                 {/* Message Loading Error Placeholder */}
                 {/* ... */}
                 <Chat isOnline={isOnline} />
                 {/* Search panel overlays chat, if active */}
                 {messageSearch && (
-                  <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-lg animate-fade-in">
+                  <div key="search-overlay" className="fixed inset-0 z-40 bg-black/40 backdrop-blur-lg animate-fade-in">
                     <div className="max-w-2xl w-full mx-auto my-12 md:my-20">
                       <SearchMessages />
                     </div>
@@ -152,7 +154,9 @@ function Main() {
               </div>
             ) : (
               // Empty State
-              <Empty />
+              <div key="empty-state" className="flex flex-col flex-1">
+                <Empty />
+              </div>
             )}
           </div>
         </div>

@@ -3,8 +3,12 @@ import React, { useState, useEffect } from "react";
 import List from "./List";
 import SearchBar from "./SearchBar";
 import ChatListHeader from "./ChatListHeader";
-import ContactsList from "./ContactsList";
+import dynamic from "next/dynamic";
 import { useChatStore } from "@/stores/chatStore";
+
+const ContactsList = dynamic(() => import("./ContactsList"), {
+  loading: () => <div className="h-full bg-ancient-bg-dark" />,
+});
 
 function ChatList() {
   const allContactsPage = useChatStore((s) => s.allContactsPage);
@@ -23,19 +27,23 @@ function ChatList() {
       transition-all
     ">
       {/* Default chats view */}
-      <div className={`${pageType === 'default' ? 'block' : 'hidden'} contents`}>
-        <ChatListHeader />
-        <SearchBar />
-        {/* Main scrollable area for chat list */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-          <List pageType={pageType} />
+      {pageType === 'default' && (
+        <div className="flex flex-col h-full overflow-hidden">
+          <ChatListHeader />
+          <SearchBar />
+          {/* Main scrollable area for chat list */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+            <List pageType={pageType} />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Contacts view */}
-      <div className={`${pageType === 'contacts' ? 'block' : 'hidden'} h-full`}>
-        <ContactsList />
-      </div>
+      {pageType === 'contacts' && (
+        <div className="h-full">
+          <ContactsList />
+        </div>
+      )}
     </div>
   );
 }

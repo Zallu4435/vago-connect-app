@@ -47,7 +47,7 @@ function List() {
   }, [contacts, contactsSearch]);
 
   useEffect(() => {
-    if (!hasNextPage) return;
+    if (!hasNextPage || isFetchingNextPage) return;
     const el = sentinelRef.current;
     if (!el) return;
     const obs = new IntersectionObserver((entries) => {
@@ -55,24 +55,24 @@ function List() {
       if (e.isIntersecting) {
         fetchNextPage();
       }
-    });
+    }, { rootMargin: '200px' });
     obs.observe(el);
     return () => {
       obs.disconnect();
     };
-  }, [hasNextPage, fetchNextPage, data]);
+  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
 
   let content = null;
 
   if (isLoading) {
     content = (
-      <div className="w-full py-8 flex justify-center items-center">
+      <div key="loading-chats" className="w-full py-8 flex justify-center items-center">
         <LoadingSpinner label="Loading chats..." className="text-ancient-text-muted" />
       </div>
     );
   } else if (error) {
     content = (
-      <div className="mx-2 sm:mx-4 my-3 sm:my-6 px-4 sm:px-5 py-4 sm:py-6 flex flex-col gap-3 sm:gap-4 rounded-lg sm:rounded-xl shadow-xl bg-ancient-warning-bg text-ancient-text-light">
+      <div key="error-chats" className="mx-2 sm:mx-4 my-3 sm:my-6 px-4 sm:px-5 py-4 sm:py-6 flex flex-col gap-3 sm:gap-4 rounded-lg sm:rounded-xl shadow-xl bg-ancient-warning-bg text-ancient-text-light">
         <ErrorMessage message="Failed to load chats." />
         <button
           type="button"
@@ -85,21 +85,21 @@ function List() {
     );
   } else if (contactsSearch && filteredContacts.length === 0) {
     content = (
-      <div className="w-full py-8 text-center text-sm sm:text-base text-ancient-text-muted">
+      <div key="no-results-chats" className="w-full py-8 text-center text-sm sm:text-base text-ancient-text-muted">
         No results found.
       </div>
     );
   } else {
     const list = filteredContacts.length > 0 ? filteredContacts : contacts;
     content = (
-      <ul className="space-y-0">
+      <ul key="chat-list" className="space-y-0">
         {list.map((contact) => (
           <li key={contact.id}>
             <ChatListItem data={contact} />
           </li>
         ))}
         {hasNextPage && (
-          <li ref={sentinelRef}>
+          <li key="sentinel" ref={sentinelRef}>
             {isFetchingNextPage ? (
               <div className="w-full py-4 flex justify-center items-center">
                 <LoadingSpinner className="text-ancient-text-muted" />

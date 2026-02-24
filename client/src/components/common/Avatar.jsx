@@ -3,8 +3,10 @@ import React, { useEffect, useState } from "react";
 import { FaCamera, FaMagic, FaCircle, FaUserCircle } from "react-icons/fa";
 import ContextMenu from "./ContextMenu";
 import PhotoPicker from "./PhotoPicker";
-import PhotoLibrary from "./PhotoLibrary";
-import CapturePhoto from "./CapturePhoto";
+import dynamic from "next/dynamic";
+
+const PhotoLibrary = dynamic(() => import("./PhotoLibrary"), { ssr: false });
+const CapturePhoto = dynamic(() => import("./CapturePhoto"), { ssr: false });
 
 function Avatar({ type, image, setImage, defaultImage = "" }) {
   const [hover, setHover] = useState(false);

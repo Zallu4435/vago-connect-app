@@ -18,8 +18,8 @@ export function useMessageSocketHandlers() {
   const attachedRef = useRef(false);
 
   useEffect(() => {
-    if (!socket.current || attachedRef.current) return;
-
+    const s = socket.current;
+    if (!s || attachedRef.current) return;
     const onMsgReceive = (data: any) => {
       const mappedType: Message['type'] = ((): Message['type'] => {
         const t = (data?.type || 'text').toLowerCase();
@@ -38,10 +38,9 @@ export function useMessageSocketHandlers() {
       socketSync.onMessageReceive(normalized, String(normalized.receiverId), currentChatUser?.id);
       addMessage(normalized);
     };
-
     // Ensure no duplicate handlers before attaching
-    socket.current.off('msg-recieve', onMsgReceive);
-    socket.current.on('msg-recieve', onMsgReceive);
+    s.off('msg-recieve', onMsgReceive);
+    s.on('msg-recieve', onMsgReceive);
     const onStatusUpdate = ({ messageId, status }: any) => {
       socketSync.onMessageStatusUpdate(messageId, status);
     };
@@ -60,32 +59,27 @@ export function useMessageSocketHandlers() {
     const onForwarded = (payload: any) => {
       socketSync.onMessageForwarded(payload);
     };
-
-    socket.current.off('message-status-update', onStatusUpdate);
-    socket.current.off('message-edited', onEdited);
-    socket.current.off('message-deleted', onDeleted);
-    socket.current.off('message-reacted', onReacted);
-    socket.current.off('message-starred', onStarred);
-    socket.current.off('message-forwarded', onForwarded);
-
-    socket.current.on('message-status-update', onStatusUpdate);
-    socket.current.on('message-edited', onEdited);
-    socket.current.on('message-deleted', onDeleted);
-    socket.current.on('message-reacted', onReacted);
-    socket.current.on('message-starred', onStarred);
-    socket.current.on('message-forwarded', onForwarded);
-
+    s.off('message-status-update', onStatusUpdate);
+    s.off('message-edited', onEdited);
+    s.off('message-deleted', onDeleted);
+    s.off('message-reacted', onReacted);
+    s.off('message-starred', onStarred);
+    s.off('message-forwarded', onForwarded);
+    s.on('message-status-update', onStatusUpdate);
+    s.on('message-edited', onEdited);
+    s.on('message-deleted', onDeleted);
+    s.on('message-reacted', onReacted);
+    s.on('message-starred', onStarred);
+    s.on('message-forwarded', onForwarded);
     attachedRef.current = true;
-
     return () => {
-      if (!socket.current) return;
-      socket.current.off('msg-recieve', onMsgReceive);
-      socket.current.off('message-status-update', onStatusUpdate);
-      socket.current.off('message-edited', onEdited);
-      socket.current.off('message-deleted', onDeleted);
-      socket.current.off('message-reacted', onReacted);
-      socket.current.off('message-starred', onStarred);
-      socket.current.off('message-forwarded', onForwarded);
+      s.off('msg-recieve', onMsgReceive);
+      s.off('message-status-update', onStatusUpdate);
+      s.off('message-edited', onEdited);
+      s.off('message-deleted', onDeleted);
+      s.off('message-reacted', onReacted);
+      s.off('message-starred', onStarred);
+      s.off('message-forwarded', onForwarded);
       attachedRef.current = false;
     };
   }, [socket, currentChatUser?.id, addMessage, socketSync, authUserId]);

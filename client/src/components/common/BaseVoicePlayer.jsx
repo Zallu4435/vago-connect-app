@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { FaPlay, FaPause } from "react-icons/fa";
 import AnimatedWave from "@/components/common/AnimatedWave";
 import { formatDuration } from "@/utils/formatDuration";
+import Image from "next/image";
 
 /**
  * BaseVoicePlayer
@@ -115,7 +116,7 @@ export default function BaseVoicePlayer({
       audio.src = src || "";
       audio.load();
       setHasError(false);
-    } catch {}
+    } catch { }
   }, [src, onPlayChange]);
 
   const progress = useMemo(() => (duration ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0), [current, duration]);
@@ -130,19 +131,17 @@ export default function BaseVoicePlayer({
     >
       {showAvatars && leftAvatarUrl && (
         <div className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full overflow-hidden flex-shrink-0 bg-ancient-input-bg border border-ancient-border-stone">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={leftAvatarUrl} alt="avatar" className="object-cover w-full h-full" loading="lazy" />
+          <Image src={leftAvatarUrl} alt="avatar" fill className="object-cover" sizes="36px" />
         </div>
       )}
 
       <button
         type="button"
         onClick={togglePlay}
-        className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center cursor-pointer z-10 text-base sm:text-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-          isIncoming 
-            ? "bg-ancient-icon-glow text-ancient-bg-dark hover:bg-green-500 focus:ring-ancient-icon-glow" 
-            : "bg-ancient-bg-dark text-ancient-icon-glow hover:bg-ancient-input-bg focus:ring-ancient-bubble-other"
-        }`}
+        className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center cursor-pointer z-10 text-base sm:text-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${isIncoming
+          ? "bg-ancient-icon-glow text-ancient-bg-dark hover:bg-green-500 focus:ring-ancient-icon-glow"
+          : "bg-ancient-bg-dark text-ancient-icon-glow hover:bg-ancient-input-bg focus:ring-ancient-bubble-other"
+          }`}
         aria-label={isPlaying ? "Pause audio" : "Play audio"}
         disabled={hasError}
       >
@@ -164,8 +163,7 @@ export default function BaseVoicePlayer({
 
       {showAvatars && rightAvatarUrl && (
         <div className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-full overflow-hidden flex-shrink-0 bg-ancient-input-bg border border-ancient-icon-glow">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={rightAvatarUrl} alt="avatar" className="object-cover w-full h-full" loading="lazy" />
+          <Image src={rightAvatarUrl} alt="avatar" fill className="object-cover" sizes="36px" />
         </div>
       )}
 

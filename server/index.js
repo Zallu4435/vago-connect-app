@@ -56,7 +56,9 @@ io.on("connection", (socket) => {
   socket.on("send-msg", (data) => {
     const sendUserSocket = onlineUsers.get(data.to);
     if (sendUserSocket) {
-      socket.to(sendUserSocket).emit("msg-recieve", {
+      // Use io.to() instead of socket.to() so it doesn't exclude the sender
+      // This is critical for "You" self-chats where to === from.
+      io.to(sendUserSocket).emit("msg-recieve", {
         from: data.from,
         message: data.message,
         type: data.type || "text",
@@ -107,7 +109,7 @@ io.on("connection", (socket) => {
       }
       // terminate this socket connection
       socket.disconnect(true);
-    } catch (_) {}
+    } catch (_) { }
   });
 
   socket.on("disconnect", () => {

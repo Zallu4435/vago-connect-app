@@ -107,7 +107,7 @@ export const getInitialContactswithMessages = async (req, res, next) => {
     let result = page.map((p) => {
       const convo = p.conversation;
       const lastMsg = convo.messages[0] || null;
-      const other = convo.type === 'direct' ? convo.participants.find(cp => cp.userId !== userId)?.user : null;
+      const other = convo.type === 'direct' ? (convo.participants.find(cp => cp.userId !== userId)?.user || convo.participants.find(cp => cp.userId === userId)?.user) : null;
       return {
         conversationId: convo.id,
         type: convo.type,

@@ -36,11 +36,13 @@ function CapturePhoto({ onCapture, onClose }) {
     };
     start();
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
+      const stream = streamRef.current;
+      const video = videoRef.current;
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
       }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
+      if (video) {
+        video.srcObject = null;
       }
     };
   }, [onClose]);

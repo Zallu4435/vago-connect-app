@@ -1,11 +1,14 @@
 "use client";
 import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import Image from "next/image";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
 import MessageWrapper from "./MessageWrapper";
-import ForwardModal from "./ForwardModal";
+import dynamic from "next/dynamic";
 import SelectMessagesBar from "./SelectMessagesBar";
 import { showToast } from "@/lib/toast";
+
+const ForwardModal = dynamic(() => import("./ForwardModal"), { ssr: false });
 import { useMessagesPaginated } from "@/hooks/queries/useMessagesPaginated";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import TextMessage from "./messages/TextMessage";
@@ -48,6 +51,11 @@ function ChatContainer() {
     const pages = pagesData?.pages || [];
     return pages.flatMap((p) => p.messages);
   }, [pagesData]);
+
+  // When the user changes, clear out messages so it doesn't bleed.
+  useEffect(() => {
+    setMessages([]);
+  }, [currentChatUser?.id, setMessages]);
 
   useEffect(() => {
     if (!Array.isArray(mergedMessages)) return;
@@ -156,7 +164,7 @@ function ChatContainer() {
         loadingOlderRef.current = true;
         fetchNextPage();
       }
-    }, { root: scroller, threshold: 0.01 });
+    }, { root: scroller, threshold: 0.01, rootMargin: '100px 0px 0px 0px' });
 
     obs.observe(el);
     return () => obs.disconnect();

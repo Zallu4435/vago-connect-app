@@ -58,17 +58,18 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goToNext, goToPrev, onClose, currentMedia, mediaItems.length, handleTogglePlay]);
 
-  if (!currentMedia) return null;
-
   // Dynamic icon based on media type for unsupported/document views
   const DisplayIcon = useMemo(() => {
+    if (!currentMedia) return MdInsertDriveFile;
     switch (currentMedia.type) {
       case 'audio': return MdAudiotrack;
       case 'location': return MdLocationOn;
       case 'document': return MdDescription;
       default: return MdInsertDriveFile; // Generic file icon
     }
-  }, [currentMedia.type]);
+  }, [currentMedia?.type]);
+
+  if (!currentMedia) return null;
 
   // Determine if it's a media type we can display directly or a file
   const isDirectlyDisplayable = String(currentMedia.type).startsWith("image") || String(currentMedia.type).startsWith("video") || String(currentMedia.type).startsWith("audio");

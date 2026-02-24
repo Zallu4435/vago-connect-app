@@ -5,7 +5,12 @@ import MessageStatus from "@/components/common/MessageStatus";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
 import { FaImage } from "react-icons/fa";
-import MediaCarouselView from "../MediaGallery/MediaCarouselView";
+import Image from "next/image";
+import dynamic from "next/dynamic";
+
+const MediaCarouselView = dynamic(() => import("../MediaGallery/MediaCarouselView"), {
+  ssr: false,
+});
 
 function ImageMessage({ message, isIncoming }) {
   const userInfo = useAuthStore((s) => s.userInfo);
@@ -14,8 +19,8 @@ function ImageMessage({ message, isIncoming }) {
   const chatMessages = useChatStore((s) => s.messages) || [];
 
   const mediaItems = React.useMemo(() => {
-    const list = Array.isArray(chatMessages) ? chatMessages : [];
-    const items = list
+    const list = chatMessages;
+    const items = (Array.isArray(list) ? list : [])
       .filter((m) => String(m?.type || "").startsWith("image"))
       .map((m) => ({
         mediaId: m?.id,
@@ -56,8 +61,8 @@ function ImageMessage({ message, isIncoming }) {
       <div className={`message-bubble message-bubble-image ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} max-w-[480px]`}>
         <div
           className={`relative rounded-xl overflow-hidden shadow-xl cursor-pointer transition-all duration-200 hover:shadow-2xl group max-w-[480px] ${isIncoming
-              ? "bg-ancient-bubble-user border border-ancient-input-border"
-              : "bg-ancient-bubble-other border border-ancient-icon-glow/30"
+            ? "bg-ancient-bubble-user border border-ancient-input-border"
+            : "bg-ancient-bubble-other border border-ancient-icon-glow/30"
             }`}
           onClick={() => setShowImageViewer(true)}
           role="button"
@@ -81,16 +86,17 @@ function ImageMessage({ message, isIncoming }) {
           )}
 
           {/* Image */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={message.content || message.message || ""}
-            alt={hasCaption ? message.caption : "Sent image"}
-            className={`rounded-xl object-contain w-auto max-w-[480px] h-auto max-h-[420px] sm:max-h-[520px] ${imageLoaded ? 'block' : 'hidden'
-              } transition-opacity duration-300`}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageLoaded(false)}
-            loading="lazy"
-          />
+          <div className={`relative w-full max-w-[480px] min-h-[200px] sm:min-h-[280px] ${imageLoaded ? 'block' : 'hidden'}`}>
+            <Image
+              src={message.content || message.message || ""}
+              alt={hasCaption ? message.caption : "Sent image"}
+              fill
+              className="rounded-xl object-contain transition-opacity duration-300"
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(false)}
+              sizes="(max-width: 640px) 100vw, 480px"
+            />
+          </div>
 
           {/* Caption overlay */}
           {hasCaption && imageLoaded && (
@@ -104,8 +110,8 @@ function ImageMessage({ message, isIncoming }) {
           {/* Time and status overlay */}
           <div
             className={`absolute ${hasCaption ? 'bottom-12' : 'bottom-2'} right-2 flex items-center gap-1.5 px-2 py-1 rounded-md backdrop-blur-sm transition-opacity ${hasCaption
-                ? 'bg-black/40'
-                : 'bg-black/50 group-hover:bg-black/70'
+              ? 'bg-black/40'
+              : 'bg-black/50 group-hover:bg-black/70'
               }`}
           >
             <span className="text-[10px] sm:text-[11px] text-white/90 font-medium tabular-nums">

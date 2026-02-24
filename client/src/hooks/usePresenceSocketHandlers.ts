@@ -7,17 +7,17 @@ export function usePresenceSocketHandlers() {
   const setOnlineUsers = useChatStore((s) => s.setOnlineUsers);
 
   useEffect(() => {
-    if (!socket.current) return;
+    const s = socket.current;
+    if (!s) return;
 
     const onOnlineUsers = (users: any[]) => {
       setOnlineUsers(users || []);
     };
 
-    socket.current.on('online-users', onOnlineUsers);
+    s.on('online-users', onOnlineUsers);
 
     return () => {
-      if (!socket.current) return;
-      socket.current.off('online-users', onOnlineUsers);
+      s.off('online-users', onOnlineUsers);
     };
-  }, [socket.current, setOnlineUsers]);
+  }, [socket, setOnlineUsers]);
 }

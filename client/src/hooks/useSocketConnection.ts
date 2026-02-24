@@ -35,48 +35,53 @@ export function useSocketConnection() {
         timeout: 20000,
       });
       setSocket(socketRef);
-      try { socketRef.current.connect(); } catch {}
+      try { socketRef.current.connect(); } catch { }
     }
-  }, [userInfo, shouldConnect, setSocket]);
+  }, [userInfo, shouldConnect, setSocket, socket]);
 
   // Register socket lifecycle listeners only
   useEffect(() => {
-    if (socket.current && !lifecycleAttachedRef.current) {
-      // Connection lifecycle
-      socket.current.on('disconnect', () => {
+    const s = socket.current;
+    if (s && !lifecycleAttachedRef.current) {
+      const onDisconnect = () => {
         connectionToastId.current = showToast.loading('Severed connection to the ethereal plane...');
-      });
-      socket.current.on('connect', () => {
+      };
+      const onConnect = () => {
         if (connectionToastId.current) {
           showToast.dismiss(connectionToastId.current);
           connectionToastId.current = null;
         }
         showToast.success('Reconnected to the ethereal plane!');
-        try { if (userInfo?.id) socket.current.emit('add-user', userInfo.id); } catch {}
-      });
-      socket.current.on('connect_error', () => {
+        try { if (userInfo?.id) s.emit('add-user', userInfo.id); } catch { }
+      };
+      const onConnectError = () => {
         if (connectionToastId.current) {
           showToast.dismiss(connectionToastId.current);
           connectionToastId.current = null;
         }
         showToast.error('Failed to connect to the ethereal plane.');
-      });
-      lifecycleAttachedRef.current = true;
-    }
+      };
 
-    return () => {
-      if (socket.current) {
-        socket.current.off('disconnect');
-        socket.current.off('connect');
-        socket.current.off('connect_error');
-      }
-    };
-  }, [socket.current, userInfo?.id]);
+      // Connection lifecycle
+      s.on('disconnect', onDisconnect);
+      s.on('connect', onConnect);
+      s.on('connect_error', onConnectError);
+
+      lifecycleAttachedRef.current = true;
+
+      return () => {
+        s.off('disconnect', onDisconnect);
+        s.off('connect', onConnect);
+        s.off('connect_error', onConnectError);
+        lifecycleAttachedRef.current = false;
+      };
+    }
+  }, [socket, userInfo?.id]);
 
   // Disconnect and clear on auth sign-out or when shouldConnect turns false
   useEffect(() => {
     if ((!userInfo || !shouldConnect) && socket.current) {
-      try { socket.current.disconnect(); } catch {}
+      try { socket.current.disconnect(); } catch { }
       clearSocket();
       lifecycleAttachedRef.current = false;
     }

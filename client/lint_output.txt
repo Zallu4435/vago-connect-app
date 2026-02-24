@@ -1,0 +1,35 @@
+
+> whatsapp-clone@0.1.0 lint
+> next lint
+
+
+./src/components/Chat/MediaGallery/MediaCarouselView.jsx
+64:23  Error: React Hook "useMemo" is called conditionally. React Hooks must be called in the exact same order in every component render.  react-hooks/rules-of-hooks
+
+./src/components/Chat/MediaGallery/MediaPreviewGridItem.jsx
+26:9  Warning: Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+./src/components/Chat/messages/DocumentMessage.jsx
+29:9  Warning: The 'messages' logical expression could make the dependencies of useMemo Hook (at line 48) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'messages' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+./src/components/Chat/messages/ImageMessage.jsx
+14:9  Warning: The 'chatMessages' logical expression could make the dependencies of useMemo Hook (at line 42) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'chatMessages' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+./src/components/Chat/messages/VideoMessage.jsx
+24:9  Warning: The 'chatMessages' logical expression could make the dependencies of useMemo Hook (at line 40) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'chatMessages' in its own useMemo() Hook.  react-hooks/exhaustive-deps
+
+./src/components/common/CapturePhoto.jsx
+43:18  Warning: The ref value 'videoRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'videoRef.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+
+./src/components/common/ErrorBoundary.tsx
+69:15  Error: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.  react/no-unescaped-entities
+
+./src/components/common/IncomingCallNotification.jsx
+25:28  Error: React Hook "useCallback" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks
+29:28  Error: React Hook "useCallback" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks
+
+./src/hooks/useCallSocketHandlers.ts
+47:14  Warning: The ref value 'socket.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'socket.current' to a variable inside the effect, and use that variable in the cleanup function.  react-hooks/exhaustive-deps
+49:6  Warning: React Hook useEffect has a missing dependency: 'socket'. Either include it or remove the dependency array. Mutable values like 'socket.current' aren't valid dependencies because mutating them doesn't re-render the component.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

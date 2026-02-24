@@ -15,20 +15,24 @@ function IncomingCallNotification() {
   const call = useCallStore((s) => s.call);
   const socket = useSocketStore((s) => s.socket);
 
-  // If no call or if the call object is incomplete, don't render.
-  if (!call || !call.from || !call.callType) return null;
-
-  const isVideoCall = call.callType === "video";
+  const isVideoCall = call?.callType === "video";
   const callerName = call?.from?.name || "Mysterious Caller";
   const callerImage = call?.from?.image || "/default_avatar.png";
 
   const handleAcceptCall = useCallback(() => {
-    socket?.current?.emit?.("accept-call", { from: call.from.id, to: call.to.id });
+    if (socket?.current && call?.from && call?.to) {
+      socket.current.emit("accept-call", { from: call.from.id, to: call.to.id });
+    }
   }, [socket, call]);
 
   const handleRejectCall = useCallback(() => {
-    socket?.current?.emit?.("reject-call", { from: call.from.id, to: call.to.id });
+    if (socket?.current && call?.from && call?.to) {
+      socket.current.emit("reject-call", { from: call.from.id, to: call.to.id });
+    }
   }, [socket, call]);
+
+  // If no call or if the call object is incomplete, don't render.
+  if (!call || !call.from || !call.callType) return null;
 
   return (
     <div

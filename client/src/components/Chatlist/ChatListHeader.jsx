@@ -4,9 +4,11 @@ import { IoSettingsOutline } from "react-icons/io5";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useState } from "react";
-import GroupCreateModal from "./GroupCreateModal";
-import SidebarMenu from "./SidebarMenu";
+import dynamic from "next/dynamic";
 import { getAbsoluteUrl } from "@/lib/url";
+
+const GroupCreateModal = dynamic(() => import("./GroupCreateModal"), { ssr: false });
+const SidebarMenu = dynamic(() => import("./SidebarMenu"), { ssr: false });
 
 function ChatListHeader() {
   const userInfo = useAuthStore((s) => s.userInfo);
