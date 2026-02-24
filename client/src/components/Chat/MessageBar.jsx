@@ -94,12 +94,24 @@ function MessageBar({ isOnline = true }) {
     const isVideo = mime.startsWith("video/");
     const endpoint = isImage ? ADD_IMAGE_ROUTE : isVideo ? ADD_VIDEO_ROUTE : ADD_FILE_ROUTE;
     const field = isImage ? "image" : isVideo ? "video" : "file";
+    const tempId = Date.now();
 
     const form = new FormData();
     form.append(field, file, file.name || 'upload');
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
     if (caption?.trim()) form.append("caption", caption.trim());
+
+    // Optimistic message
+    const optimisticMsg = normalizeMessage({
+      id: tempId,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      content: "",
+    }, userInfo.id, currentChatUser.id, isImage ? "image" : isVideo ? "video" : "document");
+    if (caption?.trim()) optimisticMsg.caption = caption.trim();
+
+    setMessages((prev) => ([...(prev || []), optimisticMsg]));
 
     try {
       setUploadProgress({
@@ -125,9 +137,12 @@ function MessageBar({ isOnline = true }) {
 
       const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, isImage ? "image" : isVideo ? "video" : "document");
       if (!msg.caption && caption?.trim()) msg.caption = caption.trim();
-      setMessages((prev) => ([...(prev || []), msg]));
+
+      // Remove optimistic and add real
+      setMessages((prev) => prev.map(m => m.id === tempId ? msg : m));
       addToMessagesCache(msg);
     } catch (err) {
+      useChatStore.getState().updateMessageStatus(tempId, "error");
       showToast.error("Upload failed. Try again.");
       console.error("uploadFile error", err);
     } finally {
@@ -199,6 +214,18 @@ function MessageBar({ isOnline = true }) {
     const text = message.trim();
     if (!text || !currentChatUser?.id || !userInfo?.id) return;
 
+    const tempId = Date.now();
+    const optimisticMsg = normalizeMessage({
+      id: tempId,
+      content: text,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    }, userInfo.id, currentChatUser.id, "text");
+
+    setMessages((prev) => ([...(prev || []), optimisticMsg]));
+    setMessage("");
+    if (replyTo) clearReplyTo();
+
     sendMessageMutation.mutate(
       { from: userInfo.id, to: currentChatUser.id, content: text, type: "text", replyToId: replyTo?.id },
       {
@@ -211,12 +238,11 @@ function MessageBar({ isOnline = true }) {
             messageId: data.id,
           });
           const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "text");
-          setMessages((prev) => ([...(prev || []), msg]));
+          setMessages((prev) => prev.map(m => m.id === tempId ? msg : m));
           addToMessagesCache(msg);
-          setMessage("");
-          if (replyTo) clearReplyTo();
         },
         onError: (e) => {
+          useChatStore.getState().updateMessageStatus(tempId, "error");
           console.error("sendMessage error", e);
           showToast.error("Failed to send message. Try again.");
         },
@@ -313,92 +339,113 @@ function MessageBar({ isOnline = true }) {
         onDrop={onDrop}
         onDragOver={onDragOver}
       >
-        {/* Attach Button */}
-        <div className="relative">
-          <button
-            ref={attachButtonRef}
-            className="p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95"
-            onClick={() => setShowAttachMenu((v) => !v)}
-            title="Attach"
-            disabled={!isOnline}
-          >
-            <MdAttachFile className="text-ancient-icon-inactive text-xl sm:text-2xl" />
-          </button>
+        {/* Main Controls or Audio Recorder */}
+        {!showAudioRecorder ? (
+          <>
+            <div className="flex items-center gap-0.5 sm:gap-1">
+              {/* Emoji Button */}
+              <button
+                className="p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95 text-ancient-icon-inactive hover:text-white"
+                onClick={() => { setShowEmojiPicker(v => !v); setShowAttachMenu(false); }}
+                title="Emoji"
+              >
+                <BsEmojiSmile className="text-xl sm:text-2xl" />
+              </button>
 
-          <ActionSheet
-            open={showAttachMenu}
-            onClose={() => setShowAttachMenu(false)}
-            align="left"
-            placement="above"
-            anchorRef={attachButtonRef}
-            items={[
-              { label: "Image", icon: FaCamera, onClick: () => handleFileSelect('image') },
-              { label: "Video", icon: IoVideocam, onClick: () => handleFileSelect('video') },
-              { label: "File", icon: MdInsertDriveFile, onClick: () => handleFileSelect('file') },
-              { label: "Location", icon: FaLocationArrow, onClick: handleSendLocation },
-              { label: "Emoji", icon: BsEmojiSmile, onClick: () => { setShowEmojiPicker(true); setShowAttachMenu(false); } },
-            ]}
-          />
-        </div>
+              {/* Attach Button */}
+              <div className="relative">
+                <button
+                  ref={attachButtonRef}
+                  className="p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95 text-ancient-icon-inactive hover:text-white"
+                  onClick={() => { setShowAttachMenu((v) => !v); setShowEmojiPicker(false); }}
+                  title="Attach"
+                  disabled={!isOnline}
+                >
+                  <MdAttachFile className="text-xl sm:text-2xl transform rotate-45" />
+                </button>
 
-        {/* Emoji Picker */}
-        {showEmojiPicker && (
-          <div className="absolute bottom-20 sm:bottom-24 left-4 z-50" ref={emojiPickerRef}>
-            <EmojiPicker onEmojiClick={handleEmojiClick} theme="dark" />
-          </div>
-        )}
-
-        {/* Message Input */}
-        <div className="flex-1 relative">
-          <input
-            type="text"
-            placeholder="Type a message..."
-            className="w-full h-11 sm:h-12 bg-ancient-input-bg border border-ancient-input-border rounded-full px-4 sm:px-5 text-sm sm:text-base text-ancient-text-light placeholder:text-ancient-text-muted focus:outline-none focus:border-ancient-icon-glow transition-all shadow-inner"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onPaste={onPaste}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && message.trim().length > 0) {
-                sendMessage();
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape' && replyTo) {
-                clearReplyTo();
-              }
-            }}
-            ref={inputRef}
-            disabled={!isOnline}
-          />
-
-          {/* Upload Progress Overlay */}
-          {uploadProgress.label && (
-            <div className="absolute inset-0 bg-ancient-input-bg/95 backdrop-blur-sm rounded-full flex items-center px-4 gap-3 border border-ancient-icon-glow/50">
-              <span className="text-ancient-text-light text-xs sm:text-sm flex-shrink-0">{uploadProgress.label}</span>
-              <div className="flex-1 h-1.5 bg-ancient-border-stone rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-ancient-icon-glow rounded-full transition-all duration-100"
-                  style={{ width: `${uploadProgress.percent}%` }}
+                <ActionSheet
+                  open={showAttachMenu}
+                  onClose={() => setShowAttachMenu(false)}
+                  align="left"
+                  placement="above"
+                  anchorRef={attachButtonRef}
+                  items={[
+                    { label: "Image", icon: FaCamera, onClick: () => handleFileSelect('image') },
+                    { label: "Video", icon: IoVideocam, onClick: () => handleFileSelect('video') },
+                    { label: "File", icon: MdInsertDriveFile, onClick: () => handleFileSelect('file') },
+                    { label: "Location", icon: FaLocationArrow, onClick: handleSendLocation },
+                  ]}
                 />
               </div>
-              <span className="text-ancient-text-light text-xs sm:text-sm font-medium flex-shrink-0">{uploadProgress.percent}%</span>
             </div>
-          )}
-        </div>
 
-        {/* Send/Microphone Button */}
-        <button
-          className="p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95"
-          onClick={message.trim().length > 0 ? sendMessage : () => setShowAudioRecorder(true)}
-          title={message.trim().length > 0 ? "Send Message" : "Record Voice"}
-          disabled={!isOnline || (message.trim().length > 0 && sendMessageMutation.isPending)}
-        >
-          {message.trim().length > 0 ? (
-            <MdSend className="text-ancient-icon-glow text-xl sm:text-2xl" />
-          ) : (
-            <FaMicrophone className="text-ancient-icon-glow text-lg sm:text-xl" />
-          )}
-        </button>
+            {/* Emoji Picker */}
+            {showEmojiPicker && (
+              <div className="absolute bottom-20 sm:bottom-24 left-4 z-50" ref={emojiPickerRef}>
+                <EmojiPicker onEmojiClick={handleEmojiClick} theme="dark" />
+              </div>
+            )}
+
+            {/* Message Input */}
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Type a message..."
+                className="w-full h-11 sm:h-12 bg-ancient-input-bg border border-ancient-input-border rounded-full px-4 sm:px-5 text-sm sm:text-base text-ancient-text-light placeholder:text-ancient-text-muted focus:outline-none focus:border-ancient-icon-glow transition-all shadow-inner"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onPaste={onPaste}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && message.trim().length > 0) {
+                    sendMessage();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape' && replyTo) {
+                    clearReplyTo();
+                  }
+                }}
+                ref={inputRef}
+                disabled={!isOnline}
+              />
+
+              {/* Upload Progress Overlay */}
+              {uploadProgress.label && (
+                <div className="absolute inset-0 bg-ancient-input-bg/95 backdrop-blur-sm rounded-full flex items-center px-4 gap-3 border border-ancient-icon-glow/50">
+                  <span className="text-ancient-text-light text-xs sm:text-sm flex-shrink-0">{uploadProgress.label}</span>
+                  <div className="flex-1 h-1.5 bg-ancient-border-stone rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-ancient-icon-glow rounded-full transition-all duration-100"
+                      style={{ width: `${uploadProgress.percent}%` }}
+                    />
+                  </div>
+                  <span className="text-ancient-text-light text-xs sm:text-sm font-medium flex-shrink-0">{uploadProgress.percent}%</span>
+                </div>
+              )}
+            </div>
+
+            {/* Send/Microphone Button */}
+            <button
+              className="p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95 flex-shrink-0 disabled:opacity-70"
+              onClick={message.trim().length > 0 ? sendMessage : () => setShowAudioRecorder(true)}
+              title={message.trim().length > 0 ? "Send Message" : "Record Voice"}
+              disabled={!isOnline || (message.trim().length > 0 && sendMessageMutation.isPending)}
+            >
+              {message.trim().length > 0 ? (
+                sendMessageMutation.isPending ? (
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-ancient-icon-glow border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <MdSend className="text-ancient-icon-glow text-xl sm:text-2xl" />
+                )
+              ) : (
+                <FaMicrophone className="text-ancient-icon-glow text-lg sm:text-xl" />
+              )}
+            </button>
+          </>
+        ) : (
+          <CaptureAudio onChange={setShowAudioRecorder} />
+        )}
 
         {/* Error Message */}
         {sendMessageMutation.isError && (
@@ -406,9 +453,6 @@ function MessageBar({ isOnline = true }) {
             <ErrorMessage message="Failed to send. Try again." />
           </div>
         )}
-
-        {/* Audio Recorder */}
-        {showAudioRecorder && <CaptureAudio onChange={setShowAudioRecorder} />}
 
         {/* Media Preview Modal */}
         <MediaPreviewModal

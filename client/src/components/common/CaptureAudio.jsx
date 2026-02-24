@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { FaMicrophone, FaStop, FaPlay, FaPause, FaTrash } from "react-icons/fa";
 import { MdSend } from "react-icons/md";
 import { IoClose } from "react-icons/io5";
@@ -193,149 +193,126 @@ function CaptureAudio({ onChange }) {
 
   const playbackProgress = playbackDuration ? (playbackTime / playbackDuration) * 100 : 0;
 
+  const staticHeights = useMemo(() => Array.from({ length: 30 }, () => 0.2 + Math.random() * 0.8), []);
+
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-fade-in"
+    <div className="flex-1 flex items-center justify-between gap-2 sm:gap-4 bg-transparent animate-fade-in w-full">
+      <audio ref={audioRef} hidden />
+
+      {/* Delete/Close Button */}
+      <button
         onClick={close}
-      />
+        className="p-2 sm:p-2.5 rounded-full hover:bg-red-500/10 text-ancient-text-muted hover:text-red-500 transition-colors active:scale-95 flex-shrink-0"
+        aria-label="Discard Recording"
+      >
+        <FaTrash className="text-lg" />
+      </button>
 
-      {/* Recording Interface */}
-      <div className="fixed inset-x-0 bottom-0 z-50 bg-ancient-bg-dark border-t-2 border-ancient-icon-glow/30 shadow-2xl animate-slide-in-up">
-        <audio ref={audioRef} hidden />
+      {/* Timer / Visualizer / Progress */}
+      <div className="flex-1 flex items-center bg-ancient-input-bg border border-ancient-input-border rounded-full px-4 h-11 sm:h-12 relative overflow-hidden shadow-inner">
+        {/* Timer */}
+        <div className="text-ancient-icon-glow font-medium tabular-nums min-w-[3.5rem] flex-shrink-0 text-sm sm:text-base">
+          {isRecording
+            ? formatTime(recordingDuration)
+            : recordedBlob
+              ? formatTime(playbackTime)
+              : "0:00"}
+        </div>
 
-        {/* Main Content */}
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-ancient-text-light text-lg sm:text-xl font-semibold">
-              {isRecording ? "Recording..." : recordedBlob ? "Review Recording" : "Voice Message"}
-            </h3>
-            <button
-              onClick={close}
-              className="p-2 rounded-full bg-ancient-bg-medium hover:bg-red-600/20 text-ancient-text-muted hover:text-red-500 transition-all"
-              aria-label="Close"
-            >
-              <IoClose className="text-2xl" />
-            </button>
+        {/* Visualizer (Recording) */}
+        {isRecording && (
+          <div className="flex-1 flex items-center justify-center gap-0.5 sm:gap-1 h-6 px-2 overflow-hidden mask-edges">
+            {staticHeights.map((h, i) => (
+              <div
+                key={i}
+                className="w-1 bg-ancient-icon-glow rounded-full"
+                style={{
+                  height: '100%',
+                  transformOrigin: 'bottom',
+                  animation: `audio-wave ${0.4 + (i % 3) * 0.2}s ease-in-out infinite`,
+                  animationDelay: `${i * 0.05}s`,
+                }}
+              />
+            ))}
           </div>
+        )}
 
-          {/* Recording/Playback Area */}
-          <div className="bg-ancient-bg-medium rounded-2xl p-6 sm:p-8 mb-6 border border-ancient-border-stone/50">
-            {/* Waveform Animation (when recording) */}
-            {isRecording && (
-              <div className="flex items-center justify-center gap-1.5 h-20 mb-4">
-                {[...Array(20)].map((_, i) => (
+        {/* Playback Track (Recorded) */}
+        {recordedBlob && !isRecording && (
+          <div className="flex-1 flex items-center px-1 sm:px-2 h-full gap-2 sm:gap-3">
+            <button
+              onClick={togglePlayback}
+              className="text-ancient-text-muted hover:text-white flex-shrink-0 transition-all active:scale-95"
+            >
+              {isPlaying ? <FaPause className="text-sm" /> : <FaPlay className="text-sm ml-0.5" />}
+            </button>
+            <div
+              className="flex-1 flex items-center justify-between gap-[2px] h-6 cursor-pointer"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                if (audioRef.current) {
+                  audioRef.current.currentTime = percent * playbackDuration;
+                  setPlaybackTime(audioRef.current.currentTime);
+                }
+              }}
+            >
+              {staticHeights.map((h, i) => {
+                const isPlayed = (i / 30) * 100 <= playbackProgress;
+                return (
                   <div
                     key={i}
-                    className="w-1 bg-ancient-icon-glow rounded-full animate-pulse"
+                    className={`w-1 rounded-full transition-colors duration-200 ${isPlayed ? 'bg-ancient-icon-glow' : 'bg-ancient-text-muted opacity-40'}`}
                     style={{
-                      height: `${20 + Math.random() * 60}%`,
+                      height: '100%',
+                      transformOrigin: 'bottom',
+                      transform: isPlaying ? undefined : `scaleY(${h})`,
+                      animation: isPlaying ? `audio-wave ${0.4 + (i % 3) * 0.2}s ease-in-out infinite` : 'none',
                       animationDelay: `${i * 0.05}s`,
-                      animationDuration: `${0.5 + Math.random() * 0.5}s`,
                     }}
                   />
-                ))}
-              </div>
-            )}
-
-            {/* Playback Progress (when recorded) */}
-            {recordedBlob && !isRecording && (
-              <div className="mb-4">
-                <div className="h-2 bg-ancient-border-stone rounded-full overflow-hidden mb-2">
-                  <div
-                    className="h-full bg-ancient-icon-glow rounded-full transition-all duration-100"
-                    style={{ width: `${playbackProgress}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-ancient-text-muted">
-                  <span>{formatTime(playbackTime)}</span>
-                  <span>{formatTime(playbackDuration)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Timer/Status */}
-            <div className="text-center">
-              <div className="text-3xl sm:text-4xl font-bold text-ancient-icon-glow mb-2 tabular-nums">
-                {isRecording
-                  ? formatTime(recordingDuration)
-                  : recordedBlob
-                    ? formatTime(playbackDuration)
-                    : "0:00"}
-              </div>
-              <p className="text-ancient-text-muted text-sm">
-                {isRecording
-                  ? "Recording in progress..."
-                  : recordedBlob
-                    ? "Tap play to review"
-                    : "Tap the microphone to start"}
-              </p>
+                );
+              })}
             </div>
           </div>
-
-          {/* Controls */}
-          <div className="flex items-center justify-center gap-4">
-            {!recordedBlob ? (
-              // Recording controls
-              <>
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-white shadow-xl transition-all transform hover:scale-105 active:scale-95 ${isRecording
-                    ? "bg-red-600 hover:bg-red-500"
-                    : "bg-ancient-icon-glow hover:bg-green-500"
-                    }`}
-                  aria-label={isRecording ? "Stop Recording" : "Start Recording"}
-                >
-                  {isRecording ? (
-                    <FaStop className="text-2xl sm:text-3xl" />
-                  ) : (
-                    <FaMicrophone className="text-2xl sm:text-3xl" />
-                  )}
-                </button>
-              </>
-            ) : (
-              // Playback controls
-              <>
-                <button
-                  onClick={deleteRecording}
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-ancient-bg-medium hover:bg-red-600/20 text-ancient-text-muted hover:text-red-500 transition-all transform hover:scale-105 active:scale-95"
-                  aria-label="Delete Recording"
-                >
-                  <FaTrash className="text-lg sm:text-xl" />
-                </button>
-
-                <button
-                  onClick={togglePlayback}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark shadow-xl transition-all transform hover:scale-105 active:scale-95"
-                  aria-label={isPlaying ? "Pause" : "Play"}
-                >
-                  {isPlaying ? (
-                    <FaPause className="text-2xl sm:text-3xl" />
-                  ) : (
-                    <FaPlay className="text-2xl sm:text-3xl ml-1" />
-                  )}
-                </button>
-
-                <button
-                  onClick={sendRecording}
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark shadow-xl transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Send Recording"
-                  disabled={uploadAudioMutation.isPending}
-                >
-                  {uploadAudioMutation.isPending ? (
-                    <LoadingSpinner size={20} />
-                  ) : (
-                    <MdSend className="text-lg sm:text-xl" />
-                  )}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
+        )}
       </div>
-    </>
+
+      {/* Primary Action Button (Record vs Send) */}
+      <div className="flex-shrink-0 relative">
+        {!recordedBlob ? (
+          // Recording toggle
+          <button
+            onClick={isRecording ? stopRecording : startRecording}
+            className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center text-white shadow-md transition-all transform hover:scale-105 active:scale-95 ${isRecording
+              ? "bg-red-500 shadow-red-500/20"
+              : "bg-ancient-icon-glow shadow-ancient-icon-glow/20"
+              }`}
+            aria-label={isRecording ? "Stop Recording" : "Start Recording"}
+          >
+            {isRecording ? (
+              <div className="w-3.5 h-3.5 bg-white rounded-sm animate-pulse" /> // Square for stop
+            ) : (
+              <FaMicrophone className="text-lg" />
+            )}
+          </button>
+        ) : (
+          // Send button
+          <button
+            onClick={sendRecording}
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center bg-ancient-icon-glow hover:brightness-110 text-ancient-bg-dark shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Send Recording"
+            disabled={uploadAudioMutation.isPending}
+          >
+            {uploadAudioMutation.isPending ? (
+              <div className="w-5 h-5 border-2 border-ancient-bg-dark border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <MdSend className="text-xl mr-0.5" />
+            )}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

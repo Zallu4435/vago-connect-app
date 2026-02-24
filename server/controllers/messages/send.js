@@ -62,7 +62,7 @@ function emitMessageSent(conversation, message) {
       const sid = global.onlineUsers.get(String(p.userId)) || global.onlineUsers.get(p.userId);
       if (sid) global.io.to(sid).emit("message-sent", { message });
     });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 export const addMessage = async (req, res, next) => {
@@ -131,12 +131,13 @@ export const addVideo = async (req, res, next) => {
         type: "video",
         content: contentUrl,
         status: recipientOnline ? "delivered" : "sent",
+        caption: caption && String(caption).trim() ? String(caption).trim() : null,
         duration: durationSec ? Math.round(durationSec) : null,
         replyToMessageId: replyData.replyToMessageId,
         quotedMessage: replyData.quotedMessage,
       },
     });
-    try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) }); } catch (_) {}
+    try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) }); } catch (_) { }
     emitMessageSent(convo, newMessage);
     return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
@@ -155,15 +156,15 @@ export const addImage = async (req, res, next) => {
         hasFile: Boolean(req.file),
         fileMeta: req.file
           ? {
-              originalname: req.file.originalname,
-              mimetype: req.file.mimetype,
-              size: req.file.size,
-              bufferLen: req.file.buffer ? req.file.buffer.length : 0,
-            }
+            originalname: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            bufferLen: req.file.buffer ? req.file.buffer.length : 0,
+          }
           : null,
         ts: Date.now(),
       });
-    } catch (_) {}
+    } catch (_) { }
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -173,7 +174,7 @@ export const addImage = async (req, res, next) => {
         mimetype: req.file?.mimetype,
         bufferLen: req.file?.buffer?.length,
       });
-    } catch (_) {}
+    } catch (_) { }
     const cld = await uploadBuffer(req.file.buffer, {
       folder: process.env.CLOUDINARY_FOLDER || undefined,
       resource_type: 'image',
@@ -186,7 +187,7 @@ export const addImage = async (req, res, next) => {
         width: cld?.width,
         height: cld?.height,
       });
-    } catch (_) {}
+    } catch (_) { }
     const contentUrl = cld.secure_url;
     const blocked = await isBlockedBetweenUsers(prisma, from, to);
     if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
@@ -198,7 +199,7 @@ export const addImage = async (req, res, next) => {
         senderId: Number(from),
         hasUrl: Boolean(contentUrl),
       });
-    } catch (_) {}
+    } catch (_) { }
     const newMessage = await prisma.message.create({
       data: {
         conversationId: convo.id,
@@ -213,17 +214,17 @@ export const addImage = async (req, res, next) => {
     });
     try {
       await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) });
-      try { console.log('[Image:addImage] mediaFile persisted'); } catch (_) {}
+      try { console.log('[Image:addImage] mediaFile persisted'); } catch (_) { }
     } catch (e) {
-      try { console.warn('[Image:addImage] mediaFile persist failed', { message: e?.message }); } catch (_) {}
+      try { console.warn('[Image:addImage] mediaFile persist failed', { message: e?.message }); } catch (_) { }
     }
     emitMessageSent(convo, newMessage);
-    try { console.log('[Image:addImage] done', { messageId: newMessage?.id }); } catch (_) {}
+    try { console.log('[Image:addImage] done', { messageId: newMessage?.id }); } catch (_) { }
     return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
     try {
       console.error('[Image:addImage] error', { message: error?.message, stack: error?.stack });
-    } catch (_) {}
+    } catch (_) { }
     next(error);
   }
 };
@@ -231,7 +232,7 @@ export const addImage = async (req, res, next) => {
 export const addAudio = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, replyToMessageId } = req.body;
+    const { from, to, replyToMessageId, caption } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -276,7 +277,7 @@ export const addAudio = async (req, res, next) => {
           cloudinaryAssetId: cld.asset_id || null,
         },
       });
-    } catch (_) {}
+    } catch (_) { }
     emitMessageSent(convo, newMessage);
     return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
@@ -296,10 +297,10 @@ export const addFile = async (req, res, next) => {
     const inferredType = mime.startsWith("image/")
       ? "image"
       : mime.startsWith("video/")
-      ? "video"
-      : mime.startsWith("audio/")
-      ? "audio"
-      : "document";
+        ? "video"
+        : mime.startsWith("audio/")
+          ? "audio"
+          : "document";
     const cld = await uploadBuffer(req.file.buffer, {
       folder: process.env.CLOUDINARY_FOLDER || undefined,
       resource_type: inferredType === 'image' ? 'image' : inferredType === 'video' ? 'video' : 'auto',
@@ -340,7 +341,7 @@ export const addFile = async (req, res, next) => {
           cloudinaryAssetId: cld.asset_id || null,
         },
       });
-    } catch (_) {}
+    } catch (_) { }
     emitMessageSent(convo, newMessage);
     return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
