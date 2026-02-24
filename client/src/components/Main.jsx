@@ -111,20 +111,21 @@ function Main() {
       {/* Main Chat Layout */}
       {!audioCall && !videoCall && (
         <div className="
-          flex flex-col-reverse md:flex-row
+          flex flex-col md:flex-row
           h-dvh w-dvw max-h-screen max-w-full overflow-hidden
           bg-ancient-bg-dark text-ancient-text-light
         ">
           {/* Sidebar/Chat List */}
-          <div className="
-            flex-shrink-0 w-full md:w-[340px] lg:w-[400px] 
-            h-[55dvh] md:h-screen max-h-[50vh] md:max-h-full
-            border-b md:border-b-0 md:border-r border-ancient-border-stone 
+          <div className={`
+            flex-shrink-0 w-full md:w-[340px] lg:w-[400px]
+            h-screen md:h-screen max-h-screen md:max-h-full
+            border-b md:border-b-0 md:border-r border-ancient-border-stone
             shadow-xl z-20 bg-ancient-bg-dark
             relative
             transition-all
             md:sticky md:top-0
-          ">
+            ${currentChatUser ? 'hidden' : 'block'} md:block
+          `}>
             {isUserLoading ? (
               <div className="flex flex-col h-full w-full items-center justify-center text-ancient-text-muted">
                 <LoadingSpinner label="Preparing your chats…" />
@@ -134,7 +135,7 @@ function Main() {
             )}
           </div>
           {/* Main Chat Area or Empty State */}
-          <div className="flex-1 min-w-0 flex flex-col">
+          <div className={`flex-1 min-w-0 flex flex-col ${currentChatUser ? 'block' : 'hidden'} md:block`}>
             {currentChatUser ? (
               <div className={`flex flex-col flex-1 w-full max-w-full h-full`}>
                 {/* Message Loading Error Placeholder */}

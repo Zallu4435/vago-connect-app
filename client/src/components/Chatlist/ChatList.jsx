@@ -17,24 +17,25 @@ function ChatList() {
   return (
     <div className="
       bg-ancient-bg-dark flex flex-col
-      h-[55dvh] sm:h-screen max-h-screen w-full
+      h-full max-h-full w-full
       md:w-[320px] lg:w-[400px]
       overflow-hidden border-r border-ancient-border-stone z-20 shadow-xl
       transition-all
     ">
-      {pageType === "default" && (
-        <>
-          <ChatListHeader />
-          <SearchBar />
-          {/* Main scrollable area for chat list */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-            <List pageType={pageType} />
-          </div>
-        </>
-      )}
-      {pageType === "contacts" && (
+      {/* Default chats view */}
+      <div className={`${pageType === 'default' ? 'block' : 'hidden'} contents`}>
+        <ChatListHeader />
+        <SearchBar />
+        {/* Main scrollable area for chat list */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+          <List pageType={pageType} />
+        </div>
+      </div>
+
+      {/* Contacts view */}
+      <div className={`${pageType === 'contacts' ? 'block' : 'hidden'} h-full`}>
         <ContactsList />
-      )}
+      </div>
     </div>
   );
 }

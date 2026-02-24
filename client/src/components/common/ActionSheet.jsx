@@ -2,6 +2,19 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+// Create or get portal root
+const getPortalRoot = () => {
+  if (typeof document === 'undefined') return null;
+
+  let portalRoot = document.getElementById('action-sheet-portal');
+  if (!portalRoot) {
+    portalRoot = document.createElement('div');
+    portalRoot.id = 'action-sheet-portal';
+    document.body.appendChild(portalRoot);
+  }
+  return portalRoot;
+};
+
 export default function ActionSheet({
   open,
   onClose,
@@ -14,6 +27,12 @@ export default function ActionSheet({
 }) {
   const ref = useRef(null);
   const [coords, setCoords] = useState({ top: 0, left: 0, visibility: "hidden" });
+  const [portalRoot, setPortalRoot] = useState(null);
+
+  // Initialize portal root
+  useEffect(() => {
+    setPortalRoot(getPortalRoot());
+  }, []);
 
   // Click and escape to dismiss, responsive for mobile/touch too
   useEffect(() => {
@@ -64,7 +83,7 @@ export default function ActionSheet({
     };
   }, [open, align, placement, anchorRef]);
 
-  if (!open) return null;
+  if (!open || !portalRoot) return null;
 
   const menu = (
     <div
@@ -108,5 +127,5 @@ export default function ActionSheet({
     </div>
   );
 
-  return createPortal(menu, document.body);
+  return createPortal(menu, portalRoot);
 }

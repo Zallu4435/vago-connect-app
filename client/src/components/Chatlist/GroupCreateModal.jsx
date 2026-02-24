@@ -67,11 +67,11 @@ export default function GroupCreateModal({ open, onClose }) {
 
     createGroup.mutate(form, {
       onSuccess: () => {
-        showToast.success("Ancient conclave established!");
+        showToast.success("Group created");
         onClose?.();
       },
       onError: (error) => {
-        showToast.error("Failed to establish the conclave. The spirits are restless.");
+        showToast.error("Failed to create group. Please try again.");
         console.error("Group creation error:", error);
       },
     });
@@ -94,7 +94,7 @@ export default function GroupCreateModal({ open, onClose }) {
               <IoClose className="h-6 w-6 sm:h-7 sm:w-7" />
             </button>
             <h3 className="text-ancient-text-light text-lg sm:text-xl font-bold flex items-center gap-2">
-              <FaMagic className="text-ancient-icon-glow" /> Select Conclave Members
+              <FaMagic className="text-ancient-icon-glow" /> Add participants
             </h3>
             <div className="w-6 sm:w-7" /> {/* Alignment placeholder */}
           </div>
@@ -105,7 +105,7 @@ export default function GroupCreateModal({ open, onClose }) {
               name="Search Contacts"
               state={searchTerm}
               setState={setSearchTerm}
-              placeholder="Search for spirits..."
+              placeholder="Search contacts"
               Icon={FaMagic}
             />
           </div>
@@ -146,12 +146,12 @@ export default function GroupCreateModal({ open, onClose }) {
           <div className="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-4 space-y-2">
             {isLoading && (
               <div className="text-ancient-text-muted text-center py-8 text-base sm:text-lg">
-                Summoning spirits from the ethereal plane...
+                Loading contacts...
               </div>
             )}
             {!isLoading && filteredContacts.length === 0 && (
               <div className="text-ancient-text-muted text-center py-8 text-base sm:text-lg">
-                No spirits found matching your incantation.
+                No contacts found.
               </div>
             )}
             {!isLoading &&
@@ -171,7 +171,7 @@ export default function GroupCreateModal({ open, onClose }) {
               disabled={!canProceedToStep2}
               className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold text-base sm:text-lg px-5 py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Next Ritual ({selected.length}){" "}
+              Next ({selected.length}){" "}
               <IoArrowBack className="rotate-180 h-5 w-5 sm:h-6 sm:w-6" />
             </button>
           </div>
@@ -190,7 +190,7 @@ export default function GroupCreateModal({ open, onClose }) {
               <IoArrowBack className="h-6 w-6 sm:h-7 sm:w-7" />
             </button>
             <h3 className="text-ancient-text-light text-lg sm:text-xl font-bold flex items-center gap-2">
-              <FaScroll className="text-ancient-icon-glow" /> Inscribe Conclave Details
+              <FaScroll className="text-ancient-icon-glow" /> Group details
             </h3>
           </div>
 
@@ -198,18 +198,18 @@ export default function GroupCreateModal({ open, onClose }) {
             <AvatarUpload iconFile={iconFile} setIconFile={setIconFile} name={name} />
             <div className="w-full max-w-xs sm:max-w-sm space-y-4">
               <ThemedInput
-                name="Conclave Name"
+                name="Group name"
                 state={name}
                 setState={setName}
-                placeholder="E.g., Whispering Circle, Council of Elders"
+                placeholder="Enter group name"
                 Icon={FaScroll}
                 label
               />
               <ThemedInput
-                name="Conclave Purpose"
+                name="Description"
                 state={description}
                 setState={setDescription}
-                placeholder="Share the purpose of your gathering..."
+                placeholder="Add an optional description"
                 Icon={FaFeather}
                 label
               />
@@ -222,7 +222,7 @@ export default function GroupCreateModal({ open, onClose }) {
               disabled={!canFinalizeGroup || createGroup.isPending}
               className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold text-base sm:text-lg px-6 py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {createGroup.isPending ? "Forging Conclave..." : "Forge Conclave"}{" "}
+              {createGroup.isPending ? "Creating..." : "Create group"}{" "}
               <FaMagic />
             </button>
           </div>

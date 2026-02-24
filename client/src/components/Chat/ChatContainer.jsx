@@ -1,14 +1,15 @@
 "use client";
-import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
-import MessageActions from "./MessageActions";
+import MessageWrapper from "./MessageWrapper";
 import ForwardModal from "./ForwardModal";
 import SelectMessagesBar from "./SelectMessagesBar";
 import { showToast } from "@/lib/toast";
 import { useMessagesPaginated } from "@/hooks/queries/useMessagesPaginated";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import TextMessage from "./messages/TextMessage";
+import { MdArrowDownward } from "react-icons/md";
 import ImageMessage from "./messages/ImageMessage";
 import AudioMessage from "./messages/AudioMessage";
 import VideoMessage from "./messages/VideoMessage";
@@ -26,10 +27,9 @@ function ChatContainer() {
   const messages = useChatStore((s) => s.messages);
   const containerRef = useRef(null);
   const topSentinelRef = useRef(null);
-  const prevScrollHeightRef = useRef(0);
-  const prevScrollTopRef = useRef(0);
+  const messagesEndRef = useRef(null); // Sentinel for auto-scroll
   const loadingOlderRef = useRef(false);
-  const initialScrolledRef = useRef(false);
+  const shouldAutoScrollRef = useRef(true); // Track if we should auto-scroll
   const [showJump, setShowJump] = useState(false);
 
   // Paginated messages logic
@@ -79,33 +79,39 @@ function ChatContainer() {
     });
   }, []);
 
-  // Scroll preservation and pin-to-bottom
+  // Preserve scroll position when loading older messages (pagination)
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
-    if (loadingOlderRef.current) {
-      const newScrollHeight = el.scrollHeight;
-      const delta = newScrollHeight - prevScrollHeightRef.current;
-      el.scrollTop = prevScrollTopRef.current + delta;
-      loadingOlderRef.current = false;
-    }
+    if (!el || !loadingOlderRef.current) return;
+
+    // Scroll position is automatically preserved by the browser when new content
+    // is added at the top, so we just reset the flag
+    loadingOlderRef.current = false;
   }, [messages]);
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
-    const nearBottom = distanceFromBottom <= 120;
-    if (!initialScrolledRef.current) {
-      el.scrollTop = el.scrollHeight;
-      initialScrolledRef.current = true;
-      return;
-    }
-    if (nearBottom) el.scrollTop = el.scrollHeight;
+  // Auto-scroll to bottom using modern pattern with useLayoutEffect
+  // This runs synchronously before browser paint, preventing flicker
+  useLayoutEffect(() => {
+    if (!messagesEndRef.current || !shouldAutoScrollRef.current) return;
+
+    // Smooth scroll to the sentinel element at the end of messages
+    messagesEndRef.current.scrollIntoView({
+      behavior: 'smooth',
+      block: 'end'
+    });
   }, [messages]);
 
+  // Reset auto-scroll when chat changes and scroll to bottom immediately
   useEffect(() => {
-    initialScrolledRef.current = false;
+    shouldAutoScrollRef.current = true;
+
+    if (messagesEndRef.current) {
+      // Instant scroll on chat change (no smooth behavior)
+      messagesEndRef.current.scrollIntoView({
+        behavior: 'instant',
+        block: 'end'
+      });
+    }
   }, [currentChatUser?.id]);
 
   const setReplyTo = useChatStore((s) => s.setReplyTo);
@@ -129,42 +135,54 @@ function ChatContainer() {
   const onScroll = useCallback((e) => {
     const el = e.currentTarget;
     if (!el) return;
+
     const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
-    setShowJump(distanceFromBottom > 240);
+
+    // Show "Go to Bottom" button if user scrolled up more than 150px
+    const shouldShowButton = distanceFromBottom > 150;
+    setShowJump(shouldShowButton);
+
+    // Update auto-scroll behavior: only auto-scroll if user is near bottom
+    shouldAutoScrollRef.current = distanceFromBottom <= 150;
   }, []);
   useEffect(() => {
     const el = topSentinelRef.current;
     const scroller = containerRef.current;
     if (!el || !scroller) return;
+
     const obs = new IntersectionObserver((entries) => {
       const e = entries[0];
       if (e.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        prevScrollHeightRef.current = scroller.scrollHeight;
-        prevScrollTopRef.current = scroller.scrollTop;
         loadingOlderRef.current = true;
         fetchNextPage();
       }
     }, { root: scroller, threshold: 0.01 });
+
     obs.observe(el);
     return () => obs.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
   const jumpToLatest = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    if (!messagesEndRef.current) return;
+
+    // Re-enable auto-scroll and scroll to bottom
+    shouldAutoScrollRef.current = true;
+    messagesEndRef.current.scrollIntoView({
+      behavior: 'smooth',
+      block: 'end'
+    });
   }, []);
 
   return (
     <div
       ref={containerRef}
       onScroll={onScroll}
-      className="h-full w-full flex-1 relative overflow-auto custom-scrollbar bg-transparent text-ancient-text-light"
+      className="h-full w-full flex-1 relative overflow-auto pb-28 custom-scrollbar bg-transparent text-ancient-text-light"
     >
       {/* Optional: floating background visuals */}
       <div className="bg-chat-background bg-fixed h-full w-full opacity-[0.04] fixed left-0 top-0 z-0 pointer-events-none"></div>
 
       <div className="flex w-full">
-        <div className="flex flex-col justify-end w-full gap-3 overflow-auto px-2 sm:px-4 py-3">
+        <div className="flex flex-col justify-end w-full gap-3 px-2 sm:px-4 py-3">
           {/* Sticky sentinel for pagination */}
           <div className="sticky top-0 z-10 flex justify-center pointer-events-none">
             <div ref={topSentinelRef} className="h-6">
@@ -173,6 +191,14 @@ function ChatContainer() {
               )}
             </div>
           </div>
+          {/* Select messages control bar (sticky) */}
+          <SelectMessagesBar
+            selectMode={selectMode}
+            selectedCount={selectedIds.length}
+            onToggleSelect={() => setSelectMode((v) => !v)}
+            onCancel={() => { setSelectMode(false); setSelectedIds([]); }}
+            onForward={() => setShowForward(true)}
+          />
           {/* Message stack */}
           {(() => {
             const storeAll = Array.isArray(messages) ? messages : [];
@@ -182,78 +208,54 @@ function ChatContainer() {
             return filtered.map((message, idx) => {
               const isIncoming = Number(message.senderId) === Number(currentChatUser?.id);
               return (
-                <div 
+                <MessageWrapper
                   key={message.id}
-                  className={`relative w-full flex ${isIncoming ? 'justify-start' : 'justify-end'} py-1`}
+                  message={message}
+                  isIncoming={isIncoming}
+                  selectMode={selectMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
                 >
-                  {/* Selection checkbox when selectMode is on */}
-                  {selectMode && (
-                    <input
-                      type="checkbox"
-                      className="mr-2 sm:mr-3 mt-2 form-checkbox h-4 w-4 sm:h-5 sm:w-5 text-ancient-icon-glow border-ancient-border-stone rounded focus:ring-0 cursor-pointer flex-shrink-0"
-                      checked={selectedIds.includes(message.id)}
-                      onChange={() => toggleSelect(message.id)}
-                    />
-                  )}
-
-                  {/* Message components */}
                   {message.type === "text" && (
-                    <div className="relative w-full max-w-full">
-                      <TextMessage message={message} isIncoming={isIncoming} />
-                      <MessageActions message={message} isIncoming={isIncoming} />
-                    </div>
+                    <TextMessage message={message} isIncoming={isIncoming} />
                   )}
 
                   {message.type === "image" && (
-                    <div className="relative w-full max-w-full">
-                      <ImageMessage message={message} />
-                      <MessageActions message={message} isIncoming={isIncoming} />
-                    </div>
+                    <ImageMessage message={message} isIncoming={isIncoming} />
                   )}
 
                   {message.type === "audio" && (
-                    <div className="relative w-full max-w-full">
-                      <AudioMessage message={message} isIncoming={isIncoming} />
-                      <MessageActions message={message} isIncoming={isIncoming} />
-                    </div>
+                    <AudioMessage message={message} isIncoming={isIncoming} />
                   )}
 
                   {message.type === "video" && (
-                    <div className="relative w-full max-w-full">
-                      <VideoMessage message={message} />
-                      <MessageActions message={message} isIncoming={isIncoming} />
-                    </div>
+                    <VideoMessage message={message} isIncoming={isIncoming} />
                   )}
 
                   {(message.type === "document" || (!['text', 'image', 'audio', 'video', 'location'].includes(String(message.type || '')))) && (
-                    <div className="relative w-full max-w-full">
-                      <DocumentMessage message={message} />
-                      <MessageActions message={message} isIncoming={isIncoming} />
-                    </div>
+                    <DocumentMessage message={message} isIncoming={isIncoming} />
                   )}
-                </div>
+                </MessageWrapper>
               );
             });
           })()}
 
-          {/* Selection bar for forwarding */}
-          <SelectMessagesBar
-            selectMode={selectMode}
-            selectedCount={selectedIds.length}
-            onToggleSelect={() => setSelectMode((v) => !v)}
-            onCancel={() => { setSelectMode(false); setSelectedIds([]); }}
-            onForward={() => setShowForward(true)}
-          />
+          {/* Scroll sentinel - target for auto-scroll */}
+          <div ref={messagesEndRef} className="h-1" aria-hidden="true" />
+
+
         </div>
       </div>
-      {/* Jump to latest button */}
+      {/* Jump to latest (icon button) - Fixed positioning for consistent placement */}
       {showJump && (
         <button
           type="button"
           onClick={jumpToLatest}
-          className="absolute right-4 bottom-24 z-20 bg-ancient-icon-glow text-ancient-bg-dark px-3 py-2 rounded-full shadow-lg hover:bg-ancient-bubble-user transition-colors"
+          title="Jump to latest"
+          aria-label="Jump to latest"
+          className="fixed right-4 md:right-6 bottom-36 md:bottom-40 z-30 pointer-events-auto w-12 h-12 md:w-13 md:h-13 rounded-full flex items-center justify-center bg-ancient-icon-glow text-ancient-bg-dark shadow-xl hover:shadow-2xl hover:brightness-110 hover:scale-105 active:scale-95 transition-all duration-200 animate-in fade-in slide-in-from-bottom-2"
         >
-          Jump to latest
+          <MdArrowDownward className="text-2xl" />
         </button>
       )}
 

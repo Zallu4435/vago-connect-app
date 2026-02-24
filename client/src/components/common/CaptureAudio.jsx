@@ -1,16 +1,13 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { FaMicrophone, FaStop, FaPlay, FaPause } from "react-icons/fa";
+import { FaMicrophone, FaStop, FaPlay, FaPause, FaTrash } from "react-icons/fa";
 import { MdSend } from "react-icons/md";
-import { FaMagic, FaWater, FaSpinner } from "react-icons/fa"; // Reliable icons
-import { IoClose } from "react-icons/io5"; // For a clear close/cancel icon
+import { IoClose } from "react-icons/io5";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useSocketStore } from "@/stores/socketStore";
 import { useUploadAudio } from "@/hooks/mutations/useUploadAudio";
 import { showToast } from "@/lib/toast";
-import Image from "next/image"; // For user avatar
-import BaseVoicePlayer from "@/components/common/BaseVoicePlayer";
 
 // Helper for time formatting
 function formatTime(secs) {
@@ -20,7 +17,7 @@ function formatTime(secs) {
   return `${m}:${s}`;
 }
 
-function CaptureAudio({ onChange, hide }) {
+function CaptureAudio({ onChange }) {
   const userInfo = useAuthStore((s) => s.userInfo);
   const currentChatUser = useChatStore((s) => s.currentChatUser);
   const messages = useChatStore((s) => s.messages);
@@ -32,72 +29,50 @@ function CaptureAudio({ onChange, hide }) {
   const [recordedBlob, setRecordedBlob] = useState(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audioPlaybackCurrentTime, setAudioPlaybackCurrentTime] = useState(0);
-  const [audioPlaybackDuration, setAudioPlaybackDuration] = useState(0);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const [playbackDuration, setPlaybackDuration] = useState(0);
 
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
-  const audioRef = useRef(null); // For legacy playback; BaseVoicePlayer used for UI
-  const recordingTimerRef = useRef(null); // For tracking recording duration
-  const playbackTimerRef = useRef(null); // For tracking playback duration
+  const audioRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const playbackTimerRef = useRef(null);
 
-  // Internal cleanup that does NOT notify parent; used for unmount (StrictMode safe)
-  const internalCleanup = useCallback(() => {
-    stopRecordingTimer();
-    stopPlaybackTimer();
+  // Cleanup
+  const cleanup = useCallback(() => {
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
     try {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      if (mediaRecorderRef.current?.state !== "inactive") {
         mediaRecorderRef.current.stop();
         mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       }
-    } catch {}
+    } catch { }
     try {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = "";
       }
-    } catch {}
+    } catch { }
   }, []);
 
   const close = useCallback(() => {
-    internalCleanup();
+    cleanup();
     setRecordedBlob(null);
     setIsRecording(false);
     setIsPlaying(false);
     setRecordingDuration(0);
-    setAudioPlaybackCurrentTime(0);
-    setAudioPlaybackDuration(0);
+    setPlaybackTime(0);
+    setPlaybackDuration(0);
     onChange?.(false);
-    hide?.();
-  }, [internalCleanup, onChange, hide]);
+  }, [cleanup, onChange]);
 
   useEffect(() => {
-    return () => {
-      internalCleanup(); // Do not trigger onChange(false) during StrictMode test unmount
-    };
-  }, [internalCleanup]);
+    return () => cleanup();
+  }, [cleanup]);
 
-  const startRecordingTimer = () => {
-    stopRecordingTimer(); // Clear any existing timer
-    recordingTimerRef.current = setInterval(() => setRecordingDuration((d) => d + 1), 1000);
-  };
-  const stopRecordingTimer = () => {
-    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-    recordingTimerRef.current = null;
-  };
-
-  const startPlaybackTimer = () => {
-    stopPlaybackTimer();
-    playbackTimerRef.current = setInterval(() => {
-      if (audioRef.current) setAudioPlaybackCurrentTime(audioRef.current.currentTime);
-    }, 50); // Update frequently for smoother progress bar
-  };
-  const stopPlaybackTimer = () => {
-    if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
-    playbackTimerRef.current = null;
-  };
-
-  const handleStartRecording = useCallback(async () => {
+  // Start recording
+  const startRecording = useCallback(async () => {
     if (!navigator?.mediaDevices?.getUserMedia) {
       showToast.error("Microphone access not available.");
       return;
@@ -106,57 +81,84 @@ function CaptureAudio({ onChange, hide }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
       chunksRef.current = [];
+
       mr.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data?.size > 0) chunksRef.current.push(e.data);
       };
+
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         setRecordedBlob(blob);
-        stream.getTracks().forEach((t) => t.stop()); // Stop the microphone stream
-        stopRecordingTimer();
-        // Prepare for playback
+        stream.getTracks().forEach((t) => t.stop());
+
         if (audioRef.current) {
           audioRef.current.src = URL.createObjectURL(blob);
           audioRef.current.load();
           audioRef.current.onloadedmetadata = () => {
-            setAudioPlaybackDuration(audioRef.current?.duration || 0);
-            setAudioPlaybackCurrentTime(0);
+            setPlaybackDuration(audioRef.current?.duration || 0);
+            setPlaybackTime(0);
           };
           audioRef.current.onended = () => {
             setIsPlaying(false);
-            setAudioPlaybackCurrentTime(0);
-            stopPlaybackTimer();
+            setPlaybackTime(0);
+            if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
           };
         }
       };
+
       mediaRecorderRef.current = mr;
       setRecordingDuration(0);
       setRecordedBlob(null);
       setIsRecording(true);
       setIsPlaying(false);
-      setAudioPlaybackCurrentTime(0);
-      setAudioPlaybackDuration(0);
+      setPlaybackTime(0);
+      setPlaybackDuration(0);
       mr.start();
-      startRecordingTimer();
+
+      recordingTimerRef.current = setInterval(() => setRecordingDuration((d) => d + 1), 1000);
     } catch (err) {
       console.error("Audio getUserMedia error", err);
       showToast.error("Failed to access microphone.");
     }
   }, []);
 
-  const handleStopRecording = useCallback(() => {
+  // Stop recording
+  const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      stopRecordingTimer();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     }
   }, [isRecording]);
 
-  const handleTogglePlayback = useCallback(() => {
-    // No-op; playback handled by BaseVoicePlayer
+  // Toggle playback
+  const togglePlayback = useCallback(() => {
+    if (!audioRef.current || !recordedBlob) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+      playbackTimerRef.current = setInterval(() => {
+        if (audioRef.current) setPlaybackTime(audioRef.current.currentTime);
+      }, 50);
+    }
+  }, [isPlaying, recordedBlob]);
+
+  // Delete recording
+  const deleteRecording = useCallback(() => {
+    setRecordedBlob(null);
+    setPlaybackTime(0);
+    setPlaybackDuration(0);
+    setIsPlaying(false);
+    if (playbackTimerRef.current) clearInterval(playbackTimerRef.current);
   }, []);
 
-  const handleSendRecording = useCallback(async () => {
+  // Send recording
+  const sendRecording = useCallback(async () => {
     if (!recordedBlob || !userInfo?.id || !currentChatUser?.id) return;
 
     const form = new FormData();
@@ -164,104 +166,171 @@ function CaptureAudio({ onChange, hide }) {
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
 
-    const toastId = showToast.loading("Conjuring echo...");
+    const toastId = showToast.loading("Sending voice message...");
     uploadAudioMutation.mutate(form, {
       onSuccess: (data) => {
         showToast.dismiss(toastId);
-        showToast.success("Echo conjured!");
+        showToast.success("Voice message sent!");
         socket.current?.emit("send-msg", {
           to: currentChatUser.id,
           from: userInfo.id,
           message: data.content,
           type: data.type || "audio",
-          timestamp: Date.now(), // Add timestamp here
-          messageStatus: "sent", // Assuming initial status
+          timestamp: Date.now(),
+          messageStatus: "sent",
         });
         setMessages([...(messages || []), data]);
         close();
       },
       onError: (err) => {
         showToast.dismiss(toastId);
-        showToast.error("Conjuration failed. Try again.");
+        showToast.error("Failed to send. Try again.");
         console.error("sendAudio error", err);
       },
     });
   }, [recordedBlob, userInfo, currentChatUser, uploadAudioMutation, socket, messages, setMessages, close]);
 
-
-  const playbackProgress = audioPlaybackDuration ? (audioPlaybackCurrentTime / audioPlaybackDuration) * 100 : 0;
-  const previewUrl = React.useMemo(() => {
-    if (!recordedBlob) return "";
-    const url = URL.createObjectURL(recordedBlob);
-    return url;
-  }, [recordedBlob]);
-  useEffect(() => {
-    return () => {
-      try {
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-      } catch {}
-    };
-  }, [previewUrl]);
+  const playbackProgress = playbackDuration ? (playbackTime / playbackDuration) * 100 : 0;
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-40 bg-ancient-bg-dark border-t border-ancient-border-stone flex items-center justify-between p-3 gap-4 shadow-2xl animate-slide-in-up">
-      <audio ref={audioRef} hidden /> {/* Hidden audio element for playback */}
-
-      {/* User Avatar */}
-      {userInfo?.profileImage && (
-        <div className="relative h-10 w-10 rounded-full overflow-hidden flex-shrink-0 bg-ancient-input-bg border border-ancient-icon-glow">
-          <Image src={userInfo.profileImage} alt="User Avatar" fill className="object-cover" />
-        </div>
-      )}
-
-      {/* Cancel Button */}
-      <button
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-fade-in"
         onClick={close}
-        className="p-2 rounded-full bg-red-700/70 hover:bg-red-600 text-white transition-colors duration-200 shadow-md"
-        aria-label="Cancel Recording"
-      >
-        <IoClose className="text-xl" />
-      </button>
+      />
 
-      {/* Main Recording/Playback Area */}
-      <div className="flex-1 flex items-center gap-3 bg-ancient-input-bg rounded-full py-2 px-4 shadow-inner border border-ancient-input-border">
+      {/* Recording Interface */}
+      <div className="fixed inset-x-0 bottom-0 z-50 bg-ancient-bg-dark border-t-2 border-ancient-icon-glow/30 shadow-2xl animate-slide-in-up">
+        <audio ref={audioRef} hidden />
 
-        {/* Recording/Playback Indicator & Timer */}
-        {recordedBlob && !isRecording ? ( // Reviewing state
-          <div className="flex-1">
-            <BaseVoicePlayer src={previewUrl} isIncoming={false} showAvatars={Boolean(userInfo?.profileImage)} leftAvatarUrl={userInfo?.profileImage} />
+        {/* Main Content */}
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-ancient-text-light text-lg sm:text-xl font-semibold">
+              {isRecording ? "Recording..." : recordedBlob ? "Review Recording" : "Voice Message"}
+            </h3>
+            <button
+              onClick={close}
+              className="p-2 rounded-full bg-ancient-bg-medium hover:bg-red-600/20 text-ancient-text-muted hover:text-red-500 transition-all"
+              aria-label="Close"
+            >
+              <IoClose className="text-2xl" />
+            </button>
           </div>
-        ) : ( // Recording or initial idle state
-          <>
-            <FaWater className={`text-2xl ${isRecording ? 'text-red-500 animate-pulse' : 'text-ancient-text-muted'}`} />
-            <span className={`flex-1 text-center text-lg ${isRecording ? 'text-red-500 animate-pulse' : 'text-ancient-text-muted'}`}>
-              {isRecording ? `Recording ${formatTime(recordingDuration)}` : 'Tap to start recording'}
-            </span>
-          </>
-        )}
-      </div>
 
-      {/* Record/Stop Button */}
-      {!recordedBlob ? ( // If no recording exists, show record button
-        <button
-          onClick={isRecording ? handleStopRecording : handleStartRecording}
-          className={`p-4 rounded-full text-white shadow-lg transition-colors duration-200
-            ${isRecording ? "bg-red-600 hover:bg-red-500" : "bg-ancient-icon-glow hover:bg-green-500"}`}
-          aria-label={isRecording ? "Stop Recording" : "Start Recording"}
-        >
-          {isRecording ? <FaStop className="text-xl" /> : <FaMicrophone className="text-xl" />}
-        </button>
-      ) : ( // If recording exists, show send button
-        <button
-          onClick={handleSendRecording}
-          className="p-4 rounded-full bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark shadow-lg transition-colors duration-200"
-          aria-label="Send Recording"
-          disabled={uploadAudioMutation.isPending}
-        >
-          {uploadAudioMutation.isPending ? <FaSpinner className="text-xl animate-spin" /> : <MdSend className="text-xl" />}
-        </button>
-      )}
-    </div>
+          {/* Recording/Playback Area */}
+          <div className="bg-ancient-bg-medium rounded-2xl p-6 sm:p-8 mb-6 border border-ancient-border-stone/50">
+            {/* Waveform Animation (when recording) */}
+            {isRecording && (
+              <div className="flex items-center justify-center gap-1.5 h-20 mb-4">
+                {[...Array(20)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-1 bg-ancient-icon-glow rounded-full animate-pulse"
+                    style={{
+                      height: `${20 + Math.random() * 60}%`,
+                      animationDelay: `${i * 0.05}s`,
+                      animationDuration: `${0.5 + Math.random() * 0.5}s`,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Playback Progress (when recorded) */}
+            {recordedBlob && !isRecording && (
+              <div className="mb-4">
+                <div className="h-2 bg-ancient-border-stone rounded-full overflow-hidden mb-2">
+                  <div
+                    className="h-full bg-ancient-icon-glow rounded-full transition-all duration-100"
+                    style={{ width: `${playbackProgress}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-ancient-text-muted">
+                  <span>{formatTime(playbackTime)}</span>
+                  <span>{formatTime(playbackDuration)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Timer/Status */}
+            <div className="text-center">
+              <div className="text-3xl sm:text-4xl font-bold text-ancient-icon-glow mb-2 tabular-nums">
+                {isRecording
+                  ? formatTime(recordingDuration)
+                  : recordedBlob
+                    ? formatTime(playbackDuration)
+                    : "0:00"}
+              </div>
+              <p className="text-ancient-text-muted text-sm">
+                {isRecording
+                  ? "Recording in progress..."
+                  : recordedBlob
+                    ? "Tap play to review"
+                    : "Tap the microphone to start"}
+              </p>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center justify-center gap-4">
+            {!recordedBlob ? (
+              // Recording controls
+              <>
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-white shadow-xl transition-all transform hover:scale-105 active:scale-95 ${isRecording
+                    ? "bg-red-600 hover:bg-red-500"
+                    : "bg-ancient-icon-glow hover:bg-green-500"
+                    }`}
+                  aria-label={isRecording ? "Stop Recording" : "Start Recording"}
+                >
+                  {isRecording ? (
+                    <FaStop className="text-2xl sm:text-3xl" />
+                  ) : (
+                    <FaMicrophone className="text-2xl sm:text-3xl" />
+                  )}
+                </button>
+              </>
+            ) : (
+              // Playback controls
+              <>
+                <button
+                  onClick={deleteRecording}
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-ancient-bg-medium hover:bg-red-600/20 text-ancient-text-muted hover:text-red-500 transition-all transform hover:scale-105 active:scale-95"
+                  aria-label="Delete Recording"
+                >
+                  <FaTrash className="text-lg sm:text-xl" />
+                </button>
+
+                <button
+                  onClick={togglePlayback}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark shadow-xl transition-all transform hover:scale-105 active:scale-95"
+                  aria-label={isPlaying ? "Pause" : "Play"}
+                >
+                  {isPlaying ? (
+                    <FaPause className="text-2xl sm:text-3xl" />
+                  ) : (
+                    <FaPlay className="text-2xl sm:text-3xl ml-1" />
+                  )}
+                </button>
+
+                <button
+                  onClick={sendRecording}
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark shadow-xl transition-all transform hover:scale-105 active:scale-95"
+                  aria-label="Send Recording"
+                  disabled={uploadAudioMutation.isPending}
+                >
+                  <MdSend className="text-lg sm:text-xl" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
