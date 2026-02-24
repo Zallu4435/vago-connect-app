@@ -20,7 +20,7 @@ function IncomingCallNotification() {
 
   const isVideoCall = call.callType === "video";
   const callerName = call?.from?.name || "Mysterious Caller";
-  const callerImage = call?.from?.image || "/default_mystical_avatar.png";
+  const callerImage = call?.from?.image || "/default_avatar.png";
 
   const handleAcceptCall = useCallback(() => {
     socket?.current?.emit?.("accept-call", { from: call.from.id, to: call.to.id });

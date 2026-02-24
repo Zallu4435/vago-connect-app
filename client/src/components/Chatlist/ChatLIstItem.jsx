@@ -27,9 +27,9 @@ function ChatListItem({ data, isContactsPage = false }) {
   const lastTime = data?.timestamp ? calculateTime(data.timestamp) : "";
   let preview = "";
 
-  if (data?.type === "image") preview = "Ancient Image Echo";
-  else if (data?.type === "audio") preview = "Whispered Incantation";
-  else preview = data?.message || "No words echo...";
+  if (data?.type === "image") preview = "Image";
+  else if (data?.type === "audio") preview = "Voice message";
+  else preview = data?.message || "No messages yet";
 
   const pinMutation = usePinChat();
   const onTogglePin = (e) => {
@@ -46,7 +46,7 @@ function ChatListItem({ data, isContactsPage = false }) {
 
   const displayName = data?.isSelf
     ? (data?.isPinned ? "Saved messages" : "You")
-    : (data?.name || "Unknown Entity");
+    : (data?.name || "Unknown User");
 
   return (
     <div

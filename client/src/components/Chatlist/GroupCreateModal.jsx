@@ -10,6 +10,7 @@ import ThemedInput from "@/components/common/ThemedInput";
 import AvatarUpload from "@/components/common/AvatarUpload";
 import ContactSelectorItem from "@/components/common/ContactSelectorItem";
 import ModalShell from "@/components/common/ModalShell";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 export default function GroupCreateModal({ open, onClose }) {
   const { data: sections = {}, isLoading } = useAllContacts();
@@ -124,7 +125,7 @@ export default function GroupCreateModal({ open, onClose }) {
                   >
                     <div className="relative h-10 w-10 rounded-full overflow-hidden border-2 border-ancient-icon-glow">
                       <Image
-                        src={contact.image || "/default_mystical_avatar.png"}
+                        src={contact.image || "/default_avatar.png"}
                         alt={contact.name}
                         fill
                         className="object-cover"
@@ -222,8 +223,13 @@ export default function GroupCreateModal({ open, onClose }) {
               disabled={!canFinalizeGroup || createGroup.isPending}
               className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold text-base sm:text-lg px-6 py-2 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {createGroup.isPending ? "Creating..." : "Create group"}{" "}
-              <FaMagic />
+              {createGroup.isPending ? (
+                <LoadingSpinner label="Creating..." size={20} />
+              ) : (
+                <>
+                  Create group <FaMagic />
+                </>
+              )}
             </button>
           </div>
         </div>

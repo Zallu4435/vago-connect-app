@@ -8,6 +8,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { useSocketStore } from "@/stores/socketStore";
 import { useUploadAudio } from "@/hooks/mutations/useUploadAudio";
 import { showToast } from "@/lib/toast";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 // Helper for time formatting
 function formatTime(secs) {
@@ -319,11 +320,15 @@ function CaptureAudio({ onChange }) {
 
                 <button
                   onClick={sendRecording}
-                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark shadow-xl transition-all transform hover:scale-105 active:scale-95"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark shadow-xl transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label="Send Recording"
                   disabled={uploadAudioMutation.isPending}
                 >
-                  <MdSend className="text-lg sm:text-xl" />
+                  {uploadAudioMutation.isPending ? (
+                    <LoadingSpinner size={20} />
+                  ) : (
+                    <MdSend className="text-lg sm:text-xl" />
+                  )}
                 </button>
               </>
             )}

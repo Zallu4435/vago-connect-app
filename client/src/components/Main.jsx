@@ -96,11 +96,11 @@ function Main() {
       {/* Full Page Error for User Loading */}
       {authEmail && userError && (
         <FullPageError
-          title="Failed to decipher ancient prophecy"
-          message="The sacred scrolls are unreadable. Verify your connection to the ethereal plane and attempt again."
+          title="Connection Error"
+          message="We couldn't connect to the server. Please check your internet connection and try again."
           onRetry={() => refetchUser()}
           actionHref="/login"
-          actionLabel="Return to Login Ritual"
+          actionLabel="Return to Login"
         />
       )}
 

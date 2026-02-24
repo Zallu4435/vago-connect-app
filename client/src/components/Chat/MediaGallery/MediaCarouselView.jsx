@@ -77,7 +77,7 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
     <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between bg-ancient-bg-dark/80 text-ancient-text-light shadow-2xl z-[61] border-b border-ancient-border-stone/50">
-        <h3 className="text-xl font-bold text-ancient-icon-glow">{currentMedia.fileName || "Ancient Vision"}</h3>
+        <h3 className="text-xl font-bold text-ancient-icon-glow">{currentMedia.fileName || "Media Preview"}</h3>
         <div className="flex items-center gap-4">
           {onDownload && (
             <button
@@ -150,7 +150,7 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
           {String(currentMedia.type).startsWith("audio") && (
             <div className={`bg-ancient-bg-dark p-10 rounded-xl text-ancient-text-light flex flex-col items-center gap-6 border border-ancient-border-stone shadow-2xl transition-opacity duration-300 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}>
               <MdAudiotrack className="text-7xl text-ancient-icon-glow animate-pulse" />
-              <p className="text-2xl font-semibold text-center max-w-xs">{currentMedia.fileName || "Whispered Melody"}</p>
+              <p className="text-2xl font-semibold text-center max-w-xs">{currentMedia.fileName || "Voice Message"}</p>
               <audio
                 ref={audioRef}
                 src={currentMedia.url}
@@ -172,7 +172,7 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
           {!isDirectlyDisplayable && ( // For documents, location, or other unsupported types
             <div className={`bg-ancient-bg-dark p-10 rounded-xl text-ancient-text-light flex flex-col items-center gap-6 border border-ancient-border-stone shadow-2xl transition-opacity duration-300 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}>
               <DisplayIcon className="text-7xl text-ancient-icon-glow" />
-              <p className="text-2xl font-semibold text-center max-w-xs">{currentMedia.fileName || "Ancient Tome"}</p>
+              <p className="text-2xl font-semibold text-center max-w-xs">{currentMedia.fileName || "Document"}</p>
               <p className="text-sm text-ancient-text-muted">Type: {currentMedia.type}</p>
               <a
                 href={currentMedia.url}

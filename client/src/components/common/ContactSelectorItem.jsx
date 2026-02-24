@@ -16,7 +16,7 @@ export default function ContactSelectorItem({ contact, isSelected, onToggle }) {
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <div className="relative h-8 w-8 sm:h-10 sm:w-10 rounded-full overflow-hidden bg-ancient-input-bg flex-shrink-0">
           <Image
-            src={contact.image || "/default_mystical_avatar.png"}
+            src={contact.image || "/default_avatar.png"}
             alt={contact.name || "Unknown Contact"}
             fill
             className="object-cover"

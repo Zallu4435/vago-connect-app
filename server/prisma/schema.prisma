@@ -21,7 +21,7 @@ model User {
   profileImage String? @db.Text
   profileImagePublicId String? @db.VarChar(255)
   profileImageVersion  Int?
-  about        String  @default("Hey there! I am using WhatsApp") @db.Text
+  about        String  @default("Hey there! I am using Vago Connect") @db.Text
 
   // Privacy settings
   lastSeenPrivacy       String @default("everyone") @db.VarChar(20)

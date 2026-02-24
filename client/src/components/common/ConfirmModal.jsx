@@ -2,6 +2,7 @@
 import React from "react";
 import { IoWarning, IoAlertCircle, IoInformationCircle } from "react-icons/io5";
 import ModalShell from "@/components/common/ModalShell";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 const VARIANT_MAP = {
   danger: {
@@ -86,10 +87,14 @@ export default function ConfirmModal({
           className={`
             px-3 sm:px-4 py-2 rounded-lg font-bold shadow-md transition-colors
             ${v.confirmClass} disabled:opacity-60 disabled:cursor-not-allowed
-            w-full xs:w-auto
+            w-full xs:w-auto flex items-center justify-center
           `}
         >
-          {confirmLoading ? "Processing..." : confirmText}
+          {confirmLoading ? (
+            <LoadingSpinner size={20} label="Processing..." />
+          ) : (
+            confirmText
+          )}
         </button>
       </div>
     </ModalShell>

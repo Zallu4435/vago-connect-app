@@ -15,7 +15,7 @@ function MessageWrapper({
     onToggleSelect,
     children,
 }) {
-    const senderAvatar = message?.sender?.profileImage || "/default_mystical_avatar.png";
+    const senderAvatar = message?.sender?.profileImage || "/default_avatar.png";
     const isSelected = selectedIds?.includes(message.id);
 
     return (
@@ -41,7 +41,7 @@ function MessageWrapper({
                             type="sm"
                             image={senderAvatar}
                             setImage={() => { }}
-                            defaultImage="/default_mystical_avatar.png"
+                            defaultImage="/default_avatar.png"
                         />
                     </div>
                 )}
@@ -89,7 +89,7 @@ function MessageWrapper({
                             type="sm"
                             image={senderAvatar}
                             setImage={() => { }}
-                            defaultImage="/default_mystical_avatar.png"
+                            defaultImage="/default_avatar.png"
                         />
                     </div>
                 )}

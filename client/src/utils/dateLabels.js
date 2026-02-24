@@ -10,7 +10,7 @@ export function getThematicDayLabel(dateStr) {
       return "Today";
     }
     if (messageDate.toDateString() === yesterday.toDateString()) {
-      return "Yesterday's Echoes";
+      return "Yesterday";
     }
     return messageDate.toLocaleDateString("en-US", {
       year: "numeric",
@@ -18,6 +18,6 @@ export function getThematicDayLabel(dateStr) {
       day: "numeric",
     });
   } catch {
-    return "Ancient Times";
+    return "Older";
   }
 }

@@ -13,7 +13,7 @@ export default function ThemedMemberListItem({ member, currentUserIsAdmin, group
     <div className="flex items-center justify-between p-3 rounded-lg hover:bg-ancient-input-bg transition-colors duration-200 group">
       <div className="flex items-center gap-3">
         <div className="relative h-12 w-12 rounded-full overflow-hidden bg-ancient-input-bg flex-shrink-0 border border-ancient-border-stone">
-          <Image src={member.profileImage || "/default_mystical_avatar.png"} alt={member.name} fill className="object-cover" />
+          <Image src={member.profileImage || "/default_avatar.png"} alt={member.name} fill className="object-cover" />
         </div>
         <div className="flex flex-col">
           <span className="text-ancient-text-light text-base font-medium flex items-center gap-2">

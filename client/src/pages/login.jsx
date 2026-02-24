@@ -8,6 +8,7 @@ import { useRouter } from "next/router";
 import { useAuthStore } from "@/stores/authStore";
 import { showToast } from "@/lib/toast";
 import { isTokenExpired } from "@/lib/tokenManager";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 function Login() {
   const router = useRouter();
@@ -21,9 +22,11 @@ function Login() {
     }
   }, [accessToken, router]);
 
+  const [isLoading, setIsLoading] = React.useState(false);
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
+      setIsLoading(true);
       const result = await signInWithPopup(firebaseAuth, provider);
       const firebaseToken = await result.user.getIdToken();
       const email = result.user.email;
@@ -46,6 +49,8 @@ function Login() {
     } catch (err) {
       console.error(err);
       showToast.error("Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -63,7 +68,7 @@ function Login() {
       <div className="flex flex-col items-center justify-center gap-4 sm:gap-6 text-ancient-text-light animate-fade-in-up">
         <FaScroll className="text-6xl sm:text-8xl md:text-9xl text-ancient-icon-glow drop-shadow-lg animate-pulse-light" />
         <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold font-serif select-none text-center tracking-wide drop-shadow-xl px-4">
-          Ethereal Whispers
+          Vago Connect
         </h1>
         <p className="text-ancient-text-muted text-sm sm:text-lg text-center max-w-xs sm:max-w-md px-4">
           Sign in to continue.
@@ -83,14 +88,22 @@ function Login() {
           active:scale-95
           max-w-[90vw] sm:max-w-xl
           w-full sm:w-auto
+          disabled:opacity-50 disabled:cursor-not-allowed
         "
         onClick={handleLogin}
+        disabled={isLoading}
       >
-        <FcGoogle className="text-3xl sm:text-4xl md:text-5xl transition-transform duration-300 group-hover:scale-125 group-hover:rotate-6 drop-shadow-md flex-shrink-0" />
-        <span className="text-ancient-text-light text-lg sm:text-2xl md:text-3xl font-bold select-none tracking-wider group-hover:text-ancient-icon-glow">
-          Sign in with Google
-        </span>
-        <FaMagic className="hidden sm:block text-3xl sm:text-4xl md:text-5xl text-ancient-icon-glow opacity-0 group-hover:opacity-100 transition-opacity duration-300 group-hover:animate-spin-slow flex-shrink-0" />
+        {isLoading ? (
+          <LoadingSpinner label="Authenticating..." size={32} />
+        ) : (
+          <>
+            <FcGoogle className="text-3xl sm:text-4xl md:text-5xl transition-transform duration-300 group-hover:scale-125 group-hover:rotate-6 drop-shadow-md flex-shrink-0" />
+            <span className="text-ancient-text-light text-lg sm:text-2xl md:text-3xl font-bold select-none tracking-wider group-hover:text-ancient-icon-glow">
+              Sign in with Google
+            </span>
+            <FaMagic className="hidden sm:block text-3xl sm:text-4xl md:text-5xl text-ancient-icon-glow opacity-0 group-hover:opacity-100 transition-opacity duration-300 group-hover:animate-spin-slow flex-shrink-0" />
+          </>
+        )}
       </button>
 
       {/* Footer */}

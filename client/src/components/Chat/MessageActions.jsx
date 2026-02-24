@@ -122,6 +122,7 @@ export default function MessageActions({
           onChange={setEditText}
           onSave={onSaveEdit}
           onCancel={() => setIsEditing(false)}
+          isSaving={editMutation.isPending}
         />
       </div>
     );
