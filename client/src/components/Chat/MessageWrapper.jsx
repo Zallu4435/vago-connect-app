@@ -3,6 +3,8 @@ import React from "react";
 import Avatar from "@/components/common/Avatar";
 import MessageActions from "./MessageActions";
 
+import { useChatStore } from "@/stores/chatStore";
+
 /**
  * MessageWrapper - Unified wrapper for all message types
  * Handles layout, avatar positioning, alignment, and common message features
@@ -13,8 +15,12 @@ function MessageWrapper({
     selectMode,
     selectedIds,
     onToggleSelect,
+    onReply,
+    onForward,
     children,
 }) {
+    const currentChatUser = useChatStore((s) => s.currentChatUser);
+    const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
     const senderAvatar = message?.sender?.profileImage || "/default_avatar.png";
     const isSelected = selectedIds?.includes(message.id);
 
@@ -35,7 +41,7 @@ function MessageWrapper({
             {/* Message content with avatar */}
             <div className={`flex gap-2 items-end max-w-[85%] md:max-w-[80%]`}>
                 {/* Avatar for incoming messages (left side) */}
-                {isIncoming && message?.sender && (
+                {isGroup && isIncoming && message?.sender && (
                     <div className="flex-shrink-0 mb-1">
                         <Avatar
                             type="sm"
@@ -48,17 +54,18 @@ function MessageWrapper({
 
                 {/* Message bubble and metadata */}
                 <div className="flex flex-col gap-1 min-w-0">
-                    {/* Forwarded label */}
-                    {message.isForwarded && (
-                        <span className="text-[10px] text-ancient-text-muted italic px-2">
-                            Forwarded
-                        </span>
-                    )}
 
                     {/* Message content with actions */}
-                    <div className="relative">
+                    <div className="relative group">
                         {children}
-                        <MessageActions message={message} isIncoming={isIncoming} />
+                        {!message.isDeletedForEveryone && (
+                            <MessageActions
+                                message={message}
+                                isIncoming={isIncoming}
+                                onReply={onReply}
+                                onForward={onForward}
+                            />
+                        )}
                     </div>
 
                     {/* Reactions */}
@@ -83,7 +90,7 @@ function MessageWrapper({
                 </div>
 
                 {/* Avatar for outgoing messages (right side) */}
-                {!isIncoming && message?.sender && (
+                {isGroup && !isIncoming && message?.sender && (
                     <div className="flex-shrink-0 mb-1">
                         <Avatar
                             type="sm"

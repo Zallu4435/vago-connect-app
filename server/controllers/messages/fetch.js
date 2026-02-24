@@ -5,7 +5,17 @@ export const getMessages = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
     const { from, to } = req.params;
-    const convo = await getOrCreateDirectConversation(prisma, from, to);
+    const isGroup = req.query.isGroup === 'true';
+
+    let convo;
+    if (isGroup) {
+      convo = await prisma.conversation.findUnique({ where: { id: Number(to) } });
+      if (!convo || convo.type !== 'group') {
+        return res.status(404).json({ message: "Group not found" });
+      }
+    } else {
+      convo = await getOrCreateDirectConversation(prisma, from, to);
+    }
 
     // Query params
     const rawLimit = Number(req.query.limit);
@@ -26,19 +36,24 @@ export const getMessages = async (req, res, next) => {
       where: {
         conversationId: convo.id,
         ...(clearedAt ? { createdAt: { gt: clearedAt } } : {}),
+        NOT: {
+          deletedBy: {
+            array_contains: Number(from),
+          },
+        },
       },
       orderBy: { createdAt: direction },
       take: limit + 1,
       ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
-      select: {
-        id: true,
-        conversationId: true,
-        senderId: true,
-        type: true,
-        content: true,
-        status: true,
-        createdAt: true,
-      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true
+          }
+        }
+      }
     });
 
     let nextCursor = null;
@@ -90,7 +105,16 @@ export const getInitialContactswithMessages = async (req, res, next) => {
         conversation: {
           include: {
             participants: { include: { user: { select: { id: true, name: true, email: true, about: true, profileImage: true } } } },
-            messages: { orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, type: true, content: true, status: true, createdAt: true, senderId: true } },
+            messages: {
+              where: {
+                NOT: {
+                  deletedBy: {
+                    array_contains: userId,
+                  },
+                },
+              },
+              orderBy: { createdAt: "desc" },
+            },
           },
         },
       },
@@ -106,15 +130,30 @@ export const getInitialContactswithMessages = async (req, res, next) => {
 
     let result = page.map((p) => {
       const convo = p.conversation;
-      const lastMsg = convo.messages[0] || null;
+      const clearedAt = p.clearedAt ? new Date(p.clearedAt).getTime() : 0;
+      const validMessages = convo.messages.filter(m => new Date(m.createdAt).getTime() > clearedAt);
+      const lastMsg = validMessages[0] || null;
       const other = convo.type === 'direct' ? (convo.participants.find(cp => cp.userId !== userId)?.user || convo.participants.find(cp => cp.userId === userId)?.user) : null;
       return {
         conversationId: convo.id,
         type: convo.type,
+        participants: convo.participants.map(p => ({
+          userId: p.userId,
+          role: p.role,
+          user: p.user ? {
+            id: p.user.id,
+            name: p.user.name,
+            email: p.user.email,
+            profileImage: p.user.profileImage
+          } : null
+        })),
+        groupName: convo.groupName,
+        groupDescription: convo.groupDescription,
+        groupIcon: convo.groupIcon,
         lastMessage: lastMsg ? {
           id: lastMsg.id,
           type: lastMsg.type,
-          message: lastMsg.content,
+          message: lastMsg.type === 'text' ? lastMsg.content : '',
           status: lastMsg.status,
           timestamp: lastMsg.createdAt,
           senderId: lastMsg.senderId,
@@ -138,6 +177,10 @@ export const getInitialContactswithMessages = async (req, res, next) => {
     if (q) {
       const term = q.toLowerCase();
       result = result.filter((row) => {
+        if (row.type === 'group') {
+          const name = String(row.groupName || '').toLowerCase();
+          return name.includes(term);
+        }
         const u = row?.user;
         if (!u) return false;
         const name = String(u.name || '').toLowerCase();

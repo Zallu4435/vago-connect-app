@@ -45,8 +45,16 @@ export default function GroupManageModal({ open, onClose, groupId }) {
   // Fetch all contacts for adding new members
   const { data: allContactsSections = {}, isLoading: isLoadingContacts } = useAllContacts();
   const flatAllContacts = useMemo(() => {
-    return Object.values(allContactsSections).flat().map((u) => ({ id: u.id, name: u.name, image: u.profileImage }));
-  }, [allContactsSections]);
+    return Object.values(allContactsSections)
+      .flat()
+      .filter((u) => String(u.id) !== String(userInfo?.id))
+      .map((u) => ({
+        id: u.id,
+        name: u.name,
+        about: u.about,
+        image: u.profileImage,
+      }));
+  }, [allContactsSections, userInfo]);
 
   // Derive group data from currentChatUser if it's the target group
   // Assuming currentChatUser contains group details (members, name, description, icon, adminId, etc.)

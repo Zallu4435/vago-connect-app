@@ -189,7 +189,7 @@ function ContactsList() {
 
       {/* Group Create Modal */}
       {showGroupCreate && (
-        <GroupCreateModal onClose={handleCloseGroupCreate} />
+        <GroupCreateModal open={showGroupCreate} onClose={handleCloseGroupCreate} />
       )}
     </div>
   );

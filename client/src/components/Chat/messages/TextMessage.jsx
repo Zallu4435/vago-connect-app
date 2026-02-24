@@ -2,10 +2,15 @@
 import React from "react";
 import { calculateTime } from "@/utils/CalculateTime";
 import MessageStatus from "@/components/common/MessageStatus";
+import RepliedMessageQuote from "./RepliedMessageQuote";
+import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
+import { RiShareForwardFill } from "react-icons/ri";
 
 function TextMessage({ message, isIncoming }) {
   const userInfo = useAuthStore((s) => s.userInfo);
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
 
   const messageBubbleClass = isIncoming
     ? "bg-ancient-bubble-user text-ancient-text-light"
@@ -15,6 +20,18 @@ function TextMessage({ message, isIncoming }) {
     <div className={`message-bubble ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} ${messageBubbleClass} max-w-[420px]`}>
       {/* Message content */}
       <div className="flex flex-col gap-2">
+        {isGroup && isIncoming && message.sender?.name && (
+          <div className="text-[11px] sm:text-[12px] font-bold text-ancient-text-muted opacity-90 truncate -mb-1">
+            ~ {message.sender.name}
+          </div>
+        )}
+        {message.isForwarded && (
+          <div className="flex items-center gap-1 text-[11px] sm:text-[12px] text-ancient-text-muted mb-1 italic">
+            <RiShareForwardFill />
+            <span>Forwarded</span>
+          </div>
+        )}
+        <RepliedMessageQuote quotedMessage={message.quotedMessage} />
         <span className="break-words leading-relaxed text-sm sm:text-base">
           {message.content || message.message}
         </span>

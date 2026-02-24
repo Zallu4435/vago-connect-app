@@ -1,5 +1,17 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+const getModalPortalRoot = () => {
+  if (typeof document === 'undefined') return null;
+  let root = document.getElementById('modal-portal');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'modal-portal';
+    document.body.appendChild(root);
+  }
+  return root;
+};
 
 export default function ModalShell({
   open,
@@ -11,6 +23,11 @@ export default function ModalShell({
   ariaLabelledby
 }) {
   const ref = useRef(null);
+  const [portalRoot, setPortalRoot] = useState(null);
+
+  useEffect(() => {
+    setPortalRoot(getModalPortalRoot());
+  }, []);
 
   useEffect(() => {
     const onDocClick = (e) => {
@@ -23,7 +40,7 @@ export default function ModalShell({
       document.addEventListener("mousedown", onDocClick);
       document.addEventListener("keydown", onKey);
       setTimeout(() => {
-        try { ref.current?.focus?.(); } catch {}
+        try { ref.current?.focus?.(); } catch { }
       }, 0);
     }
     return () => {
@@ -32,9 +49,9 @@ export default function ModalShell({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !portalRoot) return null;
 
-  return (
+  return createPortal(
     <div className="
       fixed inset-0 z-50 flex items-center justify-center
       p-2 sm:p-4 bg-black/70 backdrop-blur-sm
@@ -64,6 +81,7 @@ export default function ModalShell({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    portalRoot
   );
 }

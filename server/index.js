@@ -62,6 +62,10 @@ io.on("connection", (socket) => {
         from: data.from,
         message: data.message,
         type: data.type || "text",
+        messageId: data.messageId,
+        replyToMessageId: data.replyToMessageId,
+        quotedMessage: data.quotedMessage,
+        caption: data.caption,
       });
     }
   });

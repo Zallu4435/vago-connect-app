@@ -1,6 +1,6 @@
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
-import { FaCamera, FaMagic, FaCircle, FaUserCircle } from "react-icons/fa";
+import { FaCamera, FaMagic, FaCircle, FaUserCircle, FaUsers } from "react-icons/fa";
 import ContextMenu from "./ContextMenu";
 import PhotoPicker from "./PhotoPicker";
 import dynamic from "next/dynamic";
@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 const PhotoLibrary = dynamic(() => import("./PhotoLibrary"), { ssr: false });
 const CapturePhoto = dynamic(() => import("./CapturePhoto"), { ssr: false });
 
-function Avatar({ type, image, setImage, defaultImage = "" }) {
+function Avatar({ type, image, setImage, defaultImage = "", isGroup = false }) {
   const [hover, setHover] = useState(false);
   const [isContextMenuVisible, setIsContextMenuVisible] = useState(false);
   const [contextMenuCoordinates, setContextMenuCoordinates] = useState({ x: 0, y: 0 });
@@ -85,6 +85,8 @@ function Avatar({ type, image, setImage, defaultImage = "" }) {
                 onError={() => setSrc("")}
                 priority={type === "sm"}
               />
+            ) : isGroup ? (
+              <FaUsers className="text-ancient-text-muted/80 text-3xl sm:text-4xl" />
             ) : (
               <FaUserCircle className="text-ancient-text-muted/80 text-3xl sm:text-4xl" />
             )}
@@ -141,6 +143,8 @@ function Avatar({ type, image, setImage, defaultImage = "" }) {
                   onError={() => setSrc("")}
                   priority={true}
                 />
+              ) : isGroup ? (
+                <FaUsers className="text-ancient-text-muted/80 text-7xl sm:text-8xl md:text-9xl" />
               ) : (
                 <FaUserCircle className="text-ancient-text-muted/80 text-7xl sm:text-8xl md:text-9xl" />
               )}

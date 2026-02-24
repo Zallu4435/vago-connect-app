@@ -18,6 +18,7 @@ import ImageMessage from "./messages/ImageMessage";
 import AudioMessage from "./messages/AudioMessage";
 import VideoMessage from "./messages/VideoMessage";
 import DocumentMessage from "./messages/DocumentMessage";
+import DeletedMessage from "./messages/DeletedMessage";
 
 // VoiceMessage replaced by AudioMessage
 
@@ -46,7 +47,11 @@ function ChatContainer() {
   } = useMessagesPaginated(
     userInfo?.id ? String(userInfo.id) : undefined,
     currentChatUser?.id ? String(currentChatUser.id) : undefined,
-    { limit: 50, markRead: true }
+    {
+      limit: 50,
+      markRead: true,
+      isGroup: currentChatUser?.isGroup || currentChatUser?.type === 'group'
+    }
   );
 
   const mergedMessages = useMemo(() => {
@@ -88,6 +93,14 @@ function ChatContainer() {
       return false;
     });
   }, []);
+
+  const filteredMessages = useMemo(() => {
+    const storeAll = Array.isArray(messages) ? messages : [];
+    const pages = pagesData?.pages || [];
+    const fallbackAll = pages.flatMap((p) => p.messages) || [];
+    const all = storeAll.length > 0 ? storeAll : fallbackAll;
+    return all.filter((m) => !isDeletedForUser(m, userInfo?.id));
+  }, [messages, pagesData, isDeletedForUser, userInfo?.id]);
 
   // Preserve scroll position when loading older messages (pagination)
   useEffect(() => {
@@ -216,23 +229,20 @@ function ChatContainer() {
             </div>
           </div>
           {/* Select messages control bar (sticky) */}
-          <SelectMessagesBar
-            selectMode={selectMode}
-            selectedCount={selectedIds.length}
-            onToggleSelect={() => setSelectMode((v) => !v)}
-            onCancel={() => { setSelectMode(false); setSelectedIds([]); }}
-            onForward={() => setShowForward(true)}
-          />
+          {filteredMessages.length > 0 && (
+            <SelectMessagesBar
+              selectMode={selectMode}
+              selectedCount={selectedIds.length}
+              onToggleSelect={() => setSelectMode((v) => !v)}
+              onCancel={() => { setSelectMode(false); setSelectedIds([]); }}
+              onForward={() => setShowForward(true)}
+            />
+          )}
           {/* Message stack */}
           {(() => {
             // It's initial loading if we have no pages Data OR we are fetching the first page and have no messages yet
             const hasData = pagesData && pagesData.pages && pagesData.pages.length > 0;
-            const storeAll = Array.isArray(messages) ? messages : [];
-            const fallbackAll = Array.isArray(mergedMessages) ? mergedMessages : [];
-            const all = storeAll.length > 0 ? storeAll : fallbackAll;
-            const filtered = all.filter((m) => !isDeletedForUser(m, userInfo?.id));
-
-            const isInitialLoading = !hasData || (filtered.length === 0 && isFetchingNextPage);
+            const isInitialLoading = !hasData || (filteredMessages.length === 0 && isFetchingNextPage);
 
             if (isInitialLoading) {
               return (
@@ -242,12 +252,12 @@ function ChatContainer() {
               );
             }
 
-            if (filtered.length === 0 && !isFetchingNextPage) {
+            if (filteredMessages.length === 0 && !isFetchingNextPage) {
               return <EmptyChatState currentChatUser={currentChatUser} />;
             }
 
-            return filtered.map((message, idx) => {
-              const isIncoming = Number(message.senderId) === Number(currentChatUser?.id);
+            return filteredMessages.map((message, idx) => {
+              const isIncoming = Number(message.senderId) !== Number(userInfo?.id);
               return (
                 <MessageWrapper
                   key={message.id}
@@ -256,25 +266,29 @@ function ChatContainer() {
                   selectMode={selectMode}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
+                  onReply={handleReply}
+                  onForward={handleForward}
                 >
-                  {message.type === "text" && (
-                    <TextMessage message={message} isIncoming={isIncoming} />
-                  )}
-
-                  {message.type === "image" && (
-                    <ImageMessage message={message} isIncoming={isIncoming} />
-                  )}
-
-                  {message.type === "audio" && (
-                    <AudioMessage message={message} isIncoming={isIncoming} />
-                  )}
-
-                  {message.type === "video" && (
-                    <VideoMessage message={message} isIncoming={isIncoming} />
-                  )}
-
-                  {(message.type === "document" || (!['text', 'image', 'audio', 'video', 'location'].includes(String(message.type || '')))) && (
-                    <DocumentMessage message={message} isIncoming={isIncoming} />
+                  {message.isDeletedForEveryone ? (
+                    <DeletedMessage message={message} isIncoming={isIncoming} />
+                  ) : (
+                    <>
+                      {message.type === "text" && (
+                        <TextMessage message={message} isIncoming={isIncoming} />
+                      )}
+                      {message.type === "image" && (
+                        <ImageMessage message={message} isIncoming={isIncoming} />
+                      )}
+                      {message.type === "audio" && (
+                        <AudioMessage message={message} isIncoming={isIncoming} />
+                      )}
+                      {message.type === "video" && (
+                        <VideoMessage message={message} isIncoming={isIncoming} />
+                      )}
+                      {(message.type === "document" || (!['text', 'image', 'audio', 'video', 'location'].includes(String(message.type || '')))) && (
+                        <DocumentMessage message={message} isIncoming={isIncoming} />
+                      )}
+                    </>
                   )}
                 </MessageWrapper>
               );

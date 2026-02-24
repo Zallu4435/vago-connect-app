@@ -19,10 +19,22 @@ export interface Message {
   id: number;
   senderId: number;
   receiverId: number;
-  type: "text" | "audio" | "image";
+  type: "text" | "audio" | "image" | "video" | "document" | "location";
   message: string;
+  content: string;
   messageStatus: MessageStatusType;
   createdAt: string;
+  timestamp: string;
+  isForwarded?: boolean;
+  replyToMessageId?: number | null;
+  quotedMessage?: any;
+  caption?: string | null;
+  duration?: number | null;
+  isEdited?: boolean;
+  editedAt?: string | null;
+  reactions?: any[];
+  starredBy?: any[];
+  isDeletedForEveryone?: boolean;
 }
 
 export interface Call {

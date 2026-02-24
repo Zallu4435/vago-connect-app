@@ -27,9 +27,13 @@ function ChatListItem({ data, isContactsPage = false }) {
   const lastTime = data?.timestamp ? calculateTime(data.timestamp) : "";
   let preview = "";
 
-  if (data?.type === "image") preview = "Image";
-  else if (data?.type === "audio") preview = "Voice message";
-  else preview = data?.message || "No messages yet";
+  if (isContactsPage) {
+    preview = data?.about || "Available";
+  } else {
+    if (data?.type === "image") preview = "Image";
+    else if (data?.type === "audio") preview = "Voice message";
+    else preview = data?.message || "No messages yet";
+  }
 
   const pinMutation = usePinChat();
   const onTogglePin = (e) => {
@@ -62,6 +66,7 @@ function ChatListItem({ data, isContactsPage = false }) {
         <Avatar
           type="lg"
           image={getAbsoluteUrl(data?.profilePicture || data?.image || data?.profileImage)}
+          isGroup={data?.isGroup}
         />
       </div>
       {/* Content (center/right) */}

@@ -117,19 +117,30 @@ function ChatHeader({ onOpenMedia }) {
           <MdArrowBack className="text-xl text-ancient-text-light" />
         </button>
 
-        <Avatar
-          type="sm"
-          image={getAvatarUrl(currentChatUser, userInfo, isSelfChat)}
-        />
+        {conversationType !== "direct" && (
+          <Avatar
+            type="sm"
+            image={getAvatarUrl(currentChatUser, userInfo, isSelfChat)}
+            isGroup={true}
+          />
+        )}
 
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-ancient-text-light text-base sm:text-lg font-semibold truncate">
+        <div className="flex flex-col min-w-0 flex-1 cursor-pointer" onClick={() => (conversationType === "group" || currentChatUser?.isGroup) && setShowGroupManage(true)}>
+          <span className="text-ancient-text-light text-base sm:text-lg font-semibold truncate hover:underline">
             {isSelfChat
               ? (isPinned ? "Saved messages" : "You")
               : (currentChatUser?.name || currentChatUser?.username || "Unknown")}
           </span>
-          <span className="text-ancient-text-muted text-xs sm:text-sm truncate">
-            {isOnline ? "Online" : "Offline"}
+          <span className="text-ancient-text-muted text-xs sm:text-sm truncate hover:underline">
+            {conversationType === "group" || currentChatUser?.isGroup ? (
+              (currentChatUser?.participants || contactEntry?.participants || [])
+                .map((p) => String(p.userId) === String(userInfo?.id) ? "You" : (p.user?.name?.split(" ")[0] || "Unknown"))
+                .join(", ") || "Tap here for group info"
+            ) : isSelfChat ? (
+              "Keep notes and links handy"
+            ) : (
+              isOnline ? "Online" : "Offline"
+            )}
           </span>
         </div>
       </div>

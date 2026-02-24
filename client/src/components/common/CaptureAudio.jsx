@@ -166,6 +166,8 @@ function CaptureAudio({ onChange }) {
     form.append("audio", recordedBlob, "recording.webm");
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
+    const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
+    if (isGroup) form.append("isGroup", "true");
 
     const toastId = showToast.loading("Sending voice message...");
     uploadAudioMutation.mutate(form, {

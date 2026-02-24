@@ -10,6 +10,8 @@ export interface SendLocationInput {
   longitude: number;
   name?: string;
   address?: string;
+  replyToMessageId?: string | number;
+  isGroup?: boolean;
 }
 
 export function useSendLocation(): UseMutationResult<Message, Error, SendLocationInput> {

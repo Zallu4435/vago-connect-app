@@ -4,7 +4,7 @@ import { MdArrowDownward } from "react-icons/md";
 
 function EmptyChatState({ currentChatUser }) {
     return (
-        <div className="flex-1 flex flex-col items-center justify-center p-10 text-center h-full w-full pointer-events-none mt-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-center pointer-events-none">
             <div className="w-16 h-16 rounded-full bg-ancient-bg-dark flex items-center justify-center mb-4">
                 <MdArrowDownward className="text-ancient-text-muted text-2xl rotate-[135deg]" />
             </div>

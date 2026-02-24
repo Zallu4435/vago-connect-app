@@ -36,6 +36,18 @@ export async function getOrCreateDirectConversation(prisma, userAId, userBId) {
   return convo;
 }
 
+export async function resolveConversation(prisma, from, to, isGroup) {
+  if (isGroup === true || isGroup === 'true') {
+    const convo = await prisma.conversation.findUnique({
+      where: { id: Number(to) },
+      include: { participants: true },
+    });
+    if (!convo || convo.type !== 'group') throw new Error("Group not found");
+    return convo;
+  }
+  return await getOrCreateDirectConversation(prisma, from, to);
+}
+
 export async function isBlockedBetweenUsers(prisma, userAId, userBId) {
   const a = Number(userAId);
   const b = Number(userBId);

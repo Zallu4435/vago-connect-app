@@ -12,6 +12,7 @@ interface Page {
 interface Options {
   limit?: number;
   markRead?: boolean;
+  isGroup?: boolean;
 }
 
 export function useMessagesPaginated(userId?: string, peerId?: string, opts: Options = {}): UseInfiniteQueryResult<InfiniteData<Page>, Error> {
@@ -28,21 +29,32 @@ export function useMessagesPaginated(userId?: string, peerId?: string, opts: Opt
       // fetch older pages by default; client can reverse display order
       params.set('direction', 'before');
       if (markRead && !pageParam) params.set('markRead', 'true');
+      if (opts.isGroup) params.set('isGroup', 'true');
       const { data } = await api.get(`${GET_MESSAGES_ROUTE}/${userId}/${peerId}?${params.toString()}`);
       const backend = (data?.messages as any[]) || [];
       const mapped: Message[] = backend.map((m) => ({
         id: Number(m.id),
         senderId: Number(m.senderId),
         receiverId: Number(peerId),
-        type: (m.type === 'audio' || m.type === 'image') ? m.type : 'text',
+        type: (m.type === 'audio' || m.type === 'image' || m.type === 'video' || m.type === 'location' || m.type === 'document') ? m.type : 'text',
         message: String(m.content ?? ''),
-        messageStatus: (m.status as 'sent'|'delivered'|'read') || 'sent',
+        messageStatus: (m.status as 'sent' | 'delivered' | 'read') || 'sent',
         createdAt: String(m.createdAt),
         // UI compatibility aliases used in ChatContainer.jsx
         // @ts-ignore
         content: String(m.content ?? ''),
         // @ts-ignore
         timestamp: String(m.createdAt),
+        isForwarded: Boolean(m.isForwarded),
+        isDeletedForEveryone: Boolean(m.isDeletedForEveryone),
+        replyToMessageId: m.replyToMessageId,
+        quotedMessage: m.quotedMessage,
+        reactions: m.reactions,
+        starredBy: m.starredBy,
+        caption: m.caption,
+        duration: m.duration,
+        isEdited: m.isEdited,
+        sender: m.sender || null,
       } as any));
       return { messages: mapped, nextCursor: (data?.nextCursor as string | null) ?? null };
     },

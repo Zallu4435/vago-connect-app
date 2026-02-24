@@ -32,8 +32,14 @@ export function useMessageSocketHandlers() {
         receiverId: Number(data?.to ?? 0),
         type: mappedType,
         message: String(data?.message ?? ''),
+        content: String(data?.message ?? ''),
         messageStatus: 'delivered',
         createdAt: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
+        isForwarded: Boolean(data?.isForwarded),
+        replyToMessageId: data?.replyToMessageId,
+        quotedMessage: data?.quotedMessage,
+        caption: data?.caption,
       };
       socketSync.onMessageReceive(normalized, String(normalized.receiverId), currentChatUser?.id);
       addMessage(normalized);
@@ -47,8 +53,10 @@ export function useMessageSocketHandlers() {
     const onEdited = ({ messageId, newContent, editedAt }: any) => {
       socketSync.onMessageEdited(messageId, newContent, editedAt);
     };
-    const onDeleted = ({ messageId, deleteType, deletedBy }: any) => {
-      socketSync.onMessageDeleted(messageId, deleteType, { deletedBy });
+    const onDeleted = (data: any) => {
+      const mid = data?.messageId || data?.id;
+      const { deleteType, deletedBy } = data;
+      socketSync.onMessageDeleted(mid, deleteType, { deletedBy });
     };
     const onReacted = ({ messageId, reactions }: any) => {
       socketSync.onMessageReacted(messageId, reactions || []);

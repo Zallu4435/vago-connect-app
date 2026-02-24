@@ -33,7 +33,17 @@ export function useContactsPaginated(userId?: string, opts: Options = {}): UseIn
       const mapped = rows
         .map((row) => {
           let u = row?.user;
-          if (!u && self) {
+          const isGroup = row?.type === 'group';
+
+          if (isGroup) {
+            u = {
+              id: row.conversationId,
+              name: row.groupName,
+              about: row.groupDescription,
+              profileImage: row.groupIcon,
+              participants: row.participants || [],
+            };
+          } else if (!u && self) {
             u = {
               id: self.id,
               name: self.name || 'You',
@@ -50,10 +60,12 @@ export function useContactsPaginated(userId?: string, opts: Options = {}): UseIn
             name: u.name,
             profilePicture: u.profileImage,
             about: u.about,
+            participants: u.participants,
             conversationId: row?.conversationId,
+            isGroup,
             isPinned: Boolean(ps?.isPinned),
             pinOrder: typeof ps?.pinOrder === 'number' ? ps.pinOrder : 0,
-            isSelf: String(u.id) === String(userId),
+            isSelf: !isGroup && String(u.id) === String(userId),
             type: m?.type,
             message: m?.message,
             timestamp: m?.timestamp,

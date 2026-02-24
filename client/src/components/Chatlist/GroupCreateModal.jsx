@@ -1,5 +1,5 @@
-"use client";
 import React, { useEffect, useMemo, useState } from "react";
+import { useAuthStore } from "@/stores/authStore";
 import { useAllContacts } from "@/hooks/queries/useAllContacts";
 import { useCreateGroup } from "@/hooks/mutations/useCreateGroup";
 import { showToast } from "@/lib/toast";
@@ -13,6 +13,7 @@ import ModalShell from "@/components/common/ModalShell";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 export default function GroupCreateModal({ open, onClose }) {
+  const userInfo = useAuthStore((s) => s.userInfo);
   const { data: sections = {}, isLoading } = useAllContacts();
   const [step, setStep] = useState(1); // 1: Select participants, 2: Group info
   const [name, setName] = useState("");
@@ -34,12 +35,16 @@ export default function GroupCreateModal({ open, onClose }) {
   }, [open]);
 
   const flatContacts = useMemo(() => {
-    return Object.values(sections).flat().map((u) => ({
-      id: u.id,
-      name: u.name,
-      image: u.profileImage,
-    }));
-  }, [sections]);
+    return Object.values(sections)
+      .flat()
+      .filter((u) => String(u.id) !== String(userInfo?.id))
+      .map((u) => ({
+        id: u.id,
+        name: u.name,
+        about: u.about,
+        image: u.profileImage,
+      }));
+  }, [sections, userInfo]);
 
   const filteredContacts = useMemo(() => {
     if (!searchTerm) return flatContacts;
@@ -50,10 +55,16 @@ export default function GroupCreateModal({ open, onClose }) {
     );
   }, [flatContacts, searchTerm]);
 
-  const toggleContactSelection = (uid) =>
-    setSelected((prev) =>
-      prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid]
-    );
+  const toggleContactSelection = (uid) => {
+    setSelected((prev) => {
+      if (prev.includes(uid)) return prev.filter((x) => x !== uid);
+      if (prev.length >= 19) {
+        showToast.error("Group limit reached (max 20 members including you).");
+        return prev;
+      }
+      return [...prev, uid];
+    });
+  };
 
   const canProceedToStep2 = selected.length > 0;
   const canFinalizeGroup = name.trim().length > 0 && selected.length > 0;

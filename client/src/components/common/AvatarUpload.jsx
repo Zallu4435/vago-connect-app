@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { FaScroll } from "react-icons/fa";
+import { FaScroll, FaUsers } from "react-icons/fa";
 import { IoClose } from "react-icons/io5";
 
 export default function AvatarUpload({ iconFile, setIconFile, name, currentIconUrl, isEditable = true, onClear }) {
@@ -75,7 +75,9 @@ export default function AvatarUpload({ iconFile, setIconFile, name, currentIconU
       <div className="relative h-28 w-28 rounded-full overflow-hidden border-2 border-ancient-icon-glow flex items-center justify-center bg-ancient-input-bg shadow-lg">
         {preview ? (
           <Image key={preview} src={preview} alt={name || "Group Icon"} fill className="object-cover" unoptimized />
-        ) : null}
+        ) : (
+          <FaUsers className="text-ancient-text-muted/80 text-6xl" />
+        )}
       </div>
     </div>
   );

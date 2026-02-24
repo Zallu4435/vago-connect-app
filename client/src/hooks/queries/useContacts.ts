@@ -17,8 +17,17 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
       const mapped = rows
         .map((row) => {
           let u = row?.user;
-          // If this is a self-chat, server returns user: null → use current user's info
-          if (!u && self) {
+          const isGroup = row?.type === 'group';
+
+          if (isGroup) {
+            u = {
+              id: row.conversationId,
+              name: row.groupName,
+              about: row.groupDescription,
+              profileImage: row.groupIcon,
+              participants: row.participants || [],
+            };
+          } else if (!u && self) {
             u = {
               id: self.id,
               name: self.name || 'You',
@@ -35,10 +44,12 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
             name: u.name,
             profilePicture: u.profileImage,
             about: u.about,
+            participants: u.participants,
             conversationId: row?.conversationId,
+            isGroup,
             isPinned: Boolean(ps?.isPinned),
             pinOrder: typeof ps?.pinOrder === 'number' ? ps.pinOrder : 0,
-            isSelf: String(u.id) === String(userId),
+            isSelf: !isGroup && String(u.id) === String(userId),
             // fields used by ChatListItem for preview/time/unread
             type: m?.type,
             message: m?.message,
@@ -49,8 +60,11 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
           } as any;
         })
         .filter(Boolean) as any[];
-      // Sort: pinned first (by pinOrder asc), then by last message time desc
+      // Sort: self-chat top, then pinned (by pinOrder asc), then by last message time desc
       const sorted = mapped.slice().sort((a: any, b: any) => {
+        if (a.isSelf && !b.isSelf) return -1;
+        if (!a.isSelf && b.isSelf) return 1;
+
         if (a.isPinned && b.isPinned) return (a.pinOrder ?? 0) - (b.pinOrder ?? 0);
         if (a.isPinned) return -1;
         if (b.isPinned) return 1;

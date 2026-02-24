@@ -112,6 +112,8 @@ export const forwardMessages = async (req, res, next) => {
           content: newMsg.content,
           status: newMsg.status,
           createdAt: newMsg.createdAt,
+          isForwarded: true,
+          forwardCount: newMsg.forwardCount,
         });
 
         // Emit to destination participants (minimal payload)
@@ -122,7 +124,7 @@ export const forwardMessages = async (req, res, next) => {
               if (sid) global.io.to(sid).emit("message-forwarded", { messageId: newMsg.id, conversationId: c.id });
             });
           }
-        } catch (_) {}
+        } catch (_) { }
       }
     }
 

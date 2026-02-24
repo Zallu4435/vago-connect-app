@@ -28,7 +28,7 @@ export default function ContactSelectorItem({ contact, isSelected, onToggle }) {
             {contact.name}
           </span>
           <span className="text-ancient-text-muted text-[10px] sm:text-xs italic truncate">
-            ID: {contact.id}
+            {contact.about || "Available"}
           </span>
         </div>
       </div>

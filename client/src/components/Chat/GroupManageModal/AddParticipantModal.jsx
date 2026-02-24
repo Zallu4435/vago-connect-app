@@ -30,8 +30,19 @@ export default function AddParticipantModal({
     return (flatContacts || []).filter((c) => !existingIds.has(c.id));
   }, [flatContacts, existingMembers]);
 
-  const toggleSelection = (uid) =>
-    setSelectedAdd((prev) => (prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid]));
+  const toggleSelection = (uid) => {
+    setSelectedAdd((prev) => {
+      if (prev.includes(uid)) return prev.filter((x) => x !== uid);
+      const totalAllowed = 20 - (existingMembers?.length || 0);
+      if (prev.length >= totalAllowed) {
+        import("@/lib/toast").then((m) =>
+          m.showToast.error(`You can only add ${totalAllowed} more member(s) to reach the 20 member limit.`)
+        );
+        return prev;
+      }
+      return [...prev, uid];
+    });
+  };
 
   const handleSubmit = () => {
     onAddMembers(selectedAdd);

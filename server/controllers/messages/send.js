@@ -34,6 +34,8 @@ function toMinimalMessage(m) {
     status: m.status,
     createdAt: m.createdAt,
     ...(m.replyToMessageId ? { replyToMessageId: m.replyToMessageId } : {}),
+    ...(m.quotedMessage ? { quotedMessage: m.quotedMessage } : {}),
+    ...(m.isForwarded ? { isForwarded: m.isForwarded } : {}),
   };
 }
 
@@ -68,7 +70,7 @@ function emitMessageSent(conversation, message) {
 export const addMessage = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { content, from, to, type = "text", replyToMessageId } = req.body;
+    const { content, from, to, type = "text", replyToMessageId, isGroup } = req.body;
     const recipientOnline = global.onlineUsers?.get?.(to);
 
     if (!content || !from || !to) {
@@ -78,7 +80,7 @@ export const addMessage = async (req, res, next) => {
     // Block check (either direction)
     const blocked = await isBlockedBetweenUsers(prisma, from, to);
     if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await getOrCreateDirectConversation(prisma, from, to);
+    const convo = await resolveConversation(prisma, from, to, isGroup);
     const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
     const newMessage = await prisma.message.create({
       data: {
@@ -102,7 +104,7 @@ export const addMessage = async (req, res, next) => {
 export const addVideo = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, replyToMessageId, caption } = req.body;
+    const { from, to, replyToMessageId, caption, isGroup } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -122,7 +124,7 @@ export const addVideo = async (req, res, next) => {
     const contentUrl = cld.secure_url;
     const blocked = await isBlockedBetweenUsers(prisma, from, to);
     if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await getOrCreateDirectConversation(prisma, from, to);
+    const convo = await resolveConversation(prisma, from, to, isGroup);
     const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
     const newMessage = await prisma.message.create({
       data: {
@@ -147,7 +149,7 @@ export const addVideo = async (req, res, next) => {
 export const addImage = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, replyToMessageId, caption } = req.body;
+    const { from, to, replyToMessageId, caption, isGroup } = req.body;
     try {
       console.log('[Image:addImage] start', {
         from,
@@ -191,7 +193,7 @@ export const addImage = async (req, res, next) => {
     const contentUrl = cld.secure_url;
     const blocked = await isBlockedBetweenUsers(prisma, from, to);
     if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await getOrCreateDirectConversation(prisma, from, to);
+    const convo = await resolveConversation(prisma, from, to, isGroup);
     const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
     try {
       console.log('[Image:addImage] creating message', {
@@ -232,7 +234,7 @@ export const addImage = async (req, res, next) => {
 export const addAudio = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, replyToMessageId, caption } = req.body;
+    const { from, to, replyToMessageId, caption, isGroup } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -244,7 +246,7 @@ export const addAudio = async (req, res, next) => {
     const contentUrl = cld.secure_url;
     const blocked = await isBlockedBetweenUsers(prisma, from, to);
     if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await getOrCreateDirectConversation(prisma, from, to);
+    const convo = await resolveConversation(prisma, from, to, isGroup);
     const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
     const newMessage = await prisma.message.create({
       data: {
@@ -288,7 +290,7 @@ export const addAudio = async (req, res, next) => {
 export const addFile = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, replyToMessageId, caption } = req.body;
+    const { from, to, replyToMessageId, caption, isGroup } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -308,7 +310,7 @@ export const addFile = async (req, res, next) => {
     const contentUrl = cld.secure_url;
     const blocked = await isBlockedBetweenUsers(prisma, from, to);
     if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await getOrCreateDirectConversation(prisma, from, to);
+    const convo = await resolveConversation(prisma, from, to, isGroup);
     const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
     const newMessage = await prisma.message.create({
       data: {
@@ -352,7 +354,7 @@ export const addFile = async (req, res, next) => {
 export const addLocation = async (req, res, next) => {
   try {
     const prisma = getPrismaInstance();
-    const { from, to, latitude, longitude, name, address, replyToMessageId } = req.body || {};
+    const { from, to, latitude, longitude, name, address, replyToMessageId, isGroup } = req.body || {};
     if (!from || !to || typeof latitude === 'undefined' || typeof longitude === 'undefined') {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -366,7 +368,7 @@ export const addLocation = async (req, res, next) => {
     }
     const blocked = await isBlockedBetweenUsers(prisma, from, to);
     if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await getOrCreateDirectConversation(prisma, from, to);
+    const convo = await resolveConversation(prisma, from, to, isGroup);
     const recipientOnline = global.onlineUsers?.get?.(to);
     const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
     const payload = {

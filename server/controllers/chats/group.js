@@ -8,7 +8,7 @@ function emitToUsers(userIds, event, payload) {
       const sid = global.onlineUsers.get(String(uid)) || global.onlineUsers.get(uid);
       if (sid) global.io.to(sid).emit(event, payload);
     });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 export const createGroup = async (req, res, next) => {
@@ -24,12 +24,18 @@ export const createGroup = async (req, res, next) => {
     }
 
     // Normalize memberIds
+    if (typeof memberIds === 'string') {
+      memberIds = [memberIds];
+    }
     if (!Array.isArray(memberIds) || memberIds.length < 1) {
       return res.status(400).json({ message: "memberIds must contain at least one user" });
     }
     memberIds = [...new Set(memberIds.map((id) => Number(id)).filter((n) => !isNaN(n) && n !== creatorId))];
     if (memberIds.length < 1) {
       return res.status(400).json({ message: "memberIds cannot be empty or contain only the creator" });
+    }
+    if (memberIds.length > 19) {
+      return res.status(400).json({ message: "A group cannot have more than 20 members (including the creator)" });
     }
 
     // Validate users exist
@@ -120,6 +126,10 @@ export const addGroupMembers = async (req, res, next) => {
     const toAddIds = members.filter((id) => !existingIds.has(id));
     if (toAddIds.length === 0) {
       return res.status(200).json({ participants: convo.participants });
+    }
+
+    if (existingIds.size + toAddIds.length > 20) {
+      return res.status(400).json({ message: `Adding these members would exceed the 20 member limit. You can only add ${20 - existingIds.size} more.` });
     }
 
     const users = await prisma.user.findMany({ where: { id: { in: toAddIds } }, select: { id: true, name: true } });

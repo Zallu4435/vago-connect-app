@@ -39,6 +39,8 @@ const normalizeMessage = (raw, fromId, toId, fallbackType = "text") => ({
   reactions: Array.isArray(raw?.reactions) ? raw.reactions : [],
   starredBy: Array.isArray(raw?.starredBy) ? raw.starredBy : [],
   caption: typeof raw?.caption === 'string' ? raw.caption : undefined,
+  replyToMessageId: raw?.replyToMessageId,
+  quotedMessage: raw?.quotedMessage,
 });
 
 function MessageBar({ isOnline = true }) {
@@ -101,6 +103,9 @@ function MessageBar({ isOnline = true }) {
     form.append("from", String(userInfo.id));
     form.append("to", String(currentChatUser.id));
     if (caption?.trim()) form.append("caption", caption.trim());
+    if (replyTo?.id) form.append("replyToMessageId", String(replyTo.id));
+    const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
+    if (isGroup) form.append("isGroup", "true");
 
     // Optimistic message
     const optimisticMsg = normalizeMessage({
@@ -133,6 +138,9 @@ function MessageBar({ isOnline = true }) {
         message: data.content,
         type: data.type || (isImage ? "image" : isVideo ? "video" : "document"),
         messageId: data.id,
+        replyToMessageId: data.replyToMessageId,
+        quotedMessage: data.quotedMessage,
+        caption: data.caption,
       });
 
       const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, isImage ? "image" : isVideo ? "video" : "document");
@@ -227,7 +235,14 @@ function MessageBar({ isOnline = true }) {
     if (replyTo) clearReplyTo();
 
     sendMessageMutation.mutate(
-      { from: userInfo.id, to: currentChatUser.id, content: text, type: "text", replyToId: replyTo?.id },
+      {
+        from: userInfo.id,
+        to: currentChatUser.id,
+        content: text,
+        type: "text",
+        replyToMessageId: replyTo?.id,
+        isGroup: currentChatUser?.isGroup || currentChatUser?.type === 'group'
+      },
       {
         onSuccess: (data) => {
           socket.current?.emit("send-msg", {
@@ -236,6 +251,8 @@ function MessageBar({ isOnline = true }) {
             message: data.content,
             type: data.type || "text",
             messageId: data.id,
+            replyToMessageId: data.replyToMessageId,
+            quotedMessage: data.quotedMessage,
           });
           const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "text");
           setMessages((prev) => prev.map(m => m.id === tempId ? msg : m));
@@ -285,11 +302,27 @@ function MessageBar({ isOnline = true }) {
           return;
         }
         sendLocationMutation.mutate(
-          { from: userInfo.id, to: currentChatUser.id, latitude, longitude },
+          {
+            from: userInfo.id,
+            to: currentChatUser.id,
+            latitude,
+            longitude,
+            replyToMessageId: replyTo?.id,
+            isGroup: currentChatUser?.isGroup || currentChatUser?.type === 'group'
+          },
           {
             onSuccess: (data) => {
               showToast.dismiss(toastId);
               showToast.success("Location sent.");
+              socket.current?.emit("send-msg", {
+                to: currentChatUser.id,
+                from: userInfo.id,
+                message: data.content,
+                type: data.type || "location",
+                messageId: data.id,
+                replyToMessageId: data.replyToMessageId,
+                quotedMessage: data.quotedMessage,
+              });
               const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "location");
               setMessages((prev) => ([...(prev || []), msg]));
               addToMessagesCache(msg);

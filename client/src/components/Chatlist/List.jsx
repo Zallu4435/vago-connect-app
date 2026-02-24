@@ -26,6 +26,9 @@ function List() {
     const pages = data?.pages || [];
     const flat = pages.flatMap((p) => p.contacts || []);
     const sorted = flat.slice().sort((a, b) => {
+      if (a.isSelf && !b.isSelf) return -1;
+      if (!a.isSelf && b.isSelf) return 1;
+
       if (a.isPinned && b.isPinned) return (a.pinOrder ?? 0) - (b.pinOrder ?? 0);
       if (a.isPinned) return -1;
       if (b.isPinned) return 1;

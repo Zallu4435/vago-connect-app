@@ -5,6 +5,8 @@ import MessageStatus from "@/components/common/MessageStatus";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
 import dynamic from "next/dynamic";
+import RepliedMessageQuote from "./RepliedMessageQuote";
+import { RiShareForwardFill } from "react-icons/ri";
 
 const MediaCarouselView = dynamic(() => import("../MediaGallery/MediaCarouselView"), {
   ssr: false,
@@ -13,6 +15,8 @@ import { FaPlay, FaVideo } from "react-icons/fa";
 
 function VideoMessage({ message, isIncoming }) {
   const userInfo = useAuthStore((s) => s.userInfo);
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
   const [loaded, setLoaded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -61,6 +65,22 @@ function VideoMessage({ message, isIncoming }) {
   return (
     <>
       <div className={`message-bubble message-bubble-video ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} max-w-[480px]`}>
+        {isGroup && isIncoming && message.sender?.name && (
+          <div className="text-[11px] sm:text-[12px] font-bold text-ancient-text-muted opacity-90 truncate mb-1">
+            ~ {message.sender.name}
+          </div>
+        )}
+        {message.isForwarded && (
+          <div className="flex items-center gap-1 text-[11px] sm:text-[12px] text-ancient-text-muted mb-1 italic">
+            <RiShareForwardFill />
+            <span>Forwarded</span>
+          </div>
+        )}
+        {message.quotedMessage && (
+          <div className="mb-2 w-full max-w-[480px]">
+            <RepliedMessageQuote quotedMessage={message.quotedMessage} />
+          </div>
+        )}
         <div
           className={`relative rounded-xl overflow-hidden shadow-xl cursor-pointer transition-all duration-200 hover:shadow-2xl group max-w-[480px] ${isIncoming
             ? "bg-ancient-bubble-user border border-ancient-input-border"
