@@ -1,5 +1,6 @@
 import React from "react";
 import { BsCheck, BsCheck2, BsCheck2All } from "react-icons/bs";
+import { MdAccessTime, MdErrorOutline } from "react-icons/md";
 
 function MessageStatus({ status, MessageStatus, className = "" }) {
   const s = (status || MessageStatus || "").toLowerCase();
@@ -28,6 +29,24 @@ function MessageStatus({ status, MessageStatus, className = "" }) {
       <BsCheck
         className={`${base} text-ancient-text-muted`}
         aria-label="Sent"
+        role="img"
+        focusable="false"
+      />
+    );
+  if (s === "pending")
+    return (
+      <MdAccessTime
+        className={`${base} text-ancient-text-muted opacity-70`}
+        aria-label="Pending"
+        role="img"
+        focusable="false"
+      />
+    );
+  if (s === "error")
+    return (
+      <MdErrorOutline
+        className={`${base} text-red-500`}
+        aria-label="Error"
         role="img"
         focusable="false"
       />

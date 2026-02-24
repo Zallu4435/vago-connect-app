@@ -13,13 +13,15 @@ export interface Contact {
   about?: string;
 }
 
+export type MessageStatusType = "sent" | "delivered" | "read" | "pending" | "error";
+
 export interface Message {
   id: number;
   senderId: number;
   receiverId: number;
   type: "text" | "audio" | "image";
   message: string;
-  messageStatus: "sent" | "delivered" | "read";
+  messageStatus: MessageStatusType;
   createdAt: string;
 }
 

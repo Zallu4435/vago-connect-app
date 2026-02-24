@@ -12,6 +12,7 @@ const ForwardModal = dynamic(() => import("./ForwardModal"), { ssr: false });
 import { useMessagesPaginated } from "@/hooks/queries/useMessagesPaginated";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 import TextMessage from "./messages/TextMessage";
+import EmptyChatState from "./EmptyChatState";
 import { MdArrowDownward } from "react-icons/md";
 import ImageMessage from "./messages/ImageMessage";
 import AudioMessage from "./messages/AudioMessage";
@@ -33,6 +34,7 @@ function ChatContainer() {
   const messagesEndRef = useRef(null); // Sentinel for auto-scroll
   const loadingOlderRef = useRef(false);
   const shouldAutoScrollRef = useRef(true); // Track if we should auto-scroll
+  const prevMessagesLengthRef = useRef(0); // Track to detect new messages
   const [showJump, setShowJump] = useState(false);
 
   // Paginated messages logic
@@ -100,14 +102,28 @@ function ChatContainer() {
   // Auto-scroll to bottom using modern pattern with useLayoutEffect
   // This runs synchronously before browser paint, preventing flicker
   useLayoutEffect(() => {
-    if (!messagesEndRef.current || !shouldAutoScrollRef.current) return;
+    if (!messagesEndRef.current) return;
+
+    const currentLen = Array.isArray(messages) ? messages.length : 0;
+    const lastMessage = currentLen > 0 ? messages[currentLen - 1] : null;
+    const isNewMessageAdd = currentLen > prevMessagesLengthRef.current;
+
+    // Update ref for next render
+    prevMessagesLengthRef.current = currentLen;
+
+    const isMyMessage = lastMessage && String(lastMessage.senderId) === String(userInfo?.id);
+
+    // Force scroll if it's a new message that the current user just sent
+    const forceScroll = isNewMessageAdd && isMyMessage;
+
+    if (!shouldAutoScrollRef.current && !forceScroll) return;
 
     // Smooth scroll to the sentinel element at the end of messages
     messagesEndRef.current.scrollIntoView({
       behavior: 'smooth',
       block: 'end'
     });
-  }, [messages]);
+  }, [messages, userInfo?.id]);
 
   // Reset auto-scroll when chat changes and scroll to bottom immediately
   useEffect(() => {
@@ -209,10 +225,27 @@ function ChatContainer() {
           />
           {/* Message stack */}
           {(() => {
+            // It's initial loading if we have no pages Data OR we are fetching the first page and have no messages yet
+            const hasData = pagesData && pagesData.pages && pagesData.pages.length > 0;
             const storeAll = Array.isArray(messages) ? messages : [];
             const fallbackAll = Array.isArray(mergedMessages) ? mergedMessages : [];
             const all = storeAll.length > 0 ? storeAll : fallbackAll;
             const filtered = all.filter((m) => !isDeletedForUser(m, userInfo?.id));
+
+            const isInitialLoading = !hasData || (filtered.length === 0 && isFetchingNextPage);
+
+            if (isInitialLoading) {
+              return (
+                <div className="absolute inset-0 flex flex-col items-center justify-center h-full w-full pointer-events-none z-10">
+                  <LoadingSpinner className="text-ancient-icon-glow" size={36} label="Loading messages..." />
+                </div>
+              );
+            }
+
+            if (filtered.length === 0 && !isFetchingNextPage) {
+              return <EmptyChatState currentChatUser={currentChatUser} />;
+            }
+
             return filtered.map((message, idx) => {
               const isIncoming = Number(message.senderId) === Number(currentChatUser?.id);
               return (
