@@ -78,3 +78,41 @@ export async function unhideConversationParticipants(prisma, conversationId) {
     console.error("Failed to unhide conversation:", error);
   }
 }
+
+export function buildMediaFileData(messageId, cld, file, extra = {}) {
+  return {
+    messageId,
+    storageKey: cld.public_id,
+    originalName: file?.originalname || null,
+    mimeType: file?.mimetype || null,
+    fileSize: BigInt(cld.bytes || 0),
+    width: cld.width || null,
+    height: cld.height || null,
+    duration: cld.duration ? Math.round(cld.duration) : null,
+    cloudinaryPublicId: cld.public_id,
+    cloudinaryVersion: cld.version,
+    cloudinaryResourceType: cld.resource_type,
+    cloudinaryFormat: cld.format || null,
+    cloudinaryFolder: (cld.folder || null),
+    cloudinaryAssetId: cld.asset_id || null,
+    ...extra,
+  };
+}
+
+export async function prepareReply(prisma, convoId, replyToMessageId, requesterId) {
+  if (!replyToMessageId) return { replyToMessageId: undefined, quotedMessage: undefined };
+  const replyId = Number(replyToMessageId);
+  if (!replyId) return { replyToMessageId: undefined, quotedMessage: undefined };
+  const replyMsg = await prisma.message.findUnique({ where: { id: replyId } });
+  if (!replyMsg) throw Object.assign(new Error("Reply message not found"), { status: 404 });
+  if (replyMsg.conversationId !== convoId) throw Object.assign(new Error("Reply target not in same conversation"), { status: 400 });
+  return {
+    replyToMessageId: replyMsg.id,
+    quotedMessage: {
+      id: replyMsg.id,
+      content: replyMsg.content,
+      type: replyMsg.type,
+      senderId: replyMsg.senderId,
+    },
+  };
+}

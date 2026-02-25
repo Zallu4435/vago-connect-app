@@ -1,21 +1,11 @@
+import { MessageService } from "../../services/MessageService.js";
 import getPrismaInstance from "../../utils/PrismaClient.js";
-import { getOrCreateDirectConversation } from "./helpers.js";
+import { MessageMapper } from "../../utils/mappers/MessageMapper.js";
 
 export const getMessages = async (req, res, next) => {
   try {
-    const prisma = getPrismaInstance();
     const { from, to } = req.params;
     const isGroup = req.query.isGroup === 'true';
-
-    let convo;
-    if (isGroup) {
-      convo = await prisma.conversation.findUnique({ where: { id: Number(to) } });
-      if (!convo || convo.type !== 'group') {
-        return res.status(404).json({ message: "Group not found" });
-      }
-    } else {
-      convo = await getOrCreateDirectConversation(prisma, from, to);
-    }
 
     // Query params
     const rawLimit = Number(req.query.limit);
@@ -24,74 +14,20 @@ export const getMessages = async (req, res, next) => {
     const direction = req.query.direction === 'after' ? 'asc' : 'desc'; // default fetch older messages
     const markRead = String(req.query.markRead || '').toLowerCase() === 'true';
 
-    // Participant clearedAt support
-    const participant = await prisma.conversationParticipant.findFirst({
-      where: { conversationId: convo.id, userId: Number(from) },
-      select: { clearedAt: true },
-    });
-    const clearedAt = participant?.clearedAt || null;
-
-    // Fetch with pagination
-    const rows = await prisma.message.findMany({
-      where: {
-        conversationId: convo.id,
-        ...(clearedAt ? { createdAt: { gt: clearedAt } } : {}),
-        NOT: {
-          deletedBy: {
-            array_contains: Number(from),
-          },
-        },
-      },
-      orderBy: { createdAt: direction },
-      take: limit + 1,
-      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
-      include: {
-        sender: {
-          select: {
-            id: true,
-            name: true,
-            profileImage: true
-          }
-        },
-        reactions: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                profileImage: true
-              }
-            }
-          }
-        }
-      }
+    const result = await MessageService.getMessages({
+      from: Number(from),
+      to: Number(to),
+      isGroup,
+      limit,
+      cursorId,
+      direction,
+      markRead
     });
 
-    let nextCursor = null;
-    let page = rows;
-    if (rows.length > limit) {
-      const next = rows.pop();
-      nextCursor = next?.id ? String(next.id) : null;
-      page = rows;
-    }
-
-    // If we fetched desc for older pagination, but client prefers asc, reverse back
-    const messages = direction === 'desc' ? page.slice().reverse() : page;
-
-    // Optional mark read side-effect
-    let unreadMessages = [];
-    if (markRead) {
-      const otherUserId = Number(to);
-      const pending = messages.filter((m) => m.senderId === otherUserId && m.status !== 'read').map((m) => m.id);
-      if (pending.length) {
-        await prisma.message.updateMany({ where: { id: { in: pending } }, data: { status: 'read' } });
-        unreadMessages = pending;
-      }
-    }
-
-    return res.status(200).json({ messages, nextCursor, ...(markRead ? { unreadMessages } : {}) });
+    return res.status(200).json(result);
   } catch (error) {
-    next(error);
+    const status = error?.status || 500;
+    res.status(status).json({ message: error.message || "Internal error" });
   }
 };
 
@@ -152,54 +88,7 @@ export const getInitialContactswithMessages = async (req, res, next) => {
       page = participants;
     }
 
-    let result = page.map((p) => {
-      const convo = p.conversation;
-      const clearedAt = p.clearedAt ? new Date(p.clearedAt).getTime() : 0;
-      const validMessages = convo.messages.filter(m => new Date(m.createdAt).getTime() > clearedAt);
-      const lastMsg = validMessages[0] || null;
-      const other = convo.type === 'direct' ? (convo.participants.find(cp => cp.userId !== userId)?.user || convo.participants.find(cp => cp.userId === userId)?.user) : null;
-      return {
-        conversationId: convo.id,
-        type: convo.type,
-        createdById: convo.createdById,
-        participants: convo.participants.filter(p => !p.leftAt).map(p => ({
-          userId: p.userId,
-          role: p.role,
-          user: p.user ? {
-            id: p.user.id,
-            name: p.user.name,
-            email: p.user.email,
-            profileImage: p.user.profileImage
-          } : null
-        })),
-        groupName: convo.groupName,
-        groupDescription: convo.groupDescription,
-        groupIcon: convo.groupIcon,
-        lastMessage: lastMsg ? {
-          id: lastMsg.id,
-          type: lastMsg.type,
-          message: lastMsg.type === 'text' ? lastMsg.content : '',
-          status: lastMsg.status,
-          timestamp: lastMsg.createdAt,
-          senderId: lastMsg.senderId,
-          isSystemMessage: lastMsg.isSystemMessage || false,
-          systemMessageType: lastMsg.systemMessageType || null,
-        } : null,
-        participantState: {
-          isPinned: p.isPinned,
-          isMuted: p.isMuted,
-          isArchived: p.isArchived,
-          unreadCount: p.unreadCount,
-        },
-        user: other ? {
-          id: other.id,
-          name: other.name,
-          email: other.email,
-          about: other.about,
-          profileImage: other.profileImage,
-        } : null,
-      };
-    });
+    let result = page.map((p) => MessageMapper.toConversationListItem(p, userId));
 
     if (q) {
       const term = q.toLowerCase();
@@ -300,18 +189,7 @@ export const getCallHistory = async (req, res, next) => {
       take: 100 // Limit history slightly for performance
     });
 
-    // Structure it for the frontend
-    const calls = rawCalls.map(msg => {
-      const otherParticipant = msg.conversation?.participants.find(p => p.userId !== msg.senderId);
-      const receiverUser = otherParticipant ? otherParticipant.user : null;
-
-      return {
-        ...msg,
-        receiverId: receiverUser?.id || null,
-        receiver: receiverUser,
-        conversation: undefined // Omit giant conversation obj from payload
-      };
-    });
+    const calls = rawCalls.map(msg => MessageMapper.toCallHistoryItem(msg));
 
     return res.status(200).json({ message: "Call history fetched", status: true, calls });
   } catch (error) {

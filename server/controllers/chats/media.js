@@ -1,5 +1,6 @@
 import getPrismaInstance from "../../utils/PrismaClient.js";
 import { buildCloudinaryUrl, buildCloudinaryDownloadUrl } from "../../utils/Cloudinary.js";
+import { MediaMapper } from "../../utils/mappers/MediaMapper.js";
 
 // GET /api/chats/:id/media?type=image|video|audio|document&limit=20&offset=0
 export const getChatMedia = async (req, res, next) => {
@@ -41,66 +42,7 @@ export const getChatMedia = async (req, res, next) => {
       include: { mediaFiles: true },
     });
 
-    const items = mediaMessages.flatMap((m) => {
-      // If there are formally attached MediaFiles, map from them:
-      if (m.mediaFiles && m.mediaFiles.length) {
-        return m.mediaFiles.map((mf) => {
-          let itemType = mf.cloudinaryResourceType || m.type || '';
-          if (mf.mimeType) itemType = mf.mimeType.split('/')[0];
-          if (!['image', 'video', 'audio', 'location'].includes(itemType)) itemType = 'document';
-
-          return {
-            mediaId: mf.id,
-            messageId: m.id,
-            conversationId: m.conversationId,
-            senderId: m.senderId,
-            type: itemType,
-            url: buildCloudinaryUrl(mf.cloudinaryPublicId, { resource_type: mf.cloudinaryResourceType }),
-            thumbnailUrl: mf.thumbnailKey ? buildCloudinaryUrl(mf.thumbnailKey, { resource_type: mf.cloudinaryResourceType }) : m.thumbnailUrl || null,
-            mimeType: mf.mimeType,
-            fileSize: mf.fileSize != null ? String(mf.fileSize) : null,
-            width: mf.width,
-            height: mf.height,
-            duration: mf.duration,
-            createdAt: m.createdAt,
-            fileName: mf.originalName || m.fileName || null,
-          };
-        });
-      }
-
-      // Legacy/Fallback parsing for media messages that lack a Prisma `MediaFile` relation
-      if (!m.content) return [];
-
-      let fallbackType = m.type;
-      if (['text', 'unknown'].includes(fallbackType) || !fallbackType) {
-        const urlLower = m.content.toLowerCase();
-        if (urlLower.match(/\.(jpg|jpeg|png|gif|webp|heic)(\?.*)?$/)) fallbackType = 'image';
-        else if (urlLower.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/)) fallbackType = 'video';
-        else if (urlLower.match(/\.(mp3|wav|ogg|m4a)(\?.*)?$/)) fallbackType = 'audio';
-        else fallbackType = 'document';
-      }
-
-      const fallbackUrl = m.content.startsWith('http')
-        ? m.content
-        : buildCloudinaryUrl(m.content, { resource_type: fallbackType === 'document' ? 'raw' : fallbackType });
-
-      return [{
-        mediaId: m.id, // Using message ID strictly as mediaId fallback
-        messageId: m.id,
-        conversationId: m.conversationId,
-        senderId: m.senderId,
-        type: fallbackType,
-        url: fallbackUrl,
-        thumbnailUrl: m.thumbnailUrl || null,
-        mimeType: null,
-        fileSize: null,
-        width: null,
-        height: null,
-        duration: null,
-        createdAt: m.createdAt,
-        fileName: m.fileName || m.caption || m.content,
-      }];
-    });
+    const items = MediaMapper.mapMediaMessages(mediaMessages);
 
     return res.status(200).json({ items, count: items.length });
   } catch (error) {
@@ -198,64 +140,7 @@ export const searchChatMedia = async (req, res, next) => {
       include: { mediaFiles: true },
     });
 
-    const mediaItems = messages.flatMap((m) => {
-      if (m.mediaFiles && m.mediaFiles.length > 0) {
-        return m.mediaFiles.map((mf) => {
-          let itemType = mf.cloudinaryResourceType || m.type || '';
-          if (mf.mimeType) itemType = mf.mimeType.split('/')[0];
-          if (!['image', 'video', 'audio', 'location'].includes(itemType)) itemType = 'document';
-
-          return {
-            mediaId: mf.id,
-            messageId: m.id,
-            conversationId: m.conversationId,
-            senderId: m.senderId,
-            type: itemType,
-            url: buildCloudinaryUrl(mf.cloudinaryPublicId, { resource_type: mf.cloudinaryResourceType || 'auto' }),
-            thumbnailUrl: mf.thumbnailKey ? buildCloudinaryUrl(mf.thumbnailKey, { resource_type: mf.cloudinaryResourceType || 'image' }) : m.thumbnailUrl || null,
-            mimeType: mf.mimeType,
-            fileSize: mf.fileSize != null ? String(mf.fileSize) : null,
-            width: mf.width,
-            height: mf.height,
-            duration: mf.duration,
-            createdAt: m.createdAt,
-            fileName: mf.originalName || m.fileName || m.caption || null,
-          };
-        });
-      }
-
-      if (!m.content) return [];
-
-      let fallbackType = m.type;
-      if (['text', 'unknown'].includes(fallbackType) || !fallbackType) {
-        const urlLower = m.content.toLowerCase();
-        if (urlLower.match(/\.(jpg|jpeg|png|gif|webp|heic)(\?.*)?$/)) fallbackType = 'image';
-        else if (urlLower.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/)) fallbackType = 'video';
-        else if (urlLower.match(/\.(mp3|wav|ogg|m4a)(\?.*)?$/)) fallbackType = 'audio';
-        else fallbackType = 'document';
-      }
-
-      const fallbackUrl = m.content.startsWith('http')
-        ? m.content
-        : buildCloudinaryUrl(m.content, { resource_type: fallbackType === 'document' ? 'raw' : fallbackType });
-
-      return [{
-        mediaId: m.id,
-        messageId: m.id,
-        conversationId: m.conversationId,
-        senderId: m.senderId,
-        type: fallbackType,
-        url: fallbackUrl,
-        thumbnailUrl: m.thumbnailUrl || null,
-        mimeType: null,
-        fileSize: null,
-        width: null,
-        height: null,
-        duration: null,
-        createdAt: m.createdAt,
-        fileName: m.fileName || m.caption || m.content,
-      }];
-    });
+    const mediaItems = MediaMapper.mapMediaMessages(messages);
 
     return res.status(200).json({
       totalCount,
