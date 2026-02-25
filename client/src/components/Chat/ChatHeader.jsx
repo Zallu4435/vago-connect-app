@@ -60,6 +60,7 @@ function ChatHeader({ onOpenMedia }) {
   const isSelfChat = String(currentChatUser?.id) === String(userInfo?.id) || Boolean(contactEntry?.isSelf);
   const isPinned = Boolean(contactEntry?.isPinned);
   const isOnline = onlineUsers?.some((u) => String(u) === String(currentChatUser?.id));
+  const isGroupChat = conversationType === "group" || currentChatUser?.isGroup;
 
   // Chat actions
   const clearChat = useClearChat();
@@ -152,13 +153,15 @@ function ChatHeader({ onOpenMedia }) {
 
       {/* Right: Action Icons */}
       <div className="flex items-center gap-2 sm:gap-3">
-        <button
-          className="p-2 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95"
-          title="Video Call"
-          onClick={handleVideoCall}
-        >
-          <MdVideocam className="text-ancient-icon-inactive hover:text-ancient-icon-glow text-xl sm:text-2xl transition-colors" />
-        </button>
+        {!isGroupChat && (
+          <button
+            className="p-2 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95"
+            title="Video Call"
+            onClick={handleVideoCall}
+          >
+            <MdVideocam className="text-ancient-icon-inactive hover:text-ancient-icon-glow text-xl sm:text-2xl transition-colors" />
+          </button>
+        )}
 
         <button
           className="p-2 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95"
@@ -189,12 +192,12 @@ function ChatHeader({ onOpenMedia }) {
                 icon: MdPermMedia,
                 onClick: () => onOpenMedia?.(),
               },
-              {
+              ...(isGroupChat ? [] : [{
                 label: "Voice Call",
                 icon: MdCall,
                 onClick: handleVoiceCall,
-              },
-              ...(conversationType === "group"
+              }]),
+              ...(isGroupChat
                 ? [{
                   label: "Manage Group",
                   onClick: () => setShowGroupManage(true),
@@ -225,13 +228,13 @@ function ChatHeader({ onOpenMedia }) {
                   pinChat.mutate({ conversationId, pinned: !isPinned, userId: userInfo?.id });
                 },
               }]),
-              ...(conversationType === "group" || isSelfChat ? [] : [{
+              ...(isGroupChat || isSelfChat ? [] : [{
                 label: "Block User",
                 disabled: !currentChatUser?.id || blockUser.isPending,
                 onClick: () => setShowBlockConfirm(true),
                 danger: true,
               }]),
-              ...(conversationType === "group" ? [{
+              ...(isGroupChat ? [{
                 label: "Exit Group",
                 disabled: !conversationId || leaveGroup.isPending,
                 onClick: () => setShowExitConfirm(true),

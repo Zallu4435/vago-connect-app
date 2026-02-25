@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useAllContacts } from "@/hooks/queries/useAllContacts";
@@ -23,6 +24,8 @@ import ModalHeader from "@/components/common/ModalHeader";
 export default function GroupManageModal({ open, onClose, groupId }) {
   const userInfo = useAuthStore((s) => s.userInfo);
   const currentChatUser = useChatStore((s) => s.currentChatUser); // This should be the group's data
+  const setCurrentChatUser = useChatStore((s) => s.setCurrentChatUser);
+  const queryClient = useQueryClient();
 
   // State for Group Settings
   const [localGroupName, setLocalGroupName] = useState("");
@@ -145,6 +148,8 @@ export default function GroupManageModal({ open, onClose, groupId }) {
       onSuccess: () => {
         showToast.info("You left the group.");
         setShowLeaveConfirm(false);
+        setCurrentChatUser(null);
+        queryClient.invalidateQueries({ queryKey: ["contacts"] });
         onClose?.();
       },
       onError: () => showToast.error("Failed to leave the group."),
@@ -162,6 +167,8 @@ export default function GroupManageModal({ open, onClose, groupId }) {
       onSuccess: () => {
         showToast.info("Group deleted.");
         setShowDeleteConfirm(false);
+        setCurrentChatUser(null);
+        queryClient.invalidateQueries({ queryKey: ["contacts"] });
         onClose?.();
       },
       onError: () => showToast.error("Failed to delete group."),

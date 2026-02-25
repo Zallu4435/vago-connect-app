@@ -27,6 +27,8 @@ import {
   removeGroupMembers,
   updateGroupRole,
   updateGroupSettings,
+  leaveGroup,
+  deleteGroup,
   getCallHistory
 } from "../controllers/MessageController.js";
 import multer from "multer";
@@ -89,6 +91,9 @@ messageRouter.post("/groups/:groupId/members/remove", verifyAccessToken, removeG
 messageRouter.post("/groups/:groupId/roles", verifyAccessToken, updateGroupRole);
 // Group settings
 messageRouter.patch("/groups/:groupId/settings", verifyAccessToken, updateGroupSettings);
+messageRouter.post("/groups/:groupId/leave", verifyAccessToken, leaveGroup);
+messageRouter.delete("/groups/:groupId", verifyAccessToken, deleteGroup);
+
 messageRouter.put("/update-status", verifyAccessToken, updateMessageStatus);
 messageRouter.patch("/:id/edit", verifyAccessToken, editMessage);
 messageRouter.delete("/:id", verifyAccessToken, deleteMessage);

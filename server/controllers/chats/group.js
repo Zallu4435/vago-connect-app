@@ -317,3 +317,101 @@ export const updateGroupRole = async (req, res, next) => {
     next(error);
   }
 };
+
+export const leaveGroup = async (req, res, next) => {
+  try {
+    const prisma = getPrismaInstance();
+    const userId = Number(req?.user?.userId);
+    const groupId = Number(req.params.groupId);
+
+    if (!groupId) return res.status(400).json({ message: "groupId is required" });
+
+    const convo = await prisma.conversation.findUnique({
+      where: { id: groupId },
+      include: { participants: true },
+    });
+    if (!convo || convo.type !== 'group') return res.status(404).json({ message: "Group not found" });
+
+    const participant = convo.participants.find((p) => p.userId === userId && !p.leftAt);
+    if (!participant) return res.status(400).json({ message: "You are not an active member of this group" });
+
+    const activeParticipants = convo.participants.filter(p => !p.leftAt);
+    const adminCount = activeParticipants.filter(p => p.role === 'admin').length;
+
+    // If last admin but others remain, assign oldest member as admin
+    if (participant.role === 'admin' && adminCount === 1 && activeParticipants.length > 1) {
+      const otherMembers = activeParticipants.filter(p => p.userId !== userId);
+      otherMembers.sort((a, b) => new Date(a.joinedAt || 0) - new Date(b.joinedAt || 0));
+      const newAdmin = otherMembers[0];
+      await prisma.conversationParticipant.update({
+        where: { id: newAdmin.id },
+        data: { role: 'admin' }
+      });
+      // Notify about new admin
+      emitToUsers(activeParticipants.map(p => p.userId), 'group-role-updated', { conversationId: groupId, userId: newAdmin.userId, role: 'admin' });
+    }
+
+    // Mark as left
+    await prisma.conversationParticipant.update({
+      where: { id: participant.id },
+      data: { leftAt: new Date() }
+    });
+    await prisma.conversation.update({ where: { id: groupId }, data: { updatedAt: new Date() } });
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    const name = user?.name || "A member";
+
+    await prisma.message.create({
+      data: {
+        conversationId: groupId,
+        senderId: userId,
+        type: 'text',
+        content: `${name} left the group`,
+        isSystemMessage: true,
+        systemMessageType: 'member_removed',
+        status: 'sent',
+      },
+    });
+
+    const updated = await prisma.conversation.findUnique({
+      where: { id: groupId },
+      include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
+    });
+    const minimalParts = updated.participants.map(p => ({ user: p.user, role: p.role }));
+
+    // Notify remaining and leaving
+    emitToUsers(convo.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+    return res.status(200).json({ message: "Left group successfully", conversationId: groupId });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteGroup = async (req, res, next) => {
+  try {
+    const prisma = getPrismaInstance();
+    const adminId = Number(req?.user?.userId);
+    const groupId = Number(req.params.groupId);
+
+    if (!groupId) return res.status(400).json({ message: "groupId is required" });
+
+    const convo = await prisma.conversation.findUnique({
+      where: { id: groupId },
+      include: { participants: true },
+    });
+    if (!convo || convo.type !== 'group') return res.status(404).json({ message: "Group not found" });
+
+    const adminPart = convo.participants.find((p) => p.userId === adminId);
+    if (!adminPart || adminPart.role !== 'admin') return res.status(403).json({ message: "Only admins can delete the group" });
+
+    // Notify all participants before actual deletion
+    emitToUsers(convo.participants.map(p => p.userId), 'group-deleted', { conversationId: groupId });
+
+    // Delete the group (cascading will delete messages and participants)
+    await prisma.conversation.delete({ where: { id: groupId } });
+
+    return res.status(200).json({ message: "Group deleted successfully", conversationId: groupId });
+  } catch (error) {
+    next(error);
+  }
+};
