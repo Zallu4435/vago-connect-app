@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import { BiSearchAlt2 } from "react-icons/bi";
-import { BsFilter } from "react-icons/bs";
 import { IoClose } from "react-icons/io5";
 import { useChatStore } from "@/stores/chatStore";
 
@@ -55,17 +54,6 @@ function SearchBar() {
           </button>
         ) : null}
       </div>
-      <button
-        type="button"
-        className="
-          flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full
-          hover:bg-ancient-input-bg transition-colors duration-300
-          border border-ancient-input-border shadow
-        "
-        aria-label="Filter"
-      >
-        <BsFilter className="text-ancient-icon-inactive text-xl sm:text-2xl hover:text-ancient-icon-glow transition-colors duration-300" />
-      </button>
     </div>
   );
 }

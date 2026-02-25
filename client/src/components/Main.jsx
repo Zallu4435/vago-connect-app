@@ -9,8 +9,12 @@ const ChatList = dynamic(() => import("./Chatlist/ChatList"));
 const Chat = dynamic(() => import("./Chat/Chat"));
 const SearchMessages = dynamic(() => import("./Chat/SearchMessages"));
 const Empty = dynamic(() => import("./Empty"));
-const VideoCall = dynamic(() => import("./Call/VideoCall"));
-const AudioCall = dynamic(() => import("./Call/AudioCall"));
+const VideoCall = dynamic(() => import("./Call/VideoCall"), { ssr: false });
+const AudioCall = dynamic(() => import("./Call/AudioCall"), { ssr: false });
+const IncomingCallNotification = dynamic(
+  () => import("./common/IncomingCallNotification"),
+  { ssr: false }
+);
 import { useAuthStore } from "@/stores/authStore";
 import { useSocketStore } from "@/stores/socketStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -33,6 +37,9 @@ function Main() {
 
   const audioCall = useCallStore((s) => s.audioCall);
   const videoCall = useCallStore((s) => s.videoCall);
+  // `calling` is true on the callee side when an incoming call is ringing
+  const calling = useCallStore((s) => s.calling);
+  const callAccepted = useCallStore((s) => s.callAccepted);
 
   const router = useRouter();
   useSocketConnection();
@@ -106,7 +113,12 @@ function Main() {
         />
       )}
 
-      {/* Call Overlays */}
+      {/* ── Incoming call notification (callee side) — floats over the main layout ── */}
+      {calling && !callAccepted && !audioCall && !videoCall && (
+        <IncomingCallNotification />
+      )}
+
+      {/* ── Active call overlays (caller + callee after accept) ── */}
       {videoCall && <VideoCall />}
       {audioCall && <AudioCall />}
 

@@ -21,11 +21,10 @@ export function useMessageSocketHandlers() {
     const s = socket.current;
     if (!s || attachedRef.current) return;
     const onMsgReceive = (data: any) => {
-      const mappedType: Message['type'] = ((): Message['type'] => {
-        const t = (data?.type || 'text').toLowerCase();
-        if (t === 'text' || t === 'audio' || t === 'image') return t as Message['type'];
-        return 'text';
-      })();
+      const t = (data?.type || 'text').toLowerCase();
+      // Allowed real message types — do NOT map 'call' to 'text'
+      const knownTypes = ['text', 'audio', 'image', 'video', 'voice', 'document', 'location', 'call'];
+      const mappedType: Message['type'] = knownTypes.includes(t) ? (t as Message['type']) : 'text';
       const normalized: Message = {
         id: Number(data?.messageId),
         senderId: Number(data?.from),
@@ -80,6 +79,55 @@ export function useMessageSocketHandlers() {
     s.on('message-starred', onStarred);
     s.on('message-forwarded', onForwarded);
     attachedRef.current = true;
+
+    // ── message-sent: full DB-persisted message (call records, own sent messages) ──
+    const onMessageSent = (data: any) => {
+      const message: Message = data?.message || data;
+      if (!message?.id) return;
+
+      // Determine which conversation this belongs to — use conversationId on the message
+      const convId = (message as any)?.conversationId;
+      if (!convId) return;
+
+      // Upsert into any matching messages cache
+      qc.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
+        if (!old) return old;
+        const upsert = (list: any[]) => {
+          const exists = list.some((m: any) => m.id === message.id);
+          if (exists) {
+            // Update existing (e.g. call record status changed from 'initiated' → 'ended')
+            return list.map((m: any) => m.id === message.id ? { ...m, ...message } : m);
+          }
+          return [...list, message];
+        };
+        if (Array.isArray(old)) return upsert(old);
+        if (Array.isArray(old?.pages)) {
+          return { ...old, pages: old.pages.map((p: any) => ({ ...p, messages: upsert(p.messages || []) })) };
+        }
+        return old;
+      });
+
+      // Also update the contacts preview row
+      if (authUserId) {
+        const contactsKey = ['contacts', String(authUserId)];
+        qc.setQueryData<any[]>(contactsKey, (old = []) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((c: any) => {
+            if (String(c?.conversationId) !== String(convId)) return c;
+            return {
+              ...c,
+              type: message.type,
+              message: message.content || c.message,
+              timestamp: message.createdAt || new Date().toISOString(),
+              senderId: message.senderId,
+            };
+          });
+        });
+      }
+    };
+
+    s.off('message-sent', onMessageSent);
+    s.on('message-sent', onMessageSent);
     return () => {
       s.off('msg-recieve', onMsgReceive);
       s.off('message-status-update', onStatusUpdate);

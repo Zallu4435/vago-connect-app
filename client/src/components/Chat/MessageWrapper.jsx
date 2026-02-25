@@ -9,6 +9,7 @@ import AudioMessage from "./messages/AudioMessage";
 import VideoMessage from "./messages/VideoMessage";
 import DocumentMessage from "./messages/DocumentMessage";
 import DeletedMessage from "./messages/DeletedMessage";
+import CallMessage from "./messages/CallMessage";
 
 /**
  * MessageWrapper - Unified wrapper for all single message types
@@ -27,6 +28,7 @@ function MessageWrapper({
     const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
     const senderAvatar = message?.sender?.profileImage || "/default_avatar.png";
     const isSelected = selectedIds?.includes(message.id);
+    const isCall = message.type === "call";
 
     return (
         <BaseMessageLayout
@@ -37,17 +39,20 @@ function MessageWrapper({
             selectMode={selectMode}
             isSelected={isSelected}
             onSelectToggle={() => onToggleSelect?.(message.id)}
-            reactions={message.isDeletedForEveryone ? [] : message.reactions}
-            reactionAnchorMessage={message}
-            actionAnchorMessage={message}
-            showActions={!message.isDeletedForEveryone}
-            onReply={onReply}
-            onForward={onForward}
+            reactions={isCall ? [] : (message.isDeletedForEveryone ? [] : message.reactions)}
+            reactionAnchorMessage={isCall ? null : message}
+            actionAnchorMessage={isCall ? null : message}
+            showActions={!message.isDeletedForEveryone && !isCall}
+            onReply={isCall ? undefined : onReply}
+            onForward={isCall ? undefined : onForward}
         >
             {message.isDeletedForEveryone ? (
                 <DeletedMessage message={message} isIncoming={isIncoming} />
             ) : (
                 <>
+                    {message.type === "call" && (
+                        <CallMessage message={message} isIncoming={isIncoming} />
+                    )}
                     {message.type === "text" && (
                         <TextMessage message={message} isIncoming={isIncoming} />
                     )}
@@ -60,7 +65,7 @@ function MessageWrapper({
                     {message.type === "video" && (
                         <VideoMessage message={message} isIncoming={isIncoming} />
                     )}
-                    {(message.type === "document" || (!['text', 'image', 'audio', 'video', 'location', 'voice'].includes(String(message.type || '')))) && (
+                    {(message.type === "document" || (!['text', 'image', 'audio', 'video', 'location', 'voice', 'call'].includes(String(message.type || '')))) && (
                         <DocumentMessage message={message} isIncoming={isIncoming} />
                     )}
                 </>

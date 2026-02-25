@@ -224,3 +224,94 @@ export const getInitialContactswithMessages = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getCallHistory = async (req, res, next) => {
+  try {
+    const userId = Number(req.params.userId || '');
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    const prisma = getPrismaInstance();
+
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const dateQuery = typeof req.query.date === 'string' ? req.query.date.trim() : '';
+
+    const whereClause = {
+      type: "call",
+      conversation: {
+        participants: {
+          some: { userId: userId }
+        }
+      }
+    };
+
+    if (dateQuery) {
+      const startOfDay = new Date(dateQuery);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(dateQuery);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      whereClause.createdAt = {
+        gte: startOfDay,
+        lte: endOfDay
+      };
+    }
+
+    if (q) {
+      whereClause.conversation = {
+        AND: [
+          { participants: { some: { userId: userId } } },
+          {
+            participants: {
+              some: {
+                userId: { not: userId },
+                user: {
+                  OR: [
+                    { name: { contains: q, mode: 'insensitive' } },
+                    { email: { contains: q, mode: 'insensitive' } }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      };
+    }
+
+    const rawCalls = await prisma.message.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sender: { select: { id: true, name: true, profileImage: true, email: true } },
+        conversation: {
+          include: {
+            participants: {
+              include: {
+                user: { select: { id: true, name: true, profileImage: true, email: true } }
+              }
+            }
+          }
+        }
+      },
+      take: 100 // Limit history slightly for performance
+    });
+
+    // Structure it for the frontend
+    const calls = rawCalls.map(msg => {
+      const otherParticipant = msg.conversation?.participants.find(p => p.userId !== msg.senderId);
+      const receiverUser = otherParticipant ? otherParticipant.user : null;
+
+      return {
+        ...msg,
+        receiverId: receiverUser?.id || null,
+        receiver: receiverUser,
+        conversation: undefined // Omit giant conversation obj from payload
+      };
+    });
+
+    return res.status(200).json({ message: "Call history fetched", status: true, calls });
+  } catch (error) {
+    next(error);
+  }
+};

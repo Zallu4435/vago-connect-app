@@ -28,56 +28,85 @@ function setRefreshCookie(res, token) {
 }
 
 export const checkUser = async (req, res, next) => {
-    try {
-        const { email } = req.body
+  try {
+    const { email } = req.body
 
-        if (!email) {
-            return res.status(400).json({ message: "Email is required", status: false })
-        }
-
-        const prisma = getPrismaInstance()
-
-        const user = await prisma.user.findUnique({
-          where: { email },
-          select: { id: true, name: true, email: true, about: true, profileImage: true },
-        })
-
-        if (!user) {
-            return res.status(200).json({ message: "User not found", status: false })
-        }
-
-        return res.status(200).json({ message: "User found", status: true, user })
-
-    } catch (error) {
-        next(error)
+    if (!email) {
+      return res.status(400).json({ message: "Email is required", status: false })
     }
+
+    const prisma = getPrismaInstance()
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, name: true, email: true, about: true, profileImage: true },
+    })
+
+    if (!user) {
+      return res.status(200).json({ message: "User not found", status: false })
+    }
+
+    return res.status(200).json({ message: "User found", status: true, user })
+
+  } catch (error) {
+    next(error)
+  }
 }
 
 export const onBoardUser = async (req, res, next) => {
-    try {
-        const { name, email, about, image, profileImage } = req.body
+  try {
+    const { name, email, about, image, profileImage } = req.body
 
-        const finalProfileImage = typeof profileImage === 'string' ? profileImage : (typeof image === 'string' ? image : null);
-        if (!name || !email) {
-            return res.status(400).json({ message: "Name and email are required", status: false })
-        }
-
-        const prisma = getPrismaInstance()
-
-        const created = await prisma.user.create({ data: { name, email, about: about || undefined, profileImage: finalProfileImage || undefined } })
-        const user = {
-          id: created.id,
-          name: created.name,
-          email: created.email,
-          about: created.about,
-          profileImage: created.profileImage,
-        }
-
-        return res.status(201).json({ message: "User created", status: true, user })
-    } catch (error) {
-        next(error)
+    const finalProfileImage = typeof profileImage === 'string' ? profileImage : (typeof image === 'string' ? image : null);
+    if (!name || !email) {
+      return res.status(400).json({ message: "Name and email are required", status: false })
     }
+
+    const prisma = getPrismaInstance()
+
+    const created = await prisma.user.create({ data: { name, email, about: about || undefined, profileImage: finalProfileImage || undefined } })
+    const user = {
+      id: created.id,
+      name: created.name,
+      email: created.email,
+      about: created.about,
+      profileImage: created.profileImage,
+    }
+
+    return res.status(201).json({ message: "User created", status: true, user })
+  } catch (error) {
+    next(error)
+  }
 }
+
+export const updateProfile = async (req, res, next) => {
+  try {
+    const { userId, name, about, profileImage } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required", status: false });
+    }
+
+    const prisma = getPrismaInstance();
+
+    // Partial update - only update fields that are provided and valid
+    const dataToUpdate = {};
+    if (typeof name === 'string' && name.trim()) dataToUpdate.name = name.trim();
+    if (typeof about === 'string' && about.trim()) dataToUpdate.about = about.trim();
+    if (profileImage !== undefined) dataToUpdate.profileImage = profileImage;
+
+    const updated = await prisma.user.update({
+      where: { id: Number(userId) },
+      data: dataToUpdate,
+      select: { id: true, name: true, email: true, about: true, profileImage: true },
+    });
+
+    return res.status(200).json({ message: "Profile updated", status: true, user: updated });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 export const getAllUser = async (req, res, next) => {
   try {
@@ -92,11 +121,11 @@ export const getAllUser = async (req, res, next) => {
 
     const where = q
       ? {
-          OR: [
-            { name: { contains: q, mode: 'insensitive' } },
-            { email: { contains: q, mode: 'insensitive' } },
-          ],
-        }
+        OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+        ],
+      }
       : undefined;
 
     const rows = await prisma.user.findMany({

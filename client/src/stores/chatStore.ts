@@ -10,7 +10,7 @@ interface ChatState {
   messages: Message[];
   messageSearch: boolean;
   onlineUsers: number[];
-  allContactsPage: boolean;
+  activePage: "default" | "contacts" | "profile" | "calls";
   replyTo: Message | null;
   editMessage: Message | null;
 
@@ -23,7 +23,7 @@ interface ChatState {
   toggleMessageSearch: () => void;
   setOnlineUsers: (users: number[]) => void;
   clearChat: () => void;
-  setAllContactsPage: (value: boolean) => void;
+  setActivePage: (page: "default" | "contacts" | "profile" | "calls") => void;
   setReplyTo: (message: Message | null) => void;
   clearReplyTo: () => void;
   setEditMessage: (message: Message | null) => void;
@@ -41,7 +41,7 @@ export const useChatStore = create<ChatState>()(
       messages: [],
       messageSearch: false,
       onlineUsers: [],
-      allContactsPage: false,
+      activePage: "default",
       replyTo: null,
       editMessage: null,
 
@@ -58,7 +58,7 @@ export const useChatStore = create<ChatState>()(
       setOnlineUsers: (users) => set({ onlineUsers: users }),
       clearChat: () =>
         set({ messages: [], currentChatUser: null, messageSearch: false }),
-      setAllContactsPage: (value) => set({ allContactsPage: value }),
+      setActivePage: (page) => set({ activePage: page }),
       setReplyTo: (message) => set({ replyTo: message }),
       clearReplyTo: () => set({ replyTo: null }),
       setEditMessage: (message) => set({ editMessage: message }),

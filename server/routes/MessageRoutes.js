@@ -1,32 +1,33 @@
 import { Router } from "express";
-import { 
-  addMessage, 
-  getMessages, 
-  addImage, 
-  addAudio, 
-  addVideo, 
-  addLocation, 
-  getInitialContactswithMessages, 
-  updateMessageStatus, 
-  addFile, 
-  editMessage, 
-  deleteMessage, 
-  forwardMessages, 
-  starMessage, 
-  reactToMessage, 
-  clearChat, 
-  deleteChatForMe, 
-  archiveChat, 
-  pinChat, 
-  muteChat, 
-  getChatMedia, 
-  downloadMedia, 
-  searchChatMedia, 
-  createGroup, 
-  addGroupMembers, 
-  removeGroupMembers, 
-  updateGroupRole, 
-  updateGroupSettings 
+import {
+  addMessage,
+  getMessages,
+  addImage,
+  addAudio,
+  addVideo,
+  addLocation,
+  getInitialContactswithMessages,
+  updateMessageStatus,
+  addFile,
+  editMessage,
+  deleteMessage,
+  forwardMessages,
+  starMessage,
+  reactToMessage,
+  clearChat,
+  deleteChatForMe,
+  archiveChat,
+  pinChat,
+  muteChat,
+  getChatMedia,
+  downloadMedia,
+  searchChatMedia,
+  createGroup,
+  addGroupMembers,
+  removeGroupMembers,
+  updateGroupRole,
+  updateGroupSettings,
+  getCallHistory
 } from "../controllers/MessageController.js";
 import multer from "multer";
 import { verifyAccessToken } from "../middlewares/AuthMiddleware.js";
@@ -104,5 +105,7 @@ messageRouter.post("/chats/:id/mute", verifyAccessToken, muteChat);
 messageRouter.get("/chats/:id/media", verifyAccessToken, getChatMedia);
 messageRouter.get("/chats/:id/media/search", verifyAccessToken, searchChatMedia);
 messageRouter.get("/media/:mediaId/download", verifyAccessToken, downloadMedia);
+// Calls Route
+messageRouter.get("/calls/:userId", verifyAccessToken, getCallHistory);
 
 export default messageRouter;

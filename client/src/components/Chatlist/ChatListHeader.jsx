@@ -14,14 +14,14 @@ const SidebarMenu = dynamic(() => import("./SidebarMenu"), { ssr: false });
 
 function ChatListHeader() {
   const userInfo = useAuthStore((s) => s.userInfo);
-  const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
+  const setActivePage = useChatStore((s) => s.setActivePage);
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const [showSidebarMenu, setShowSidebarMenu] = useState(false);
 
   // Get the actual logout function and its loading state
   const { logout, isLoggingOut } = useAuth();
 
-  const handleAllContactsPage = () => setAllContactsPage(true);
+  const handleAllContactsPage = () => setActivePage("contacts");
 
   const handleLogout = async () => {
     setShowSidebarMenu(false);
@@ -70,8 +70,8 @@ function ChatListHeader() {
         user={userInfo}
         isLoggingOut={isLoggingOut}
         onNewGroup={() => { setShowSidebarMenu(false); setShowGroupCreate(true); }}
-        onProfile={() => { setShowSidebarMenu(false); }}
-        onCalls={() => { setShowSidebarMenu(false); }}
+        onProfile={() => { setShowSidebarMenu(false); setActivePage("profile"); }}
+        onCalls={() => { setShowSidebarMenu(false); setActivePage("calls"); }}
         onSettings={() => { setShowSidebarMenu(false); }}
         onLogout={handleLogout}
       />

@@ -39,8 +39,21 @@ function ChatListItem({ data, isContactsPage = false }) {
   if (isContactsPage) {
     preview = data?.about || "Available";
   } else {
-    if (data?.type === "image") preview = "Image";
-    else if (data?.type === "audio") preview = "Voice message";
+    if (data?.type === "image") preview = "📷 Image";
+    else if (data?.type === "video") preview = "🎬 Video";
+    else if (data?.type === "audio" || data?.type === "voice") preview = "🎵 Voice message";
+    else if (data?.type === "document") preview = "📄 Document";
+    else if (data?.type === "call") {
+      try {
+        const p = JSON.parse(data?.message || "{}");
+        const icon = p.callType === "video" ? "📹" : "📞";
+        const dur = p.duration > 0 ? ` · ${Math.floor(p.duration / 60)}:${String(p.duration % 60).padStart(2, "0")}` : "";
+        if (p.status === "missed") preview = `${icon} Missed call`;
+        else if (p.status === "rejected") preview = `${icon} Declined`;
+        else if (p.status === "ended") preview = `${icon} ${p.callType === "video" ? "Video" : "Voice"} call${dur}`;
+        else preview = `${icon} ${p.callType === "video" ? "Video" : "Voice"} call`;
+      } catch { preview = "📞 Call"; }
+    }
     else preview = data?.message || "No messages yet";
   }
 

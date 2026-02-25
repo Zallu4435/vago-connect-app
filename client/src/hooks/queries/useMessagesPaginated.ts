@@ -36,7 +36,7 @@ export function useMessagesPaginated(userId?: string, peerId?: string, opts: Opt
         id: Number(m.id),
         senderId: Number(m.senderId),
         receiverId: Number(peerId),
-        type: (m.type === 'audio' || m.type === 'image' || m.type === 'video' || m.type === 'location' || m.type === 'document') ? m.type : 'text',
+        type: (['audio', 'image', 'video', 'location', 'document', 'voice', 'call'].includes(m.type)) ? m.type : 'text',
         message: String(m.content ?? ''),
         messageStatus: (m.status as 'sent' | 'delivered' | 'read') || 'sent',
         createdAt: String(m.createdAt),

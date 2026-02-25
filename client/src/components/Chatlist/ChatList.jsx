@@ -9,14 +9,15 @@ import { useChatStore } from "@/stores/chatStore";
 const ContactsList = dynamic(() => import("./ContactsList"), {
   loading: () => <div className="h-full bg-ancient-bg-dark" />,
 });
+const ProfileView = dynamic(() => import("./ProfileView"), {
+  loading: () => <div className="h-full bg-ancient-bg-dark" />,
+});
+const CallsList = dynamic(() => import("./CallsList"), {
+  loading: () => <div className="h-full bg-ancient-bg-dark" />,
+});
 
 function ChatList() {
-  const allContactsPage = useChatStore((s) => s.allContactsPage);
-  const [pageType, setPageType] = useState("default");
-
-  useEffect(() => {
-    setPageType(allContactsPage ? "contacts" : "default");
-  }, [allContactsPage]);
+  const activePage = useChatStore((s) => s.activePage);
 
   return (
     <div className="
@@ -27,21 +28,35 @@ function ChatList() {
       transition-all
     ">
       {/* Default chats view */}
-      {pageType === 'default' && (
+      {activePage === 'default' && (
         <div className="flex flex-col h-full overflow-hidden">
           <ChatListHeader />
           <SearchBar />
           {/* Main scrollable area for chat list */}
           <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-            <List pageType={pageType} />
+            <List pageType={activePage} />
           </div>
         </div>
       )}
 
       {/* Contacts view */}
-      {pageType === 'contacts' && (
+      {activePage === 'contacts' && (
         <div className="h-full">
           <ContactsList />
+        </div>
+      )}
+
+      {/* Profile view */}
+      {activePage === 'profile' && (
+        <div className="h-full">
+          <ProfileView />
+        </div>
+      )}
+
+      {/* Calls view */}
+      {activePage === 'calls' && (
+        <div className="h-full animate-slide-in">
+          <CallsList />
         </div>
       )}
     </div>
