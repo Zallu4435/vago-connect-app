@@ -9,17 +9,17 @@ function DeletedMessage({ message, isIncoming }) {
         : "bg-ancient-bg-medium/40 border border-ancient-border-stone/30 text-ancient-text-muted";
 
     return (
-        <div className={`message-bubble ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} ${messageBubbleClass} max-w-[420px] italic flex items-center gap-2`}>
-            <FaBan className="text-xs opacity-50" />
-            <div className="flex flex-col gap-1 flex-1">
-                <span className="text-sm sm:text-base">
+        <div className={`message-bubble ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} ${messageBubbleClass} max-w-[420px] italic flex flex-col`}>
+            <div className="flex flex-row items-center gap-2 pr-4">
+                <FaBan className="text-xs opacity-50 shrink-0" />
+                <span className="text-sm sm:text-base whitespace-nowrap">
                     This message was deleted
                 </span>
-                <div className="flex justify-end">
-                    <span className="text-[10px] text-ancient-text-muted/60 tabular-nums">
-                        {calculateTime(message.timestamp || message.createdAt)}
-                    </span>
-                </div>
+            </div>
+            <div className="flex justify-end mt-1">
+                <span className="text-[10px] text-ancient-text-muted/60 tabular-nums leading-none">
+                    {calculateTime(message.timestamp || message.createdAt)}
+                </span>
             </div>
         </div>
     );

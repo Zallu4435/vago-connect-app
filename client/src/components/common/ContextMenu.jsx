@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
+import { useClickOutside } from "@/hooks/useClickOutside";
 import ReactDOM from "react-dom";
 import { FaMagic } from "react-icons/fa";
 
@@ -6,24 +7,7 @@ function ContextMenu({ options, cordinates, contextMenu, setContextMenu }) {
   const contextMenuRef = useRef(null);
 
   // Dismiss on click outside or Escape key (for accessibility and mobile)
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
-        setContextMenu(false);
-      }
-    };
-    const handleKeyboard = (event) => {
-      if (event.key === "Escape") setContextMenu(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside, { passive: true });
-    document.addEventListener("keydown", handleKeyboard);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyboard);
-    };
-  }, [setContextMenu]);
+  useClickOutside(contextMenu, () => setContextMenu(false), [contextMenuRef]);
 
   // Clamp coordinates to viewport edge (prevents off-screen context menus on mobile)
   const clamp = (pos, min, max) => Math.max(min, Math.min(pos, max));

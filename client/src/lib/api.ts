@@ -5,7 +5,6 @@ import { refreshAccessToken } from '@/lib/refreshToken';
 export const api = axios.create({
   // Use relative base URL so Next.js rewrite proxies to backend in dev
   baseURL: '',
-  timeout: 10000,
   withCredentials: true,
 });
 
@@ -23,7 +22,7 @@ api.interceptors.request.use((config) => {
         Authorization: `Bearer ${token}`,
       } as any;
     }
-  } catch {}
+  } catch { }
   return config;
 });
 
@@ -56,7 +55,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         // Refresh failed → logout and redirect
-        try { useAuthStore.getState().clearAuth(); } catch {}
+        try { useAuthStore.getState().clearAuth(); } catch { }
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }

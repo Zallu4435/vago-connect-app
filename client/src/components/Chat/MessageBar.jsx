@@ -11,6 +11,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useSocketStore } from "@/stores/socketStore";
 import { useSendMessage } from "@/hooks/mutations/useSendMessage";
+import { useEditMessage } from "@/hooks/mutations/useEditMessage";
 import ErrorMessage from "@/components/common/ErrorMessage";
 import { showToast } from "@/lib/toast";
 import { useSendLocation } from "@/hooks/mutations/useSendLocation";
@@ -18,6 +19,7 @@ import { api } from "@/lib/api";
 import { ADD_IMAGE_ROUTE, ADD_VIDEO_ROUTE, ADD_FILE_ROUTE } from "@/utils/ApiRoutes";
 import ActionSheet from "@/components/common/ActionSheet";
 import MediaPreviewModal from "./MediaPreviewModal";
+import { useClickOutside } from "@/hooks/useClickOutside";
 
 const CaptureAudio = dynamic(() => import("../common/CaptureAudio"), { ssr: false });
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false, loading: () => null });
@@ -50,6 +52,8 @@ function MessageBar({ isOnline = true }) {
   const setMessages = useChatStore((s) => s.setMessages);
   const replyTo = useChatStore((s) => s.replyTo);
   const clearReplyTo = useChatStore((s) => s.clearReplyTo);
+  const editMessage = useChatStore((s) => s.editMessage);
+  const clearEditMessage = useChatStore((s) => s.clearEditMessage);
   const socket = useSocketStore((s) => s.socket);
   const qc = useQueryClient();
 
@@ -58,6 +62,7 @@ function MessageBar({ isOnline = true }) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAudioRecorder, setShowAudioRecorder] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [previewContext, setPreviewContext] = useState(null); // 'image' | 'video' | 'file'
   const [uploadProgress, setUploadProgress] = useState({ label: "", percent: 0 });
   const [previewFiles, setPreviewFiles] = useState([]);
 
@@ -69,6 +74,7 @@ function MessageBar({ isOnline = true }) {
   // Mutations
   const sendMessageMutation = useSendMessage();
   const sendLocationMutation = useSendLocation();
+  const editMessageMutation = useEditMessage();
 
   // Add message to cache
   const addToMessagesCache = useCallback((msg) => {
@@ -90,6 +96,13 @@ function MessageBar({ isOnline = true }) {
   // Upload file with progress
   const uploadFile = useCallback(async (file, caption = "") => {
     if (!file || !currentChatUser?.id || !userInfo?.id) return;
+
+    // 50 MB limit validation
+    const MAX_FILE_SIZE = 50 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      showToast.error(`File "${file.name}" exceeds the 50MB limit.`);
+      return;
+    }
 
     const mime = file.type || "";
     const isImage = mime.startsWith("image/");
@@ -125,6 +138,7 @@ function MessageBar({ isOnline = true }) {
       });
 
       const { data } = await api.post(endpoint, form, {
+        timeout: 60000, // Explicitly override the default 10s Axios timeout for large media files
         onUploadProgress: (e) => {
           if (e.total) {
             setUploadProgress((prev) => ({ ...prev, percent: Math.round((e.loaded * 100) / e.total) }));
@@ -166,13 +180,16 @@ function MessageBar({ isOnline = true }) {
       e.preventDefault();
       const f = files[0];
       const mime = f?.type || "";
-      if (mime.startsWith("image/") || mime.startsWith("video/")) {
-        setPreviewFiles([f]);
+      if (mime.startsWith("image/")) {
+        setPreviewContext('image');
+      } else if (mime.startsWith("video/")) {
+        setPreviewContext('video');
       } else {
-        uploadFile(f);
+        setPreviewContext('file');
       }
+      setPreviewFiles([f]);
     }
-  }, [isOnline, uploadFile]);
+  }, [isOnline]);
 
   // Handle drag & drop
   const onDrop = useCallback((e) => {
@@ -182,35 +199,28 @@ function MessageBar({ isOnline = true }) {
     if (files?.length > 0) {
       const f = files[0];
       const mime = f?.type || "";
-      if (mime.startsWith("image/") || mime.startsWith("video/")) {
-        setPreviewFiles([f]);
+      if (mime.startsWith("image/")) {
+        setPreviewContext('image');
+      } else if (mime.startsWith("video/")) {
+        setPreviewContext('video');
       } else {
-        uploadFile(f);
+        setPreviewContext('file');
       }
+      setPreviewFiles([f]);
     }
-  }, [isOnline, uploadFile]);
+  }, [isOnline]);
 
   const onDragOver = useCallback((e) => { e.preventDefault(); }, []);
 
-  // Close emoji picker on outside click
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (event.target.id !== 'emoji-open') {
-        if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
-          setShowEmojiPicker(false);
-        }
-      }
-    };
-    document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
-  }, []);
+  useClickOutside(showEmojiPicker, () => setShowEmojiPicker(false), [emojiPickerRef]);
 
   // Focus input when reply is set
   useEffect(() => {
-    if (replyTo && inputRef.current) {
+    if ((replyTo || editMessage) && inputRef.current) {
+      if (editMessage) setMessage(editMessage.content || "");
       try { inputRef.current.focus(); } catch { }
     }
-  }, [replyTo]);
+  }, [replyTo, editMessage]);
 
   const handleEmojiClick = (_e, emojiObject) => {
     const emoji = emojiObject?.emoji || _e?.emoji;
@@ -221,6 +231,31 @@ function MessageBar({ isOnline = true }) {
     if (!isOnline) return;
     const text = message.trim();
     if (!text || !currentChatUser?.id || !userInfo?.id) return;
+
+    if (editMessage) {
+      // Optimistically update locally
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === editMessage.id
+            ? { ...m, content: text, isEdited: true, editedAt: new Date().toISOString() }
+            : m
+        )
+      );
+
+      editMessageMutation.mutate(
+        { id: editMessage.id, content: text },
+        {
+          onError: (e) => {
+            console.error("editMessage error", e);
+            showToast.error("Failed to edit message. Try again.");
+          }
+        }
+      );
+
+      clearEditMessage();
+      setMessage("");
+      return;
+    }
 
     const tempId = Date.now();
     const optimisticMsg = normalizeMessage({
@@ -265,7 +300,7 @@ function MessageBar({ isOnline = true }) {
         },
       }
     );
-  }, [isOnline, message, currentChatUser, userInfo, replyTo, sendMessageMutation, socket, setMessages, addToMessagesCache, clearReplyTo]);
+  }, [isOnline, message, currentChatUser, userInfo, replyTo, editMessage, sendMessageMutation, editMessageMutation, socket, setMessages, addToMessagesCache, clearReplyTo, clearEditMessage]);
 
   const handleFileSelect = useCallback((type) => {
     if (!isOnline) return;
@@ -275,7 +310,27 @@ function MessageBar({ isOnline = true }) {
     input.onchange = (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      if (type === 'image' || type === 'video') {
+
+      const mime = file.type || "";
+
+      // Strict enforcement to prevent OS dialog bypass
+      if (type === 'image' && !mime.startsWith("image/")) {
+        showToast.error("Please select a valid image file.");
+        return;
+      }
+      if (type === 'video' && !mime.startsWith("video/")) {
+        showToast.error("Please select a valid video file.");
+        return;
+      }
+      if (type === 'file' && (mime.startsWith("image/") || mime.startsWith("video/"))) {
+        showToast.error("Please use the Image or Video options for media.");
+        return;
+      }
+
+      setPreviewContext(type); // Pass the strict context to the modal
+
+      if (type === 'image' || type === 'video' || type === 'file') {
+        // We now route even 'file' types to the preview modal to allow captions
         setPreviewFiles([file]);
       } else {
         uploadFile(file);
@@ -346,7 +401,7 @@ function MessageBar({ isOnline = true }) {
   return (
     <>
       {/* Reply Preview - positioned above the bar */}
-      {replyTo && (
+      {replyTo && !editMessage && (
         <div className="bg-ancient-bg-medium border-t border-ancient-border-stone/50 px-3 sm:px-4 py-2">
           <div className="flex items-start justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 bg-ancient-input-bg border border-ancient-input-border rounded-lg">
             <div className="min-w-0">
@@ -359,6 +414,31 @@ function MessageBar({ isOnline = true }) {
             </div>
             <button
               onClick={clearReplyTo}
+              className="shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm rounded-md bg-ancient-bg-medium border border-ancient-input-border text-ancient-text-muted hover:text-ancient-text-light hover:border-ancient-icon-glow transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Preview - positioned above the bar */}
+      {editMessage && (
+        <div className="bg-ancient-bg-medium border-t border-ancient-border-stone/50 px-3 sm:px-4 py-2">
+          <div className="flex items-start justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-2.5 bg-ancient-input-bg border border-ancient-input-border border-l-4 border-l-ancient-icon-glow rounded-lg">
+            <div className="min-w-0">
+              <div className="text-[10px] sm:text-xs text-ancient-icon-glow font-semibold truncate">
+                Editing message
+              </div>
+              <div className="text-sm sm:text-base text-ancient-text-light truncate">
+                {editMessage.content}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                clearEditMessage();
+                setMessage("");
+              }}
               className="shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm rounded-md bg-ancient-bg-medium border border-ancient-input-border text-ancient-text-muted hover:text-ancient-text-light hover:border-ancient-icon-glow transition-colors"
             >
               Cancel
@@ -401,7 +481,7 @@ function MessageBar({ isOnline = true }) {
                   open={showAttachMenu}
                   onClose={() => setShowAttachMenu(false)}
                   align="left"
-                  placement="above"
+                  placement="top"
                   anchorRef={attachButtonRef}
                   items={[
                     { label: "Image", icon: FaCamera, onClick: () => handleFileSelect('image') },
@@ -435,8 +515,12 @@ function MessageBar({ isOnline = true }) {
                   }
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Escape' && replyTo) {
-                    clearReplyTo();
+                  if (e.key === 'Escape') {
+                    if (replyTo) clearReplyTo();
+                    if (editMessage) {
+                      clearEditMessage();
+                      setMessage("");
+                    }
                   }
                 }}
                 ref={inputRef}
@@ -491,8 +575,12 @@ function MessageBar({ isOnline = true }) {
         <MediaPreviewModal
           open={previewFiles.length > 0}
           files={previewFiles}
-          onClose={() => setPreviewFiles([])}
-          onSend={async (payload) => {
+          context={previewContext}
+          onClose={() => {
+            setPreviewFiles([]);
+            setPreviewContext(null);
+          }}
+          onSend={(payload) => {
             if (payload?.__update__ && Array.isArray(payload.files)) {
               setPreviewFiles(payload.files);
               return;
@@ -509,13 +597,16 @@ function MessageBar({ isOnline = true }) {
               files = [payload];
             }
 
-            for (let i = 0; i < files.length; i++) {
-              const f = files[i];
-              const cap = captions[i];
-              // eslint-disable-next-line no-await-in-loop
-              await uploadFile(f, cap);
-            }
+            // Immediately clear UI
             setPreviewFiles([]);
+            setPreviewContext(null);
+
+            // Process uploads asynchronously in the background so UI doesn't freeze
+            files.forEach((f, i) => {
+              const cap = captions[i];
+              // Fire-and-forget; uploadFile handles its own optimistics and toasts
+              uploadFile(f, cap).catch(() => { });
+            });
           }}
         />
       </div>

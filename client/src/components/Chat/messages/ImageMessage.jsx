@@ -1,11 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { calculateTime } from "@/utils/CalculateTime";
+import { downloadMedia } from "@/utils/downloadMedia";
 import MessageStatus from "@/components/common/MessageStatus";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
 import { FaImage } from "react-icons/fa";
-import Image from "next/image";
 import dynamic from "next/dynamic";
 import RepliedMessageQuote from "./RepliedMessageQuote";
 import { RiShareForwardFill } from "react-icons/ri";
@@ -62,7 +62,7 @@ function ImageMessage({ message, isIncoming }) {
 
   return (
     <>
-      <div className={`message-bubble message-bubble-image ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} max-w-[480px]`}>
+      <div className={`message-bubble message-bubble-image ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} p-[3px] max-w-[400px] sm:max-w-[450px]`}>
         {isGroup && isIncoming && message.sender?.name && (
           <div className="text-[11px] sm:text-[12px] font-bold text-ancient-text-muted opacity-90 truncate mb-1">
             ~ {message.sender.name}
@@ -80,10 +80,7 @@ function ImageMessage({ message, isIncoming }) {
           </div>
         )}
         <div
-          className={`relative rounded-xl overflow-hidden shadow-xl cursor-pointer transition-all duration-200 hover:shadow-2xl group max-w-[480px] ${isIncoming
-            ? "bg-ancient-bubble-user border border-ancient-input-border"
-            : "bg-ancient-bubble-other border border-ancient-icon-glow/30"
-            }`}
+          className={`relative rounded-xl overflow-hidden shadow-sm cursor-pointer transition-all duration-200 group max-w-[480px] bg-ancient-input-bg flex`}
           onClick={() => setShowImageViewer(true)}
           role="button"
           tabIndex={0}
@@ -95,26 +92,25 @@ function ImageMessage({ message, isIncoming }) {
           }}
           aria-label="Open image preview"
         >
-          {/* Loading skeleton */}
-          {!imageLoaded && (
-            <div
-              className={`flex items-center justify-center w-full max-w-[480px] min-w-[220px] sm:min-w-[260px] min-h-[200px] sm:min-h-[280px] rounded-xl ${isIncoming ? "bg-ancient-input-bg" : "bg-ancient-input-bg/50"
-                } animate-pulse`}
-            >
-              <FaImage className={`text-4xl sm:text-5xl ${isIncoming ? "text-ancient-text-muted" : "text-ancient-icon-glow/50"}`} />
-            </div>
-          )}
+          <div className="relative w-full h-auto min-h-[200px] sm:min-h-[280px] max-h-[400px] sm:max-h-[500px]">
+            {/* Loading skeleton */}
+            {!imageLoaded && (
+              <div
+                className={`absolute inset-0 z-10 flex items-center justify-center w-full h-full ${isIncoming ? "bg-ancient-input-bg" : "bg-ancient-input-bg/50"
+                  } animate-pulse`}
+              >
+                <FaImage className={`text-4xl sm:text-5xl ${isIncoming ? "text-ancient-text-muted" : "text-ancient-icon-glow/50"}`} />
+              </div>
+            )}
 
-          {/* Image */}
-          <div className={`relative w-full max-w-[480px] min-h-[200px] sm:min-h-[280px] ${imageLoaded ? 'block' : 'hidden'}`}>
-            <Image
+            {/* Native Image for correct dynamic aspect-ratio layout pushing */}
+            <img
               src={message.content || message.message || ""}
               alt={hasCaption ? message.caption : "Sent image"}
-              fill
-              className="rounded-xl object-contain transition-opacity duration-300"
+              loading="lazy"
+              className={`w-full h-auto max-h-[400px] sm:max-h-[500px] object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
               onLoad={() => setImageLoaded(true)}
-              onError={() => setImageLoaded(false)}
-              sizes="(max-width: 640px) 100vw, 480px"
+              onError={() => setImageLoaded(true)}
             />
           </div>
 
@@ -129,16 +125,15 @@ function ImageMessage({ message, isIncoming }) {
 
           {/* Time and status overlay */}
           <div
-            className={`absolute ${hasCaption ? 'bottom-12' : 'bottom-2'} right-2 flex items-center gap-1.5 px-2 py-1 rounded-md backdrop-blur-sm transition-opacity ${hasCaption
-              ? 'bg-black/40'
-              : 'bg-black/50 group-hover:bg-black/70'
-              }`}
+            className={`absolute ${hasCaption ? 'bottom-12' : 'bottom-1.5'} right-1.5 flex items-center gap-1.5 px-2 py-1 rounded-full backdrop-blur-sm transition-opacity bg-black/40 hover:bg-black/60 shadow-md`}
           >
-            <span className="text-[10px] sm:text-[11px] text-white/90 font-medium tabular-nums">
+            <span className="text-[10px] sm:text-[11px] text-white/90 font-medium tabular-nums drop-shadow-md">
               {calculateTime(message.timestamp || message.createdAt)}
             </span>
             {message.senderId === userInfo.id && (
-              <MessageStatus status={message.messageStatus} />
+              <div className="drop-shadow-md">
+                <MessageStatus status={message.messageStatus} />
+              </div>
             )}
           </div>
 
@@ -161,7 +156,7 @@ function ImageMessage({ message, isIncoming }) {
           onClose={() => setShowImageViewer(false)}
           onDownload={(mediaId) => {
             const item = mediaItems.find((m) => Number(m.mediaId) === Number(mediaId));
-            if (item?.url) window.open(item.url, "_blank");
+            if (item?.url) downloadMedia(item.url, item.fileName || "photo.jpg");
           }}
         />
       )}

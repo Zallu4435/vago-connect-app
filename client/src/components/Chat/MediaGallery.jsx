@@ -1,15 +1,15 @@
 "use client";
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useContacts } from "@/hooks/queries/useContacts";
 import { useChatMedia } from "@/hooks/queries/useChatMedia";
-import { useSearchChatMedia } from "@/hooks/queries/useSearchChatMedia";
-import { useDownloadMediaUrl } from "@/hooks/queries/useDownloadMediaUrl";
+import { DOWNLOAD_MEDIA_ROUTE } from "@/utils/ApiRoutes";
+import { api } from "@/lib/api";
 import { MdClose } from "react-icons/md";
-import { FaSearch, FaTimesCircle } from "react-icons/fa";
 import MediaPreviewGridItem from "./MediaGallery/MediaPreviewGridItem";
 import MediaCarouselView from "./MediaGallery/MediaCarouselView";
+import LoadingSpinner from "../common/LoadingSpinner";
 
 // MAIN MediaGallery Component
 export default function MediaGallery({ open, onClose }) {
@@ -18,13 +18,12 @@ export default function MediaGallery({ open, onClose }) {
   const { data: contacts = [] } = useContacts(userInfo?.id);
 
   const convoId = useMemo(() => {
-    const item = (contacts || []).find((c) => String(c?.user?.id) === String(currentChatUser?.id));
+    if (currentChatUser?.conversationId) return currentChatUser.conversationId;
+    const item = (contacts || []).find((c) => String(c?.id) === String(currentChatUser?.id));
     return item?.conversationId;
-  }, [contacts, currentChatUser?.id]);
+  }, [contacts, currentChatUser]);
 
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'images', 'videos', 'documents', 'links', 'audio', 'location'
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showCarousel, setShowCarousel] = useState(false);
   const [carouselInitialIndex, setCarouselInitialIndex] = useState(0);
 
@@ -40,35 +39,50 @@ export default function MediaGallery({ open, onClose }) {
 
   // Use a single query for all media, then filter and paginate client-side
   // or use separate queries if backend supports efficient filtering by type
-  const { data: allMediaData, isLoading: allMediaLoading } = useChatMedia({ chatId: convoId, type: typeMap[activeTab], limit: 1000, offset: 0 }); // Fetch more for client-side filtering
+  const {
+    data: allMediaData,
+    isLoading: allMediaLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useChatMedia({ chatId: open ? convoId : undefined, type: typeMap[activeTab], limit: 30 });
+
   const mediaItems = useMemo(() => {
-    return (allMediaData?.items || []).filter(item =>
-      searchTerm ? item.fileName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    item.content?.toLowerCase().includes(searchTerm.toLowerCase()) : true
-    );
-  }, [allMediaData, searchTerm]);
+    return allMediaData?.pages?.flatMap(page => page.items) || [];
+  }, [allMediaData]);
 
-
-  const [downloadId, setDownloadId] = useState(undefined);
-  const { data: dl } = useDownloadMediaUrl(downloadId);
-
-  // Auto-trigger download
-  useEffect(() => {
-    if (dl?.url && typeof window !== 'undefined') {
-      const link = document.createElement('a');
-      link.href = dl.url;
-      link.setAttribute('download', 'true'); // Or a specific filename from dl.fileName
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setDownloadId(undefined); // Reset download state
+  const scrollRef = useRef(null);
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current || !hasNextPage || isFetchingNextPage) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    if (scrollHeight - scrollTop <= clientHeight * 1.5) {
+      fetchNextPage();
     }
-  }, [dl]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleDownload = useCallback((mediaId) => {
-    setDownloadId(mediaId);
-  }, []);
+
+  const [isDownloading, setIsDownloading] = useState(null);
+
+  const handleDownload = useCallback(async (mediaId) => {
+    if (!mediaId || isDownloading) return;
+    try {
+      setIsDownloading(mediaId);
+      const { data } = await api.get(DOWNLOAD_MEDIA_ROUTE(mediaId));
+      if (data?.url && typeof window !== 'undefined') {
+        const link = document.createElement('a');
+        link.href = data.url;
+        link.setAttribute('download', 'true');
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error("Failed to download media:", error);
+    } finally {
+      setIsDownloading(null);
+    }
+  }, [isDownloading]);
 
   const handleMediaSelect = useCallback((mediaItem) => {
     const index = mediaItems.findIndex(item => item.mediaId === mediaItem.mediaId);
@@ -91,32 +105,16 @@ export default function MediaGallery({ open, onClose }) {
           </button>
         </div>
 
-        {/* Search and Tabs */}
+        {/* Tabs */}
         <div className="p-4 bg-ancient-bg-medium border-b border-ancient-border-stone flex flex-col gap-3">
-          <div className="flex items-center gap-3 bg-ancient-input-bg border border-ancient-input-border rounded-lg px-3 py-2">
-            <FaSearch className="text-ancient-icon-inactive text-lg" />
-            <input
-              type="text"
-              placeholder="Search..."
-              className="flex-grow bg-transparent outline-none text-ancient-text-light placeholder:text-ancient-text-muted text-base"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="text-ancient-icon-inactive hover:text-red-400">
-                <FaTimesCircle className="text-lg" />
-              </button>
-            )}
-          </div>
-          <div className="flex justify-around bg-ancient-bg-dark rounded-md p-1 border border-ancient-border-stone">
-            {['all', 'images', 'videos', 'audio', 'documents', 'location'].map(tab => ( // Added location
+          <div className="flex justify-around bg-ancient-bg-dark rounded-md p-1 border border-ancient-border-stone overflow-x-auto custom-scrollbar">
+            {['all', 'images', 'videos', 'audio', 'documents', 'location'].map(tab => (
               <button
                 key={tab}
-                className={`flex-1 text-center py-2 text-sm font-semibold rounded-md transition-colors duration-200 ${
-                  activeTab === tab
-                    ? 'bg-ancient-icon-glow text-ancient-bg-dark shadow-md'
-                    : 'text-ancient-text-light hover:bg-ancient-bubble-user'
-                }`}
+                className={`flex-1 text-center py-2 text-sm font-semibold rounded-md transition-colors duration-200 ${activeTab === tab
+                  ? 'bg-ancient-icon-glow text-ancient-bg-dark shadow-md'
+                  : 'text-ancient-text-light hover:bg-ancient-bubble-user'
+                  }`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -126,7 +124,11 @@ export default function MediaGallery({ open, onClose }) {
         </div>
 
         {/* Media Grid */}
-        <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
+        <div
+          className="flex-grow p-4 overflow-y-auto custom-scrollbar min-h-[50vh]"
+          ref={scrollRef}
+          onScroll={handleScroll}
+        >
           {!convoId && (
             <div className="text-ancient-text-muted text-center text-sm p-4">
               No media available for this conversation yet.
@@ -136,10 +138,14 @@ export default function MediaGallery({ open, onClose }) {
           {convoId && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {(allMediaLoading) && (
-                 <div className="col-span-full text-center text-ancient-text-muted p-4">Loading media...</div>
+                <div className="col-span-full flex justify-center items-center min-h-[300px] p-4">
+                  <LoadingSpinner size={32} className="text-ancient-icon-glow flex-shrink-0" />
+                </div>
               )}
               {!allMediaLoading && mediaItems.length === 0 && (
-                <div className="col-span-full text-center text-ancient-text-muted p-4">No items found in this category.</div>
+                <div className="col-span-full flex items-center justify-center min-h-[300px] text-center text-ancient-text-muted p-4">
+                  No items found in this category.
+                </div>
               )}
               {!allMediaLoading && mediaItems.map((it) => (
                 <MediaPreviewGridItem
@@ -147,8 +153,14 @@ export default function MediaGallery({ open, onClose }) {
                   mediaItem={it}
                   onSelect={handleMediaSelect}
                   onDownload={handleDownload}
+                  isDownloading={isDownloading === it.mediaId}
                 />
               ))}
+              {isFetchingNextPage && (
+                <div className="col-span-full flex justify-center p-4">
+                  <LoadingSpinner size={24} className="text-ancient-icon-glow" />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -160,6 +172,7 @@ export default function MediaGallery({ open, onClose }) {
           initialIndex={carouselInitialIndex}
           onClose={() => setShowCarousel(false)}
           onDownload={handleDownload}
+          isDownloading={isDownloading === mediaItems[carouselInitialIndex]?.mediaId}
         />
       )}
     </div>

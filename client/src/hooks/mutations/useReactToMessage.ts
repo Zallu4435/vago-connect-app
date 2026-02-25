@@ -8,7 +8,17 @@ export interface ReactToMessageInput {
   emoji: string;
 }
 
-export interface ReactToMessageResult { id: number; reactions: Array<{ emoji: string; userId: number }> }
+export interface ReactionDetail {
+  emoji: string;
+  userId: number;
+  user?: {
+    id: number;
+    name: string;
+    profileImage: string | null;
+  };
+}
+
+export interface ReactToMessageResult { id: number; reactions: ReactionDetail[] }
 
 type Ctx = { prev: Array<[QueryKey, any]> };
 
@@ -31,14 +41,22 @@ export function useReactToMessage(): UseMutationResult<ReactToMessageResult, Err
           const newPages = data.pages.map((p: any) => {
             const newMsgs = (p.messages || []).map((m: any) => {
               if (Number(m.id) !== Number(id)) return m;
-              const current: Array<{ emoji: string; userId: number }> = Array.isArray(m.reactions) ? [...m.reactions] : [];
+              const current: ReactionDetail[] = Array.isArray(m.reactions) ? [...m.reactions] : [];
               const idx = current.findIndex((r) => r.userId === userId && r.emoji === emoji);
               let next = current.slice();
               if (idx === -1) {
                 // add or switch reaction for this user
                 // remove any previous emoji by same user
                 next = next.filter((r) => r.userId !== userId);
-                next.push({ emoji, userId });
+                next.push({
+                  emoji,
+                  userId,
+                  user: user ? {
+                    id: Number(user.id),
+                    name: user.name,
+                    profileImage: user.profileImage
+                  } : undefined
+                });
               } else {
                 // toggle off existing same emoji
                 next.splice(idx, 1);

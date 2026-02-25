@@ -52,6 +52,17 @@ export const getMessages = async (req, res, next) => {
             name: true,
             profileImage: true
           }
+        },
+        reactions: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profileImage: true
+              }
+            }
+          }
         }
       }
     });
@@ -114,6 +125,19 @@ export const getInitialContactswithMessages = async (req, res, next) => {
                 },
               },
               orderBy: { createdAt: "desc" },
+              include: {
+                reactions: {
+                  include: {
+                    user: {
+                      select: {
+                        id: true,
+                        name: true,
+                        profileImage: true
+                      }
+                    }
+                  }
+                }
+              }
             },
           },
         },

@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import { useClickOutside } from "@/hooks/useClickOutside";
 import { createPortal } from "react-dom";
 
 const getModalPortalRoot = () => {
@@ -29,25 +30,7 @@ export default function ModalShell({
     setPortalRoot(getModalPortalRoot());
   }, []);
 
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose?.();
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
-    if (open) {
-      document.addEventListener("mousedown", onDocClick);
-      document.addEventListener("keydown", onKey);
-      setTimeout(() => {
-        try { ref.current?.focus?.(); } catch { }
-      }, 0);
-    }
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, onClose]);
+  useClickOutside(open, onClose, [ref]);
 
   if (!open || !portalRoot) return null;
 

@@ -15,8 +15,23 @@ export const getChatMedia = async (req, res, next) => {
     });
     if (!participant || participant.isDeleted) return res.status(403).json({ message: "Not a participant" });
 
-    const whereMsg = { conversationId };
-    if (type) whereMsg["type"] = String(type);
+    const whereMsg = {
+      conversationId,
+      OR: [
+        { type: "image" },
+        { type: "video" },
+        { type: "document" },
+        { type: "audio" },
+        { mediaFiles: { some: {} } }
+      ]
+    };
+    if (type) {
+      const typeStr = String(type);
+      whereMsg.OR = [
+        { type: typeStr },
+        { mediaFiles: { some: { mimeType: { startsWith: `${typeStr}/`, mode: 'insensitive' } } } }
+      ];
+    }
 
     const mediaMessages = await prisma.message.findMany({
       where: whereMsg,
@@ -27,23 +42,64 @@ export const getChatMedia = async (req, res, next) => {
     });
 
     const items = mediaMessages.flatMap((m) => {
-      if (!m.mediaFiles || !m.mediaFiles.length) return [];
-      return m.mediaFiles.map((mf) => ({
-        mediaId: mf.id,
+      // If there are formally attached MediaFiles, map from them:
+      if (m.mediaFiles && m.mediaFiles.length) {
+        return m.mediaFiles.map((mf) => {
+          let itemType = mf.cloudinaryResourceType || m.type || '';
+          if (mf.mimeType) itemType = mf.mimeType.split('/')[0];
+          if (!['image', 'video', 'audio', 'location'].includes(itemType)) itemType = 'document';
+
+          return {
+            mediaId: mf.id,
+            messageId: m.id,
+            conversationId: m.conversationId,
+            senderId: m.senderId,
+            type: itemType,
+            url: buildCloudinaryUrl(mf.cloudinaryPublicId, { resource_type: mf.cloudinaryResourceType }),
+            thumbnailUrl: mf.thumbnailKey ? buildCloudinaryUrl(mf.thumbnailKey, { resource_type: mf.cloudinaryResourceType }) : m.thumbnailUrl || null,
+            mimeType: mf.mimeType,
+            fileSize: mf.fileSize != null ? String(mf.fileSize) : null,
+            width: mf.width,
+            height: mf.height,
+            duration: mf.duration,
+            createdAt: m.createdAt,
+            fileName: mf.originalName || m.fileName || null,
+          };
+        });
+      }
+
+      // Legacy/Fallback parsing for media messages that lack a Prisma `MediaFile` relation
+      if (!m.content) return [];
+
+      let fallbackType = m.type;
+      if (['text', 'unknown'].includes(fallbackType) || !fallbackType) {
+        const urlLower = m.content.toLowerCase();
+        if (urlLower.match(/\.(jpg|jpeg|png|gif|webp|heic)(\?.*)?$/)) fallbackType = 'image';
+        else if (urlLower.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/)) fallbackType = 'video';
+        else if (urlLower.match(/\.(mp3|wav|ogg|m4a)(\?.*)?$/)) fallbackType = 'audio';
+        else fallbackType = 'document';
+      }
+
+      const fallbackUrl = m.content.startsWith('http')
+        ? m.content
+        : buildCloudinaryUrl(m.content, { resource_type: fallbackType === 'document' ? 'raw' : fallbackType });
+
+      return [{
+        mediaId: m.id, // Using message ID strictly as mediaId fallback
         messageId: m.id,
         conversationId: m.conversationId,
         senderId: m.senderId,
-        type: mf.mimeType || mf.cloudinaryResourceType || m.type,
-        url: buildCloudinaryUrl(mf.cloudinaryPublicId, { resource_type: mf.cloudinaryResourceType }),
-        thumbnailUrl: mf.thumbnailKey ? buildCloudinaryUrl(mf.thumbnailKey, { resource_type: mf.cloudinaryResourceType }) : m.thumbnailUrl || null,
-        mimeType: mf.mimeType,
-        fileSize: mf.fileSize,
-        width: mf.width,
-        height: mf.height,
-        duration: mf.duration,
+        type: fallbackType,
+        url: fallbackUrl,
+        thumbnailUrl: m.thumbnailUrl || null,
+        mimeType: null,
+        fileSize: null,
+        width: null,
+        height: null,
+        duration: null,
         createdAt: m.createdAt,
-        fileName: mf.originalName || m.fileName || null,
-      }));
+        fileName: m.fileName || m.caption || m.content,
+      }];
     });
 
     return res.status(200).json({ items, count: items.length });
@@ -101,54 +157,105 @@ export const searchChatMedia = async (req, res, next) => {
     const sizeNum = Number(pageSize) || 20;
     if (pageNum < 1 || sizeNum < 1 || sizeNum > 100) return res.status(400).json({ message: "Invalid pagination" });
 
-    // Build where for MediaFile with join to Message
-    const where = {
-      message: {
-        conversationId,
-        ...(start || end ? { createdAt: { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) } } : {}),
-        ...(type ? { OR: [ { type: String(type) } ] } : {}),
-      },
-      ...(minBytes != null || maxBytes != null ? { fileSize: { ...(minBytes != null ? { gte: BigInt(minBytes) } : {}), ...(maxBytes != null ? { lte: BigInt(maxBytes) } : {}) } } : {}),
-      ...(mimeType ? { mimeType: { contains: String(mimeType), mode: 'insensitive' } } : {}),
+    // Build where directly against Message since MediaFile might be missing for legacy messages
+    const messageWhere = {
+      conversationId,
+      ...(start || end ? { createdAt: { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) } } : {}),
+      OR: [
+        { type: "image" },
+        { type: "video" },
+        { type: "document" },
+        { type: "audio" },
+        { mediaFiles: { some: {} } }
+      ]
     };
 
-    // If type is provided, also allow filtering by MIME prefix as a fallback (e.g., image/*)
     if (type) {
-      where.OR = [
-        ...(where.OR || []),
-        { mimeType: { startsWith: `${type}/`, mode: 'insensitive' } },
+      const typeStr = String(type);
+      messageWhere.OR = [
+        { type: typeStr },
+        { mediaFiles: { some: { mimeType: { startsWith: `${typeStr}/`, mode: 'insensitive' } } } }
       ];
     }
 
-    // Count first for pagination
-    const totalCount = await prisma.mediaFile.count({ where });
+    if (mimeType) {
+      if (messageWhere.OR) {
+        messageWhere.OR.push({ mediaFiles: { some: { mimeType: { contains: String(mimeType), mode: 'insensitive' } } } });
+      } else {
+        messageWhere.OR = [{ mediaFiles: { some: { mimeType: { contains: String(mimeType), mode: 'insensitive' } } } }];
+      }
+    }
+
+    const totalCount = await prisma.message.count({ where: messageWhere });
     const totalPages = Math.ceil(totalCount / sizeNum) || 1;
     const skip = (pageNum - 1) * sizeNum;
 
-    const mediaFiles = await prisma.mediaFile.findMany({
-      where,
-      orderBy: { message: { createdAt: 'desc' } },
+    const messages = await prisma.message.findMany({
+      where: messageWhere,
+      orderBy: { createdAt: 'desc' },
       skip,
       take: sizeNum,
-      include: { message: true },
+      include: { mediaFiles: true },
     });
 
-    const mediaItems = mediaFiles.map((mf) => ({
-      mediaId: mf.id,
-      messageId: mf.messageId,
-      conversationId: mf.message.conversationId,
-      senderId: mf.message.senderId,
-      type: mf.mimeType || mf.cloudinaryResourceType || mf.message.type,
-      url: buildCloudinaryUrl(mf.cloudinaryPublicId, { resource_type: mf.cloudinaryResourceType || 'auto' }),
-      thumbnailUrl: mf.thumbnailKey ? buildCloudinaryUrl(mf.thumbnailKey, { resource_type: mf.cloudinaryResourceType || 'image' }) : mf.message.thumbnailUrl || null,
-      mimeType: mf.mimeType,
-      fileSize: mf.fileSize,
-      width: mf.width,
-      height: mf.height,
-      duration: mf.duration,
-      createdAt: mf.message.createdAt,
-      fileName: mf.originalName || mf.message.fileName || null,
-    }));
+    const mediaItems = messages.flatMap((m) => {
+      if (m.mediaFiles && m.mediaFiles.length > 0) {
+        return m.mediaFiles.map((mf) => {
+          let itemType = mf.cloudinaryResourceType || m.type || '';
+          if (mf.mimeType) itemType = mf.mimeType.split('/')[0];
+          if (!['image', 'video', 'audio', 'location'].includes(itemType)) itemType = 'document';
+
+          return {
+            mediaId: mf.id,
+            messageId: m.id,
+            conversationId: m.conversationId,
+            senderId: m.senderId,
+            type: itemType,
+            url: buildCloudinaryUrl(mf.cloudinaryPublicId, { resource_type: mf.cloudinaryResourceType || 'auto' }),
+            thumbnailUrl: mf.thumbnailKey ? buildCloudinaryUrl(mf.thumbnailKey, { resource_type: mf.cloudinaryResourceType || 'image' }) : m.thumbnailUrl || null,
+            mimeType: mf.mimeType,
+            fileSize: mf.fileSize != null ? String(mf.fileSize) : null,
+            width: mf.width,
+            height: mf.height,
+            duration: mf.duration,
+            createdAt: m.createdAt,
+            fileName: mf.originalName || m.fileName || m.caption || null,
+          };
+        });
+      }
+
+      if (!m.content) return [];
+
+      let fallbackType = m.type;
+      if (['text', 'unknown'].includes(fallbackType) || !fallbackType) {
+        const urlLower = m.content.toLowerCase();
+        if (urlLower.match(/\.(jpg|jpeg|png|gif|webp|heic)(\?.*)?$/)) fallbackType = 'image';
+        else if (urlLower.match(/\.(mp4|webm|ogg|mov)(\?.*)?$/)) fallbackType = 'video';
+        else if (urlLower.match(/\.(mp3|wav|ogg|m4a)(\?.*)?$/)) fallbackType = 'audio';
+        else fallbackType = 'document';
+      }
+
+      const fallbackUrl = m.content.startsWith('http')
+        ? m.content
+        : buildCloudinaryUrl(m.content, { resource_type: fallbackType === 'document' ? 'raw' : fallbackType });
+
+      return [{
+        mediaId: m.id,
+        messageId: m.id,
+        conversationId: m.conversationId,
+        senderId: m.senderId,
+        type: fallbackType,
+        url: fallbackUrl,
+        thumbnailUrl: m.thumbnailUrl || null,
+        mimeType: null,
+        fileSize: null,
+        width: null,
+        height: null,
+        duration: null,
+        createdAt: m.createdAt,
+        fileName: m.fileName || m.caption || m.content,
+      }];
+    });
 
     return res.status(200).json({
       totalCount,
@@ -174,7 +281,30 @@ export const downloadMedia = async (req, res, next) => {
       where: { id: mediaId },
       include: { message: { include: { conversation: { include: { participants: true } } } } },
     });
-    if (!media) return res.status(404).json({ message: "Media not found" });
+
+    // If no formal MediaFile is found, check if it's a legacy Message that holds the Cloudinary ID natively
+    if (!media) {
+      const message = await prisma.message.findUnique({
+        where: { id: mediaId },
+        include: { conversation: { include: { participants: true } } }
+      });
+
+      if (!message || !message.content) {
+        return res.status(404).json({ message: "Media not found" });
+      }
+
+      const isParticipant = message.conversation.participants.some((p) => p.userId === userId);
+      if (!isParticipant) return res.status(403).json({ message: "Forbidden" });
+
+      const url = message.content.startsWith('http')
+        ? message.content
+        : buildCloudinaryDownloadUrl(message.content, {
+          resource_type: "auto",
+          fileNameOverride: message.fileName || message.caption || undefined,
+        });
+
+      return res.status(200).json({ url });
+    }
 
     const isParticipant = media.message.conversation.participants.some((p) => p.userId === userId);
     if (!isParticipant) return res.status(403).json({ message: "Forbidden" });
@@ -182,7 +312,7 @@ export const downloadMedia = async (req, res, next) => {
     // Optional: increment download counter
     try {
       await prisma.mediaFile.update({ where: { id: mediaId }, data: { downloadCount: (media.downloadCount || 0) + 1 } });
-    } catch (_) {}
+    } catch (_) { }
 
     const url = buildCloudinaryDownloadUrl(media.cloudinaryPublicId, {
       resource_type: media.cloudinaryResourceType || "auto",

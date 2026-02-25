@@ -1,5 +1,7 @@
 "use client";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useClickOutside } from "@/hooks/useClickOutside";
+import { usePopoverPosition } from "@/hooks/usePopoverPosition";
 import { createPortal } from "react-dom";
 
 // Create or get portal root
@@ -20,13 +22,12 @@ export default function ActionSheet({
   onClose,
   items = [],
   align = "right",
-  placement = "below",
+  placement = "bottom",
   className = "",
   style = {},
   anchorRef,
 }) {
   const ref = useRef(null);
-  const [coords, setCoords] = useState({ top: 0, left: 0, visibility: "hidden" });
   const [portalRoot, setPortalRoot] = useState(null);
 
   // Initialize portal root
@@ -35,53 +36,17 @@ export default function ActionSheet({
   }, []);
 
   // Click and escape to dismiss, responsive for mobile/touch too
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose?.();
-    };
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
-    if (open) {
-      document.addEventListener("mousedown", onDocClick);
-      document.addEventListener("keydown", onKey);
-      document.addEventListener("touchstart", onDocClick, { passive: true });
-    }
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("touchstart", onDocClick);
-    };
-  }, [open, onClose]);
+  useClickOutside(open, onClose, [ref, anchorRef]);
 
-  // Responsive positioning clamps so sheet is always in-bounds
-  useLayoutEffect(() => {
-    if (!open) return;
-    const position = () => {
-      const anchor = anchorRef?.current;
-      const sheet = ref.current;
-      if (!anchor || !sheet) return;
-      const rect = anchor.getBoundingClientRect();
-      const sheetRect = sheet.getBoundingClientRect();
-      let left = rect.left;
-      if (align === "center") left = rect.left + rect.width / 2 - sheetRect.width / 2;
-      else if (align === "right") left = rect.right - sheetRect.width;
-      left = Math.max(8, Math.min(left, window.innerWidth - sheetRect.width - 8));
-      const gap = 8;
-      let top = placement === "above" ? rect.top - sheetRect.height - gap : rect.bottom + gap;
-      top = Math.max(8, Math.min(top, window.innerHeight - sheetRect.height - 8));
-      setCoords({ top, left, visibility: "visible" });
-    };
-    setCoords((c) => ({ ...c, visibility: "hidden" }));
-    const id = requestAnimationFrame(position);
-    window.addEventListener("resize", position);
-    window.addEventListener("scroll", position, true);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener("resize", position);
-      window.removeEventListener("scroll", position, true);
-    };
-  }, [open, align, placement, anchorRef]);
+  // Use Custom Positioning Hook
+  const coords = usePopoverPosition({
+    open,
+    anchorRef,
+    popoverRef: ref,
+    placement,
+    align,
+    gap: 8
+  });
 
   if (!open || !portalRoot) return null;
 

@@ -19,14 +19,11 @@ function VideoMessage({ message, isIncoming }) {
   const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
   const [loaded, setLoaded] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const videoRef = React.useRef(null);
 
   const hasCaption = typeof message?.caption === "string" && message.caption.trim().length > 0;
 
   useEffect(() => {
     setLoaded(false);
-    setIsPlaying(false);
   }, [message?.content]);
 
   const chatMessages = useChatStore((s) => s.messages) || [];
@@ -50,17 +47,6 @@ function VideoMessage({ message, isIncoming }) {
   const initialMediaIndex = React.useMemo(() => {
     return mediaItems.findIndex((mi) => Number(mi.mediaId) === Number(message?.id));
   }, [mediaItems, message?.id]);
-
-  const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
 
   return (
     <>
@@ -101,20 +87,14 @@ function VideoMessage({ message, isIncoming }) {
             </div>
           )}
 
-          {/* Video element */}
-          <div className="relative max-w-[480px]">
+          {/* Video element acting as thumbnail */}
+          <div className="relative max-w-[480px]" onClick={() => setShowPreview(true)}>
             <video
-              ref={videoRef}
               src={message?.content}
-              className={`w-full max-w-[480px] h-auto max-h-[400px] sm:max-h-[500px] object-contain ${loaded ? 'block' : 'hidden'
+              className={`w-full max-w-[480px] h-auto max-h-[400px] sm:max-h-[500px] object-cover ${loaded ? 'block' : 'hidden'
                 }`}
               onLoadedData={() => setLoaded(true)}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onEnded={() => setIsPlaying(false)}
-              onClick={() => setShowPreview(true)}
               preload="metadata"
-              playsInline
               crossOrigin="anonymous"
             >
               <source src={message?.content} type="video/mp4" />
@@ -123,22 +103,17 @@ function VideoMessage({ message, isIncoming }) {
               Your browser does not support the video tag.
             </video>
 
-            {/* Play button overlay (when not playing) */}
-            {loaded && !isPlaying && (
+            {/* Always visible Play button overlay */}
+            {loaded && (
               <div
                 className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePlayPause();
-                }}
               >
-                <button
-                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-ancient-icon-glow/90 hover:bg-ancient-icon-glow flex items-center justify-center shadow-xl transition-all duration-200 hover:scale-110"
-                  aria-label="Play video"
-                  type="button"
+                <div
+                  className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-ancient-icon-glow/90 group-hover:bg-ancient-icon-glow flex items-center justify-center shadow-xl transition-all duration-200 hover:scale-110"
+                  aria-label="Open Video Viewer"
                 >
                   <FaPlay className="text-xl sm:text-2xl text-ancient-bg-dark ml-1" />
-                </button>
+                </div>
               </div>
             )}
           </div>

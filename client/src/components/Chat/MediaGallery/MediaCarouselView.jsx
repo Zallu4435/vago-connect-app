@@ -4,7 +4,7 @@ import { MdClose, MdAudiotrack, MdLocationOn, MdDescription, MdInsertDriveFile, 
 import { BsFillPlayFill, BsPauseFill } from "react-icons/bs"; // For audio/video controls
 import Image from "next/image"; // For robust image display
 
-export default function MediaCarouselView({ mediaItems, initialIndex, onClose, onDownload }) {
+export default function MediaCarouselView({ mediaItems, initialIndex, onClose, onDownload, isDownloading }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [mediaLoaded, setMediaLoaded] = useState(false); // State to track current media load
   const videoRef = useRef(null); // Ref for video playback control
@@ -13,13 +13,15 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
 
   const currentMedia = useMemo(() => mediaItems[currentIndex], [mediaItems, currentIndex]);
 
+  const isDocumentType = !String(currentMedia.type).startsWith("image") && !String(currentMedia.type).startsWith("video") && !String(currentMedia.type).startsWith("audio");
+
   // Reset mediaLoaded state when currentMedia changes
   useEffect(() => {
-    setMediaLoaded(false);
+    setMediaLoaded(isDocumentType); // Auto-load if it's a document (no load event)
     setIsPlaying(false); // Reset play state
     if (videoRef.current) videoRef.current.pause();
     if (audioRef.current) audioRef.current.pause();
-  }, [currentMedia]);
+  }, [currentMedia, isDocumentType]);
 
   const goToNext = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % mediaItems.length);
@@ -75,34 +77,40 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
   const isDirectlyDisplayable = String(currentMedia.type).startsWith("image") || String(currentMedia.type).startsWith("video") || String(currentMedia.type).startsWith("audio");
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/95 animate-fade-in backdrop-blur-sm">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between bg-ancient-bg-dark/80 text-ancient-text-light shadow-2xl z-[61] border-b border-ancient-border-stone/50">
-        <h3 className="text-xl font-bold text-ancient-icon-glow">{currentMedia.fileName || "Media Preview"}</h3>
-        <div className="flex items-center gap-4">
+      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent text-white z-[101]">
+        <div className="flex flex-col">
+          <h3 className="text-lg font-medium text-white/90 drop-shadow-md">{currentMedia.fileName || "Media"}</h3>
+          <span className="text-xs text-white/60">{new Date(currentMedia.createdAt).toLocaleString()}</span>
+        </div>
+        <div className="flex items-center gap-3">
           {onDownload && (
             <button
-              className="p-2 rounded-full bg-ancient-bg-medium/70 hover:bg-ancient-bubble-user-light text-ancient-text-light transition-colors duration-200 shadow-md"
+              className="p-2 text-white/80 hover:text-white transition-colors duration-200"
               onClick={() => onDownload(currentMedia.mediaId)}
-              title="Download Scroll"
-              aria-label="Download Scroll"
+              title="Download"
+              disabled={isDownloading}
             >
-              <MdDownload className="text-2xl" />
+              {isDownloading ? (
+                <MdAutorenew className="text-2xl drop-shadow-md animate-spin" />
+              ) : (
+                <MdDownload className="text-2xl drop-shadow-md" />
+              )}
             </button>
           )}
           <button
-            className="p-2 rounded-full bg-red-700/70 hover:bg-red-600 text-white transition-colors duration-200 shadow-md"
+            className="p-2 text-white/80 hover:text-white transition-colors duration-200"
             onClick={onClose}
-            title="Banish Vision"
-            aria-label="Close Media Viewer"
+            title="Close"
           >
-            <MdClose className="text-2xl" />
+            <MdClose className="text-2xl drop-shadow-md" />
           </button>
         </div>
       </div>
 
       {/* Main Media Content Area */}
-      <div className="relative flex items-center justify-center flex-grow w-full h-full p-4">
+      <div className="relative flex items-center justify-center flex-grow w-full h-full p-4 pt-24 pb-32">
         {!mediaLoaded && ( // Loading Spinner
           <div className="absolute inset-0 flex items-center justify-center z-50">
             <MdAutorenew className="text-7xl text-ancient-icon-glow animate-spin" />
@@ -112,32 +120,33 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
         {/* Previous Button */}
         {mediaItems.length > 1 && (
           <button
-            className="absolute left-6 z-[61] p-3 rounded-full bg-ancient-bg-dark/70 text-ancient-text-light hover:bg-ancient-bubble-user-light transition-colors duration-200 shadow-xl"
+            className="absolute left-2 sm:left-6 z-[101] p-2 text-white/50 hover:text-white transition-colors duration-200"
             onClick={goToPrev}
-            title="Previous Enchantment"
-            aria-label="Previous Enchantment"
+            title="Previous"
           >
-            <MdChevronLeft className="text-3xl" />
+            <MdChevronLeft className="text-5xl drop-shadow-lg" />
           </button>
         )}
 
         {/* Media Display */}
-        <div className="flex items-center justify-center w-full h-full max-w-full max-h-full">
+        <div className="relative flex items-center justify-center w-full h-full max-w-full max-h-full">
           {String(currentMedia.type).startsWith("image") && (
-            <Image
-              src={currentMedia.url}
-              alt={currentMedia.fileName || "Image"}
-              fill // Use fill for responsiveness
-              className={`object-contain rounded-lg shadow-2xl transition-opacity duration-300 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}
-              onLoad={() => setMediaLoaded(true)}
-              onError={() => setMediaLoaded(true)} // Still mark loaded even if error
-            />
+            <div className="relative w-full h-full">
+              <Image
+                src={currentMedia.url}
+                alt={currentMedia.fileName || "Image"}
+                fill
+                className={`object-contain transition-opacity duration-300 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}
+                onLoad={() => setMediaLoaded(true)}
+                onError={() => setMediaLoaded(true)}
+              />
+            </div>
           )}
           {String(currentMedia.type).startsWith("video") && (
             <video
               ref={videoRef}
               src={currentMedia.url}
-              controls={false} // Custom controls
+              controls
               loop={false}
               onLoadedData={() => setMediaLoaded(true)}
               onPlay={() => setIsPlaying(true)}
@@ -149,46 +158,41 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
             </video>
           )}
           {String(currentMedia.type).startsWith("audio") && (
-            <div className={`bg-ancient-bg-dark p-10 rounded-xl text-ancient-text-light flex flex-col items-center gap-6 border border-ancient-border-stone shadow-2xl transition-opacity duration-300 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}>
-              <MdAudiotrack className="text-7xl text-ancient-icon-glow animate-pulse" />
-              <p className="text-2xl font-semibold text-center max-w-xs">{currentMedia.fileName || "Voice Message"}</p>
+            <div className={`flex flex-col items-center justify-center gap-8 transition-opacity duration-300 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}>
+              <div className={`flex items-center justify-center w-32 h-32 rounded-full border border-white/20 shadow-2xl backdrop-blur-md bg-white/5 ${isPlaying ? 'animate-pulse' : ''}`}>
+                <MdAudiotrack className="text-5xl text-white/90" />
+              </div>
               <audio
                 ref={audioRef}
                 src={currentMedia.url}
-                controls={false} // Custom controls
+                controls={false}
                 onLoadedData={() => setMediaLoaded(true)}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onEnded={() => setIsPlaying(false)}
-              ></audio>
+              />
               <button
                 onClick={handleTogglePlay}
-                className="p-4 rounded-full bg-ancient-icon-glow text-ancient-bg-dark hover:bg-green-500 transition-colors shadow-lg"
+                className="flex items-center justify-center w-16 h-16 rounded-full bg-white hover:bg-gray-200 text-black transition-all shadow-[0_0_15px_rgba(255,255,255,0.3)] focus:outline-none"
                 aria-label={isPlaying ? "Pause audio" : "Play audio"}
               >
-                {isPlaying ? <BsPauseFill className="text-3xl" /> : <BsFillPlayFill className="text-3xl" />}
+                {isPlaying ? <BsPauseFill className="text-3xl" /> : <BsFillPlayFill className="text-3xl ml-1" />}
               </button>
             </div>
           )}
-          {!isDirectlyDisplayable && ( // For documents, location, or other unsupported types
-            <div className={`bg-ancient-bg-dark p-10 rounded-xl text-ancient-text-light flex flex-col items-center gap-6 border border-ancient-border-stone shadow-2xl transition-opacity duration-300 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}>
-              <DisplayIcon className="text-7xl text-ancient-icon-glow" />
-              <p className="text-2xl font-semibold text-center max-w-xs">{currentMedia.fileName || "Document"}</p>
-              <p className="text-sm text-ancient-text-muted">Type: {currentMedia.type}</p>
-              <a
-                href={currentMedia.url}
-                target="_blank"
-                rel="noreferrer"
-                className="bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark font-semibold px-6 py-3 rounded-lg shadow-md transition-colors duration-200 flex items-center gap-2"
-              >
-                <MdDescription className="text-xl" /> View Tome
-              </a>
-              <button
-                className="mt-2 bg-blue-400 hover:bg-blue-500 text-gray-800 font-semibold px-4 py-2 rounded-lg shadow-md transition-colors duration-200"
-                onClick={() => onDownload(currentMedia.mediaId)}
-              >
-                <MdDownload className="inline-block mr-2" /> Download Tome
-              </button>
+          {!isDirectlyDisplayable && (
+            <div className={`flex flex-col items-center justify-center gap-6 transition-opacity duration-300 ${mediaLoaded ? 'opacity-100' : 'opacity-0'}`}>
+              <DisplayIcon className="text-6xl text-white/80" />
+              <div className="flex gap-4 mt-2">
+                <a
+                  href={currentMedia.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-5 py-2 rounded-full border border-white/20 transition-all flex items-center gap-2 backdrop-blur-sm"
+                >
+                  <MdDescription className="text-lg" /> View File
+                </a>
+              </div>
             </div>
           )}
         </div>
@@ -196,41 +200,44 @@ export default function MediaCarouselView({ mediaItems, initialIndex, onClose, o
         {/* Next Button */}
         {mediaItems.length > 1 && (
           <button
-            className="absolute right-6 z-[61] p-3 rounded-full bg-ancient-bg-dark/70 text-ancient-text-light hover:bg-ancient-bubble-user-light transition-colors duration-200 shadow-xl"
+            className="absolute right-2 sm:right-6 z-[101] p-2 text-white/50 hover:text-white transition-colors duration-200"
             onClick={goToNext}
-            title="Next Enchantment"
-            aria-label="Next Enchantment"
+            title="Next"
           >
-            <MdChevronRight className="text-3xl" />
+            <MdChevronRight className="text-5xl drop-shadow-lg" />
           </button>
         )}
       </div>
 
       {/* Footer with Caption & Thumbnails */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 flex flex-col bg-ancient-bg-dark/80 text-ancient-text-light shadow-2xl z-[61] border-t border-ancient-border-stone/50">
+      <div className="absolute bottom-0 left-0 right-0 p-4 pb-6 flex flex-col bg-gradient-to-t from-black via-black/80 to-transparent text-white z-[101]">
         {currentMedia.caption && (
-          <p className="text-base text-center mb-2 leading-snug max-w-3xl mx-auto line-clamp-3">{currentMedia.caption}</p>
+          <p className="text-base text-center mb-4 leading-snug max-w-3xl mx-auto drop-shadow-md text-white/90">{currentMedia.caption}</p>
         )}
-        <p className="text-xs text-ancient-text-muted text-center mb-4">{new Date(currentMedia.createdAt).toLocaleString()}</p>
 
         {mediaItems.length > 1 && (
-          <div className="flex justify-center gap-2 overflow-x-auto custom-scrollbar pb-1">
+          <div className="flex justify-center gap-2 overflow-x-auto custom-scrollbar pt-2">
             {mediaItems.map((item, idx) => {
-              const isImage = item.type?.startsWith("image/");
+              const isImage = String(item.type).startsWith("image");
+              const isVideo = String(item.type).startsWith("video");
               const isSelected = idx === currentIndex;
               return (
                 <button
-                  key={item.id || idx} // Use a unique ID or index
+                  key={item.id || idx}
                   onClick={() => setCurrentIndex(idx)}
-                  className={`relative flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200
-                    ${isSelected ? "border-ancient-icon-glow ring-2 ring-ancient-icon-glow" : "border-transparent hover:border-ancient-border-stone"}`}
+                  className={`relative flex-shrink-0 w-12 h-12 rounded-md overflow-hidden transition-all duration-200
+                    ${isSelected ? "ring-2 ring-white scale-110 z-10 opacity-100" : "opacity-50 hover:opacity-100"} `}
                   title={item.fileName || `Media ${idx + 1}`}
                 >
                   {isImage ? (
                     <Image src={item.url} alt="thumbnail" fill className="object-cover" />
+                  ) : isVideo ? (
+                    <div className="relative w-full h-full bg-black">
+                      <video src={item.url} className="w-full h-full object-cover opacity-80" />
+                    </div>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-ancient-bg-medium text-ancient-text-muted text-xs">
-                      <MdInsertDriveFile className="text-2xl text-ancient-icon-glow" />
+                    <div className="w-full h-full flex items-center justify-center bg-gray-800 text-white/80">
+                      <MdInsertDriveFile className="text-xl" />
                     </div>
                   )}
                 </button>

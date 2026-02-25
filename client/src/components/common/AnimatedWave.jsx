@@ -17,7 +17,10 @@ export default function AnimatedWave({ isPlaying, progress = 0 }) {
               height: '100%',
               transformOrigin: 'bottom',
               transform: isPlaying ? undefined : `scaleY(${h})`,
-              animation: isPlaying ? `audio-wave ${0.4 + (i % 3) * 0.2}s ease-in-out infinite` : 'none',
+              animationName: isPlaying ? 'audio-wave' : 'none',
+              animationDuration: isPlaying ? `${0.4 + (i % 3) * 0.2}s` : '0s',
+              animationTimingFunction: 'ease-in-out',
+              animationIterationCount: 'infinite',
               animationDelay: `${i * 0.05}s`,
             }}
           />

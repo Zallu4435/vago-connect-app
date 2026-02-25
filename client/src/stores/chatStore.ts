@@ -12,6 +12,7 @@ interface ChatState {
   onlineUsers: number[];
   allContactsPage: boolean;
   replyTo: Message | null;
+  editMessage: Message | null;
 
   setUserContacts: (contacts: Contact[]) => void;
   setFilteredContacts: (contacts: Contact[]) => void;
@@ -25,6 +26,8 @@ interface ChatState {
   setAllContactsPage: (value: boolean) => void;
   setReplyTo: (message: Message | null) => void;
   clearReplyTo: () => void;
+  setEditMessage: (message: Message | null) => void;
+  clearEditMessage: () => void;
   updateMessageStatus: (id: number, status: MessageStatusType) => void;
 }
 
@@ -40,6 +43,7 @@ export const useChatStore = create<ChatState>()(
       onlineUsers: [],
       allContactsPage: false,
       replyTo: null,
+      editMessage: null,
 
       setUserContacts: (contacts) => set({ userContacts: contacts }),
       setFilteredContacts: (contacts) => set({ filteredContacts: contacts }),
@@ -57,6 +61,8 @@ export const useChatStore = create<ChatState>()(
       setAllContactsPage: (value) => set({ allContactsPage: value }),
       setReplyTo: (message) => set({ replyTo: message }),
       clearReplyTo: () => set({ replyTo: null }),
+      setEditMessage: (message) => set({ editMessage: message }),
+      clearEditMessage: () => set({ editMessage: null }),
       updateMessageStatus: (id, status) =>
         set((state) => ({
           messages: state.messages.map((m) =>

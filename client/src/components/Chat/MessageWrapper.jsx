@@ -1,13 +1,18 @@
 "use client";
 import React from "react";
-import Avatar from "@/components/common/Avatar";
-import MessageActions from "./MessageActions";
-
+import BaseMessageLayout from "./BaseMessageLayout";
 import { useChatStore } from "@/stores/chatStore";
 
+import TextMessage from "./messages/TextMessage";
+import ImageMessage from "./messages/ImageMessage";
+import AudioMessage from "./messages/AudioMessage";
+import VideoMessage from "./messages/VideoMessage";
+import DocumentMessage from "./messages/DocumentMessage";
+import DeletedMessage from "./messages/DeletedMessage";
+
 /**
- * MessageWrapper - Unified wrapper for all message types
- * Handles layout, avatar positioning, alignment, and common message features
+ * MessageWrapper - Unified wrapper for all single message types
+ * Defers shared structural UI (Avatars, Checks, Reactions) to BaseMessageLayout
  */
 function MessageWrapper({
     message,
@@ -17,7 +22,6 @@ function MessageWrapper({
     onToggleSelect,
     onReply,
     onForward,
-    children,
 }) {
     const currentChatUser = useChatStore((s) => s.currentChatUser);
     const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
@@ -25,84 +29,51 @@ function MessageWrapper({
     const isSelected = selectedIds?.includes(message.id);
 
     return (
-        <div
-            className={`relative w-full flex ${isIncoming ? 'justify-start' : 'justify-end'} py-1`}
+        <BaseMessageLayout
+            isIncoming={isIncoming}
+            isGroup={isGroup}
+            senderAvatar={senderAvatar}
+            hasSender={!!message?.sender}
+            selectMode={selectMode}
+            isSelected={isSelected}
+            onSelectToggle={() => onToggleSelect?.(message.id)}
+            reactions={message.isDeletedForEveryone ? [] : message.reactions}
+            reactionAnchorMessage={message}
+            actionAnchorMessage={message}
+            showActions={!message.isDeletedForEveryone}
+            onReply={onReply}
+            onForward={onForward}
         >
-            {/* Selection checkbox when selectMode is on */}
-            {selectMode && (
-                <input
-                    type="checkbox"
-                    className="mr-2 sm:mr-3 mt-2 form-checkbox h-4 w-4 sm:h-5 sm:w-5 text-ancient-icon-glow border-ancient-border-stone rounded focus:ring-0 cursor-pointer flex-shrink-0"
-                    checked={isSelected}
-                    onChange={() => onToggleSelect?.(message.id)}
-                />
-            )}
-
-            {/* Message content with avatar */}
-            <div className={`flex gap-2 items-end max-w-[85%] md:max-w-[80%]`}>
-                {/* Avatar for incoming messages (left side) */}
-                {isGroup && isIncoming && message?.sender && (
-                    <div className="flex-shrink-0 mb-1">
-                        <Avatar
-                            type="sm"
-                            image={senderAvatar}
-                            setImage={() => { }}
-                            defaultImage="/default_avatar.png"
-                        />
-                    </div>
-                )}
-
-                {/* Message bubble and metadata */}
-                <div className="flex flex-col gap-1 min-w-0">
-
-                    {/* Message content with actions */}
-                    <div className="relative group">
-                        {children}
-                        {!message.isDeletedForEveryone && (
-                            <MessageActions
-                                message={message}
-                                isIncoming={isIncoming}
-                                onReply={onReply}
-                                onForward={onForward}
-                            />
-                        )}
-                    </div>
-
-                    {/* Reactions */}
-                    {Array.isArray(message.reactions) && message.reactions.length > 0 && (
-                        <div className="flex gap-2 text-xs mt-1 px-2 flex-wrap">
-                            {Object.entries(
-                                message.reactions.reduce((acc, r) => {
-                                    const key = r.emoji || r;
-                                    acc[key] = (acc[key] || 0) + 1;
-                                    return acc;
-                                }, {})
-                            ).map(([emoji, count]) => (
-                                <span
-                                    key={emoji}
-                                    className="px-2 py-1 rounded-full bg-ancient-input-bg/60 border border-ancient-border-stone/40 shadow-sm backdrop-blur-sm text-[11px] sm:text-xs"
-                                >
-                                    {emoji} {count > 1 && count}
-                                </span>
-                            ))}
-                        </div>
+            {message.isDeletedForEveryone ? (
+                <DeletedMessage message={message} isIncoming={isIncoming} />
+            ) : (
+                <>
+                    {message.type === "text" && (
+                        <TextMessage message={message} isIncoming={isIncoming} />
                     )}
-                </div>
-
-                {/* Avatar for outgoing messages (right side) */}
-                {isGroup && !isIncoming && message?.sender && (
-                    <div className="flex-shrink-0 mb-1">
-                        <Avatar
-                            type="sm"
-                            image={senderAvatar}
-                            setImage={() => { }}
-                            defaultImage="/default_avatar.png"
-                        />
-                    </div>
-                )}
-            </div>
-        </div>
+                    {message.type === "image" && (
+                        <ImageMessage message={message} isIncoming={isIncoming} />
+                    )}
+                    {(message.type === "audio" || message.type === "voice") && (
+                        <AudioMessage message={message} isIncoming={isIncoming} />
+                    )}
+                    {message.type === "video" && (
+                        <VideoMessage message={message} isIncoming={isIncoming} />
+                    )}
+                    {(message.type === "document" || (!['text', 'image', 'audio', 'video', 'location', 'voice'].includes(String(message.type || '')))) && (
+                        <DocumentMessage message={message} isIncoming={isIncoming} />
+                    )}
+                </>
+            )}
+        </BaseMessageLayout>
     );
 }
 
-export default MessageWrapper;
+export default React.memo(MessageWrapper, (prev, next) => {
+    return (
+        prev.message === next.message &&
+        prev.isIncoming === next.isIncoming &&
+        prev.selectMode === next.selectMode &&
+        prev.selectedIds?.includes(prev.message.id) === next.selectedIds?.includes(next.message.id)
+    );
+});

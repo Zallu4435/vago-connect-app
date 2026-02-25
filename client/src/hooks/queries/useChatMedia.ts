@@ -1,4 +1,4 @@
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { useInfiniteQuery, UseInfiniteQueryResult } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { GET_CHAT_MEDIA_ROUTE } from '@/utils/ApiRoutes';
 
@@ -26,19 +26,29 @@ interface ChatMediaItem {
   fileName?: string | null;
 }
 
-export function useChatMedia(params: ChatMediaQuery): UseQueryResult<{ items: ChatMediaItem[]; count: number }, Error> {
-  const { chatId, type, limit = 20, offset = 0 } = params;
-  return useQuery<{ items: ChatMediaItem[]; count: number }, Error>({
-    queryKey: ['chat-media', chatId, type, limit, offset],
+export function useChatMedia(params: ChatMediaQuery) {
+  const { chatId, type, limit = 20 } = params;
+
+  return useInfiniteQuery<{ items: ChatMediaItem[]; count: number }, Error>({
+    queryKey: ['chat-media', chatId, type, limit],
+    initialPageParam: 0,
     enabled: Boolean(chatId),
-    queryFn: async () => {
+    queryFn: async ({ pageParam = 0 }) => {
       const search = new URLSearchParams();
       if (type) search.set('type', type);
       if (limit != null) search.set('limit', String(limit));
-      if (offset != null) search.set('offset', String(offset));
+      if (pageParam != null) search.set('offset', String(pageParam));
+
       const url = `${GET_CHAT_MEDIA_ROUTE(chatId!)}?${search.toString()}`;
       const { data } = await api.get(url);
+
       return (data as { items: ChatMediaItem[]; count: number }) || { items: [], count: 0 };
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      if (lastPage?.items?.length === limit) {
+        return allPages.length * limit;
+      }
+      return undefined;
     },
     staleTime: 60_000,
   });

@@ -49,7 +49,18 @@ export const reactToMessage = async (req, res, next) => {
     }
 
     // Return updated reactions for the message
-    const reactions = await prisma.messageReaction.findMany({ where: { messageId: id } });
+    const reactions = await prisma.messageReaction.findMany({
+      where: { messageId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true
+          }
+        }
+      }
+    });
 
     // Emit to all participants
     try {
@@ -59,7 +70,7 @@ export const reactToMessage = async (req, res, next) => {
           if (sid) global.io.to(sid).emit("message-reacted", { messageId: id, emoji, userId: requesterId, action, reactions });
         });
       }
-    } catch (_) {}
+    } catch (_) { }
 
     return res.status(200).json({ id, reactions });
   } catch (error) {

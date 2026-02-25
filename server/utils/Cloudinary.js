@@ -13,7 +13,7 @@ export function initCloudinary() {
       apiKeyPresent: Boolean(CLOUDINARY_API_KEY),
       apiSecretPresent: Boolean(CLOUDINARY_API_SECRET),
     });
-  } catch (_) {}
+  } catch (_) { }
   cloudinary.config({
     cloud_name: CLOUDINARY_CLOUD_NAME,
     api_key: CLOUDINARY_API_KEY,
@@ -22,7 +22,7 @@ export function initCloudinary() {
   });
   try {
     console.log('[Cloudinary:init] configured', { cloudName: CLOUDINARY_CLOUD_NAME });
-  } catch (_) {}
+  } catch (_) { }
   return cloudinary;
 }
 
@@ -35,12 +35,12 @@ export function uploadBuffer(buffer, options = {}) {
         options,
         ts: Date.now(),
       });
-    } catch (_) {}
+    } catch (_) { }
     const stream = cld.uploader.upload_stream(
       { resource_type: 'auto', ...options },
       (error, result) => {
         if (error) {
-          try { console.error('[Cloudinary:uploadBuffer] error', { error }); } catch (_) {}
+          try { console.error('[Cloudinary:uploadBuffer] error', { error }); } catch (_) { }
           return reject(error);
         }
         try {
@@ -50,7 +50,7 @@ export function uploadBuffer(buffer, options = {}) {
             resource_type: result?.resource_type,
             format: result?.format,
           });
-        } catch (_) {}
+        } catch (_) { }
         resolve(result);
       }
     );
@@ -80,5 +80,26 @@ export function buildCloudinaryDownloadUrl(publicId, opts = {}) {
     flags: 'attachment',
     filename_override: fileNameOverride,
     sign_url: false,
+  });
+}
+
+// Safely destroys an orphaned Cloudinary file using its public_id.
+export function deleteCloudinaryFile(publicId, resourceType = 'image') {
+  return new Promise((resolve) => {
+    if (!publicId) return resolve(false);
+    const cld = initCloudinary();
+    try {
+      console.log('[Cloudinary:deleteFile] start destroying orphaned file', { publicId, resourceType });
+    } catch (_) { }
+
+    cld.uploader.destroy(publicId, { resource_type: resourceType }, (error, result) => {
+      if (error) {
+        try { console.error('[Cloudinary:deleteFile] Failed to destroy', { error }); } catch (_) { }
+        // Don't reject, just resolve false so it doesn't crash the server recovery loop
+        return resolve(false);
+      }
+      try { console.log('[Cloudinary:deleteFile] Successfully destroyed', { result }); } catch (_) { }
+      resolve(true);
+    });
   });
 }

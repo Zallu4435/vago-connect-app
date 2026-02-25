@@ -113,7 +113,7 @@ function SelectMessagesBar({
         onClose={() => setSheetOpen(false)}
         anchorRef={actionsBtnRef}
         align="right"
-        placement="below"
+        placement="bottom"
         items={[
           {
             label: "Forward",

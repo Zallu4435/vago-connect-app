@@ -82,6 +82,7 @@ function Avatar({ type, image, setImage, defaultImage = "", isGroup = false }) {
                 alt="avatar"
                 className="rounded-full object-cover"
                 fill
+                sizes="(max-width: 768px) 100vw, 300px"
                 onError={() => setSrc("")}
                 priority={type === "sm"}
               />
@@ -140,6 +141,7 @@ function Avatar({ type, image, setImage, defaultImage = "", isGroup = false }) {
                   alt="avatar"
                   className="rounded-full object-cover"
                   fill
+                  sizes="(max-width: 768px) 100vw, 300px"
                   onError={() => setSrc("")}
                   priority={true}
                 />

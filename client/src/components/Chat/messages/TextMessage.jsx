@@ -42,7 +42,7 @@ function TextMessage({ message, isIncoming }) {
             {calculateTime(message.timestamp || message.createdAt)}
           </span>
           {message.isEdited && (
-            <span className="text-ancient-text-muted text-[9px] sm:text-[10px] italic">(altered)</span>
+            <span className="text-ancient-text-muted text-[10px] sm:text-[11px] whitespace-nowrap ml-1">Edited</span>
           )}
           {message.senderId === userInfo.id && (
             <span className="flex-shrink-0">

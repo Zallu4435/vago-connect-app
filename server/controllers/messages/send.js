@@ -1,6 +1,6 @@
 import getPrismaInstance from "../../utils/PrismaClient.js";
-import { uploadBuffer } from "../../utils/Cloudinary.js";
-import { getOrCreateDirectConversation, isBlockedBetweenUsers } from "./helpers.js";
+import { uploadBuffer, deleteCloudinaryFile } from "../../utils/Cloudinary.js";
+import { getOrCreateDirectConversation, isBlockedBetweenUsers, resolveConversation } from "./helpers.js";
 
 function buildMediaFileData(messageId, cld, file, extra = {}) {
   return {
@@ -108,8 +108,9 @@ export const addVideo = async (req, res, next) => {
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
-    if (!(req.file.mimetype || '').startsWith('video/')) {
-      return res.status(400).json({ message: "Only video files are allowed" });
+    const mime = req.file.mimetype || '';
+    if (!mime.startsWith('video/')) {
+      return res.status(400).json({ message: "Upload Rejected: Only video files are securely permitted via this endpoint." });
     }
     const recipientOnline = global.onlineUsers?.get?.(to);
     const cld = await uploadBuffer(req.file.buffer, {
@@ -119,29 +120,41 @@ export const addVideo = async (req, res, next) => {
     // Enforce max duration 90s if Cloudinary provided duration
     const durationSec = cld?.duration ? Number(cld.duration) : null;
     if (durationSec && durationSec > 90) {
+      deleteCloudinaryFile(cld.public_id, 'video'); // Cleanup on rejection
       return res.status(400).json({ message: "Video duration exceeds 90 seconds" });
     }
     const contentUrl = cld.secure_url;
-    const blocked = await isBlockedBetweenUsers(prisma, from, to);
-    if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await resolveConversation(prisma, from, to, isGroup);
-    const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
-    const newMessage = await prisma.message.create({
-      data: {
-        conversationId: convo.id,
-        senderId: Number(from),
-        type: "video",
-        content: contentUrl,
-        status: recipientOnline ? "delivered" : "sent",
-        caption: caption && String(caption).trim() ? String(caption).trim() : null,
-        duration: durationSec ? Math.round(durationSec) : null,
-        replyToMessageId: replyData.replyToMessageId,
-        quotedMessage: replyData.quotedMessage,
-      },
-    });
-    try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) }); } catch (_) { }
-    emitMessageSent(convo, newMessage);
-    return res.status(201).json(toMinimalMessage(newMessage));
+
+    try {
+      const blocked = await isBlockedBetweenUsers(prisma, from, to);
+      if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
+      const convo = await resolveConversation(prisma, from, to, isGroup);
+      const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
+      const newMessage = await prisma.message.create({
+        data: {
+          conversationId: convo.id,
+          senderId: Number(from),
+          type: "video",
+          content: contentUrl,
+          status: recipientOnline ? "delivered" : "sent",
+          caption: caption && String(caption).trim() ? String(caption).trim() : null,
+          duration: durationSec ? Math.round(durationSec) : null,
+          replyToMessageId: replyData.replyToMessageId,
+          quotedMessage: replyData.quotedMessage,
+        },
+      });
+      try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) }); } catch (_) { }
+      emitMessageSent(convo, newMessage);
+      return res.status(201).json(toMinimalMessage(newMessage));
+    } catch (insertError) {
+      // Cleanup orphaned file if DB fails
+      try {
+        await deleteCloudinaryFile(cld.public_id, 'video');
+      } catch (e) {
+        console.error("Failed to cleanup Cloudinary file", e);
+      }
+      throw insertError;
+    }
   } catch (error) {
     next(error);
   }
@@ -170,6 +183,10 @@ export const addImage = async (req, res, next) => {
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
+    const mime = req.file.mimetype || '';
+    if (!mime.startsWith('image/')) {
+      return res.status(400).json({ message: "Upload Rejected: Only image files are securely permitted via this endpoint." });
+    }
     const recipientOnline = global.onlineUsers?.get?.(to);
     try {
       console.log('[Image:addImage] uploading to Cloudinary', {
@@ -191,38 +208,49 @@ export const addImage = async (req, res, next) => {
       });
     } catch (_) { }
     const contentUrl = cld.secure_url;
-    const blocked = await isBlockedBetweenUsers(prisma, from, to);
-    if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await resolveConversation(prisma, from, to, isGroup);
-    const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
+
     try {
-      console.log('[Image:addImage] creating message', {
-        conversationId: convo?.id,
-        senderId: Number(from),
-        hasUrl: Boolean(contentUrl),
+      const blocked = await isBlockedBetweenUsers(prisma, from, to);
+      if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
+      const convo = await resolveConversation(prisma, from, to, isGroup);
+      const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
+      try {
+        console.log('[Image:addImage] creating message', {
+          conversationId: convo?.id,
+          senderId: Number(from),
+          hasUrl: Boolean(contentUrl),
+        });
+      } catch (_) { }
+      const newMessage = await prisma.message.create({
+        data: {
+          conversationId: convo.id,
+          senderId: Number(from),
+          type: "image",
+          content: contentUrl,
+          status: recipientOnline ? "delivered" : "sent",
+          caption: caption && String(caption).trim() ? String(caption).trim() : null,
+          replyToMessageId: replyData.replyToMessageId,
+          quotedMessage: replyData.quotedMessage,
+        },
       });
-    } catch (_) { }
-    const newMessage = await prisma.message.create({
-      data: {
-        conversationId: convo.id,
-        senderId: Number(from),
-        type: "image",
-        content: contentUrl,
-        status: recipientOnline ? "delivered" : "sent",
-        caption: caption && String(caption).trim() ? String(caption).trim() : null,
-        replyToMessageId: replyData.replyToMessageId,
-        quotedMessage: replyData.quotedMessage,
-      },
-    });
-    try {
-      await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) });
-      try { console.log('[Image:addImage] mediaFile persisted'); } catch (_) { }
-    } catch (e) {
-      try { console.warn('[Image:addImage] mediaFile persist failed', { message: e?.message }); } catch (_) { }
+      try {
+        await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) });
+        try { console.log('[Image:addImage] mediaFile persisted'); } catch (_) { }
+      } catch (e) {
+        try { console.warn('[Image:addImage] mediaFile persist failed', { message: e?.message }); } catch (_) { }
+      }
+      emitMessageSent(convo, newMessage);
+      try { console.log('[Image:addImage] done', { messageId: newMessage?.id }); } catch (_) { }
+      return res.status(201).json(toMinimalMessage(newMessage));
+    } catch (insertError) {
+      // Cleanup orphaned file if DB fails
+      try {
+        await deleteCloudinaryFile(cld.public_id, 'image');
+      } catch (cleanError) {
+        console.error("Failed to scrub orphaned image", cleanError);
+      }
+      throw insertError;
     }
-    emitMessageSent(convo, newMessage);
-    try { console.log('[Image:addImage] done', { messageId: newMessage?.id }); } catch (_) { }
-    return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
     try {
       console.error('[Image:addImage] error', { message: error?.message, stack: error?.stack });
@@ -244,44 +272,51 @@ export const addAudio = async (req, res, next) => {
       resource_type: 'auto',
     });
     const contentUrl = cld.secure_url;
-    const blocked = await isBlockedBetweenUsers(prisma, from, to);
-    if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await resolveConversation(prisma, from, to, isGroup);
-    const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
-    const newMessage = await prisma.message.create({
-      data: {
-        conversationId: convo.id,
-        senderId: Number(from),
-        type: "audio",
-        content: contentUrl,
-        status: recipientOnline ? "delivered" : "sent",
-        caption: caption && String(caption).trim() ? String(caption).trim() : null,
-        replyToMessageId: replyData.replyToMessageId,
-        quotedMessage: replyData.quotedMessage,
-      },
-    });
+
     try {
-      await prisma.mediaFile.create({
+      const blocked = await isBlockedBetweenUsers(prisma, from, to);
+      if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
+      const convo = await resolveConversation(prisma, from, to, isGroup);
+      const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
+      const newMessage = await prisma.message.create({
         data: {
-          messageId: newMessage.id,
-          storageKey: cld.public_id,
-          originalName: req.file.originalname || null,
-          mimeType: req.file.mimetype || null,
-          fileSize: BigInt(cld.bytes || 0),
-          width: cld.width || null,
-          height: cld.height || null,
-          duration: cld.duration ? Math.round(cld.duration) : null,
-          cloudinaryPublicId: cld.public_id,
-          cloudinaryVersion: cld.version,
-          cloudinaryResourceType: cld.resource_type,
-          cloudinaryFormat: cld.format || null,
-          cloudinaryFolder: (cld.folder || null),
-          cloudinaryAssetId: cld.asset_id || null,
+          conversationId: convo.id,
+          senderId: Number(from),
+          type: "audio",
+          content: contentUrl,
+          status: recipientOnline ? "delivered" : "sent",
+          caption: caption && String(caption).trim() ? String(caption).trim() : null,
+          replyToMessageId: replyData.replyToMessageId,
+          quotedMessage: replyData.quotedMessage,
         },
       });
-    } catch (_) { }
-    emitMessageSent(convo, newMessage);
-    return res.status(201).json(toMinimalMessage(newMessage));
+      try {
+        await prisma.mediaFile.create({
+          data: {
+            messageId: newMessage.id,
+            storageKey: cld.public_id,
+            originalName: req.file.originalname || null,
+            mimeType: req.file.mimetype || null,
+            fileSize: BigInt(cld.bytes || 0),
+            width: cld.width || null,
+            height: cld.height || null,
+            duration: cld.duration ? Math.round(cld.duration) : null,
+            cloudinaryPublicId: cld.public_id,
+            cloudinaryVersion: cld.version,
+            cloudinaryResourceType: cld.resource_type,
+            cloudinaryFormat: cld.format || null,
+            cloudinaryFolder: (cld.folder || null),
+            cloudinaryAssetId: cld.asset_id || null,
+          },
+        });
+      } catch (_) { }
+      emitMessageSent(convo, newMessage);
+      return res.status(201).json(toMinimalMessage(newMessage));
+    } catch (insertError) {
+      // Cleanup orphaned file if DB fails
+      deleteCloudinaryFile(cld.public_id, 'video'); // Audio is often stored as raw/video in cloud
+      throw insertError;
+    }
   } catch (error) {
     next(error);
   }
@@ -294,58 +329,64 @@ export const addFile = async (req, res, next) => {
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
-    const recipientOnline = global.onlineUsers?.get?.(to);
+
     const mime = req.file.mimetype || "application/octet-stream";
-    const inferredType = mime.startsWith("image/")
-      ? "image"
-      : mime.startsWith("video/")
-        ? "video"
-        : mime.startsWith("audio/")
-          ? "audio"
-          : "document";
+    if (mime.startsWith("image/") || mime.startsWith("video/")) {
+      return res.status(400).json({ message: "Upload Rejected: Media files (images and videos) must use their respective upload panels, not the Document panel." });
+    }
+
+    const recipientOnline = global.onlineUsers?.get?.(to);
+    const inferredType = mime.startsWith("audio/") ? "audio" : "document";
     const cld = await uploadBuffer(req.file.buffer, {
       folder: process.env.CLOUDINARY_FOLDER || undefined,
-      resource_type: inferredType === 'image' ? 'image' : inferredType === 'video' ? 'video' : 'auto',
+      resource_type: 'auto',
     });
     const contentUrl = cld.secure_url;
-    const blocked = await isBlockedBetweenUsers(prisma, from, to);
-    if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
-    const convo = await resolveConversation(prisma, from, to, isGroup);
-    const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
-    const newMessage = await prisma.message.create({
-      data: {
-        conversationId: convo.id,
-        senderId: Number(from),
-        type: inferredType,
-        content: contentUrl,
-        status: recipientOnline ? "delivered" : "sent",
-        caption: caption && String(caption).trim() ? String(caption).trim() : null,
-        replyToMessageId: replyData.replyToMessageId,
-        quotedMessage: replyData.quotedMessage,
-      },
-    });
+
     try {
-      await prisma.mediaFile.create({
+      const blocked = await isBlockedBetweenUsers(prisma, from, to);
+      if (blocked) return res.status(403).json({ message: "Cannot send message. User is blocked." });
+      const convo = await resolveConversation(prisma, from, to, isGroup);
+      const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
+      const newMessage = await prisma.message.create({
         data: {
-          messageId: newMessage.id,
-          storageKey: cld.public_id,
-          originalName: req.file.originalname || null,
-          mimeType: req.file.mimetype || null,
-          fileSize: BigInt(cld.bytes || 0),
-          width: cld.width || null,
-          height: cld.height || null,
-          duration: cld.duration ? Math.round(cld.duration) : null,
-          cloudinaryPublicId: cld.public_id,
-          cloudinaryVersion: cld.version,
-          cloudinaryResourceType: cld.resource_type,
-          cloudinaryFormat: cld.format || null,
-          cloudinaryFolder: (cld.folder || null),
-          cloudinaryAssetId: cld.asset_id || null,
+          conversationId: convo.id,
+          senderId: Number(from),
+          type: inferredType,
+          content: contentUrl,
+          status: recipientOnline ? "delivered" : "sent",
+          caption: caption && String(caption).trim() ? String(caption).trim() : null,
+          replyToMessageId: replyData.replyToMessageId,
+          quotedMessage: replyData.quotedMessage,
         },
       });
-    } catch (_) { }
-    emitMessageSent(convo, newMessage);
-    return res.status(201).json(toMinimalMessage(newMessage));
+      try {
+        await prisma.mediaFile.create({
+          data: {
+            messageId: newMessage.id,
+            storageKey: cld.public_id,
+            originalName: req.file.originalname || null,
+            mimeType: req.file.mimetype || null,
+            fileSize: BigInt(cld.bytes || 0),
+            width: cld.width || null,
+            height: cld.height || null,
+            duration: cld.duration ? Math.round(cld.duration) : null,
+            cloudinaryPublicId: cld.public_id,
+            cloudinaryVersion: cld.version,
+            cloudinaryResourceType: cld.resource_type,
+            cloudinaryFormat: cld.format || null,
+            cloudinaryFolder: (cld.folder || null),
+            cloudinaryAssetId: cld.asset_id || null,
+          },
+        });
+      } catch (_) { }
+      emitMessageSent(convo, newMessage);
+      return res.status(201).json(toMinimalMessage(newMessage));
+    } catch (insertError) {
+      // Cleanup orphaned file if DB fails
+      deleteCloudinaryFile(cld.public_id, cld.resource_type || 'raw');
+      throw insertError;
+    }
   } catch (error) {
     next(error);
   }

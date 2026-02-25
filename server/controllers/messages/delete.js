@@ -13,7 +13,11 @@ export const deleteMessage = async (req, res, next) => {
       where: { id },
       include: { conversation: { include: { participants: true } } },
     });
-    if (!message) return res.status(404).json({ message: "Message not found" });
+    // Idempotent return: If it's already deleted in the database (or just gone completely),
+    // we want the frontend to think it succeeded so the UI drops the message visually.
+    if (!message) {
+      return res.status(200).json({ id, deleteType: "forEveryone" });
+    }
 
     const requesterId = Number(req?.user?.userId);
     const isParticipant = message.conversation.participants.some(p => p.userId === requesterId);
@@ -51,7 +55,7 @@ export const deleteMessage = async (req, res, next) => {
             if (sid) global.io.to(sid).emit("message-deleted", { messageId: updated.id, deleteType: "forEveryone" });
           });
         }
-      } catch (_) {}
+      } catch (_) { }
 
       return res.status(200).json({ id: updated.id, deleteType: "forEveryone" });
     }
@@ -60,6 +64,9 @@ export const deleteMessage = async (req, res, next) => {
     const deletedBy = Array.isArray(message.deletedBy) ? message.deletedBy : [];
     if (!deletedBy.includes(requesterId)) {
       deletedBy.push(requesterId);
+    } else {
+      // Idempotent success: It's already deleted for this user
+      return res.status(200).json(message);
     }
 
     const updated = await prisma.message.update({
@@ -72,7 +79,7 @@ export const deleteMessage = async (req, res, next) => {
       if (global?.io && sid) {
         global.io.to(sid).emit("message-deleted", { messageId: updated.id, deleteType: "forMe", deletedBy });
       }
-    } catch (_) {}
+    } catch (_) { }
 
     return res.status(200).json(updated);
   } catch (error) {

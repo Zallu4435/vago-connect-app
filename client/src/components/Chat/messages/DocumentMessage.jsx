@@ -2,6 +2,7 @@
 import React from "react";
 import { MdInsertDriveFile, MdDownload } from "react-icons/md";
 import { calculateTime } from "@/utils/CalculateTime";
+import { downloadMedia } from "@/utils/downloadMedia";
 import MessageStatus from "@/components/common/MessageStatus";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -144,10 +145,11 @@ function DocumentMessage({ message, isIncoming }) {
           </div>
 
           {/* Download Icon (appears on hover) */}
-          <a
-            href={message?.content || message?.message}
-            download
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadMedia(message?.content || message?.message, fileName);
+            }}
             className={`flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 ${isIncoming
               ? "bg-ancient-icon-glow/10 hover:bg-ancient-icon-glow/20 text-ancient-icon-glow"
               : "bg-ancient-bg-dark/20 hover:bg-ancient-bg-dark/40 text-ancient-icon-glow"
@@ -155,7 +157,7 @@ function DocumentMessage({ message, isIncoming }) {
             aria-label="Download document"
           >
             <MdDownload className="text-base sm:text-lg" />
-          </a>
+          </button>
         </div>
 
         {/* Sparkle particles */}
@@ -173,7 +175,7 @@ function DocumentMessage({ message, isIncoming }) {
           onClose={() => setShowPreview(false)}
           onDownload={(mediaId) => {
             const item = mediaItems.find((m) => Number(m.mediaId) === Number(mediaId));
-            if (item?.url) window.open(item.url, "_blank");
+            if (item?.url) downloadMedia(item.url, item.fileName || "document");
           }}
         />
       )}

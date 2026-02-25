@@ -1,26 +1,20 @@
 "use client";
 import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from "react";
-import Image from "next/image";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
 import MessageWrapper from "./MessageWrapper";
+import ImageGridWrapper from "./ImageGridWrapper";
 import dynamic from "next/dynamic";
 import SelectMessagesBar from "./SelectMessagesBar";
 import { showToast } from "@/lib/toast";
 
 const ForwardModal = dynamic(() => import("./ForwardModal"), { ssr: false });
 import { useMessagesPaginated } from "@/hooks/queries/useMessagesPaginated";
+import { useDeleteMessage } from "@/hooks/mutations/useDeleteMessage";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
-import TextMessage from "./messages/TextMessage";
 import EmptyChatState from "./EmptyChatState";
 import { MdArrowDownward } from "react-icons/md";
-import ImageMessage from "./messages/ImageMessage";
-import AudioMessage from "./messages/AudioMessage";
-import VideoMessage from "./messages/VideoMessage";
-import DocumentMessage from "./messages/DocumentMessage";
-import DeletedMessage from "./messages/DeletedMessage";
-
-// VoiceMessage replaced by AudioMessage
+import DeleteMessageModal from "@/components/common/DeleteMessageModal";
 
 function ChatContainer() {
   const currentChatUser = useChatStore((s) => s.currentChatUser);
@@ -28,11 +22,14 @@ function ChatContainer() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [showForward, setShowForward] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const setMessages = useChatStore((s) => s.setMessages);
   const messages = useChatStore((s) => s.messages);
   const containerRef = useRef(null);
   const topSentinelRef = useRef(null);
-  const messagesEndRef = useRef(null); // Sentinel for auto-scroll
+  const messagesEndRef = useRef(null);
+
+  const delMutation = useDeleteMessage(); // Sentinel for auto-scroll
   const loadingOlderRef = useRef(false);
   const shouldAutoScrollRef = useRef(true); // Track if we should auto-scroll
   const prevMessagesLengthRef = useRef(0); // Track to detect new messages
@@ -59,9 +56,11 @@ function ChatContainer() {
     return pages.flatMap((p) => p.messages);
   }, [pagesData]);
 
-  // When the user changes, clear out messages so it doesn't bleed.
+  // When the user changes, clear out messages and selection state so it doesn't bleed.
   useEffect(() => {
     setMessages([]);
+    setSelectMode(false);
+    setSelectedIds([]);
   }, [currentChatUser?.id, setMessages]);
 
   useEffect(() => {
@@ -159,16 +158,82 @@ function ChatContainer() {
     setSelectedIds([message.id]);
     setShowForward(true);
   }, []);
-  const toggleSelect = (id) => {
+  const toggleSelect = useCallback((id) => {
+    // Check if the message is already deleted
+    const message = filteredMessages.find(m => m.id === id);
+    if (!message) return;
+    if (message.isDeletedForEveryone || isDeletedForUser(message, userInfo?.id)) {
+      showToast.error("Cannot select a deleted message");
+      return;
+    }
+
     setSelectedIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 5) {
-        showToast.info("You can forward up to 5 messages at once");
+      if (prev.length >= 50) { // arbitrary higher limit for deletes/copy, but forward limits might apply elsewhere
+        showToast.info("You can select up to 50 messages at once");
         return prev;
       }
       return [...prev, id];
     });
-  };
+  }, [filteredMessages, isDeletedForUser, userInfo?.id]);
+
+  const handleBulkCopy = useCallback(async () => {
+    if (selectedIds.length === 0) return;
+    const selectedMsgs = filteredMessages
+      .filter(m => selectedIds.includes(m.id))
+      .sort((a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0));
+
+    const textToCopy = selectedMsgs
+      .map(m => {
+        const time = new Date(m.timestamp || m.createdAt || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const senderInfo = Number(m.senderId) === Number(userInfo?.id) ? 'You' : (m.sender?.name || currentChatUser?.name || 'Contact');
+        return `[${time}] ${senderInfo}: ${m.type === 'text' ? m.content : `[${m.type}]`}`;
+      })
+      .join('\n');
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(textToCopy);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        document.body.prepend(textArea);
+        textArea.select();
+        try { document.execCommand('copy'); } finally { textArea.remove(); }
+      }
+      showToast.success(`${selectedIds.length} messages copied`);
+      setSelectMode(false);
+      setSelectedIds([]);
+    } catch (err) {
+      console.error("Copy error:", err);
+      showToast.error("Failed to copy messages");
+    }
+  }, [selectedIds, filteredMessages, userInfo?.id, currentChatUser?.name]);
+
+  const handleBulkDelete = useCallback(async (deleteType) => {
+    if (selectedIds.length === 0) return;
+    try {
+      await Promise.all(selectedIds.map(id => delMutation.mutateAsync({ id, deleteType })));
+      showToast.success(`Deleted ${selectedIds.length} messages`);
+    } catch (e) {
+      console.error("Bulk delete error", e);
+      showToast.error("Failed to delete some messages");
+    } finally {
+      setShowDeleteConfirm(false);
+      setSelectMode(false);
+      setSelectedIds([]);
+    }
+  }, [selectedIds, delMutation]);
+
+  // Determine if ALL selected messages belong to the current user
+  const canDeleteForEveryone = useMemo(() => {
+    if (selectedIds.length === 0) return false;
+    const selectedMsgs = filteredMessages.filter(m => selectedIds.includes(m.id));
+    return selectedMsgs.every(m => String(m.senderId) === String(userInfo?.id));
+  }, [selectedIds, filteredMessages, userInfo?.id]);
+
   const onScroll = useCallback((e) => {
     const el = e.currentTarget;
     if (!el) return;
@@ -233,9 +298,18 @@ function ChatContainer() {
             <SelectMessagesBar
               selectMode={selectMode}
               selectedCount={selectedIds.length}
-              onToggleSelect={() => setSelectMode((v) => !v)}
+              onToggleSelect={() => {
+                if (selectMode) {
+                  setSelectMode(false);
+                  setSelectedIds([]);
+                } else {
+                  setSelectMode(true);
+                }
+              }}
               onCancel={() => { setSelectMode(false); setSelectedIds([]); }}
               onForward={() => setShowForward(true)}
+              onCopy={handleBulkCopy}
+              onDelete={() => setShowDeleteConfirm(true)}
             />
           )}
           {/* Message stack */}
@@ -256,41 +330,96 @@ function ChatContainer() {
               return <EmptyChatState currentChatUser={currentChatUser} />;
             }
 
-            return filteredMessages.map((message, idx) => {
-              const isIncoming = Number(message.senderId) !== Number(userInfo?.id);
+            // Clustering algorithm: group consecutive image messages
+            const clusterMessages = (messagesArr) => {
+              const clusters = [];
+              let currentGroup = null;
+
+              for (let i = 0; i < messagesArr.length; i++) {
+                const msg = messagesArr[i];
+
+                // Eligibility for Grid Clustering
+                const isEligibleImage =
+                  msg.type === "image" &&
+                  !msg.caption &&
+                  !msg.replyToMessageId &&
+                  !msg.quotedMessage &&
+                  !msg.isForwarded &&
+                  !msg.isDeletedForEveryone;
+
+                if (isEligibleImage) {
+                  if (!currentGroup) {
+                    // Start a new group
+                    currentGroup = [msg];
+                  } else {
+                    const lastMsg = currentGroup[currentGroup.length - 1];
+                    const timeDiff = Math.abs(new Date(msg.createdAt).getTime() - new Date(lastMsg.createdAt).getTime());
+
+                    // Must be same sender, same message type, and within 60 seconds
+                    const isSameSender = String(msg.senderId) === String(lastMsg.senderId);
+                    const isWithinTimeWindow = timeDiff <= 60000;
+
+                    if (isSameSender && isWithinTimeWindow) {
+                      currentGroup.push(msg); // Add to existing cluster
+                    } else {
+                      // Close current group and start a new one
+                      clusters.push(currentGroup);
+                      currentGroup = [msg];
+                    }
+                  }
+                } else {
+                  // If not an eligible image, close any active group and push the singleton message
+                  if (currentGroup) {
+                    clusters.push(currentGroup);
+                    currentGroup = null;
+                  }
+                  clusters.push([msg]); // Always chunked into an array internally for unified mapping
+                }
+              }
+
+              // Push any tailing group
+              if (currentGroup) {
+                clusters.push(currentGroup);
+              }
+
+              return clusters;
+            };
+
+            const clusteredBlocks = clusterMessages(filteredMessages);
+
+            return clusteredBlocks.map((clusterArray, idx) => {
+              const anchorMessage = clusterArray[0];
+              const isIncoming = Number(anchorMessage.senderId) !== Number(userInfo?.id);
+
+              // If it's a cluster of >1 eligible images, mount the Grid Wrapper
+              if (clusterArray.length > 1) {
+                return (
+                  <ImageGridWrapper
+                    key={`cluster-${anchorMessage.id}`}
+                    messagesArray={clusterArray}
+                    isIncoming={isIncoming}
+                    selectMode={selectMode}
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelect}
+                    onReply={handleReply}
+                    onForward={handleForward}
+                    chatMessages={filteredMessages}
+                  />
+                );
+              }
+
+              // Otherwise it maps exactly to the classic MessageWrapper for single elements
               return (
                 <MessageWrapper
-                  key={message.id}
-                  message={message}
+                  key={anchorMessage.id}
+                  message={anchorMessage}
                   isIncoming={isIncoming}
                   selectMode={selectMode}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
                   onReply={handleReply}
                   onForward={handleForward}
-                >
-                  {message.isDeletedForEveryone ? (
-                    <DeletedMessage message={message} isIncoming={isIncoming} />
-                  ) : (
-                    <>
-                      {message.type === "text" && (
-                        <TextMessage message={message} isIncoming={isIncoming} />
-                      )}
-                      {message.type === "image" && (
-                        <ImageMessage message={message} isIncoming={isIncoming} />
-                      )}
-                      {message.type === "audio" && (
-                        <AudioMessage message={message} isIncoming={isIncoming} />
-                      )}
-                      {message.type === "video" && (
-                        <VideoMessage message={message} isIncoming={isIncoming} />
-                      )}
-                      {(message.type === "document" || (!['text', 'image', 'audio', 'video', 'location'].includes(String(message.type || '')))) && (
-                        <DocumentMessage message={message} isIncoming={isIncoming} />
-                      )}
-                    </>
-                  )}
-                </MessageWrapper>
+                />
               );
             });
           })()}
@@ -325,6 +454,19 @@ function ChatContainer() {
         fromUserId={userInfo?.id}
         initialMessageIds={selectedIds}
       />
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <DeleteMessageModal
+          open={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onDelete={handleBulkDelete}
+          isPending={delMutation.isPending}
+          showForEveryoneButton={canDeleteForEveryone}
+          title={`Delete ${selectedIds.length} Messages?`}
+          description={null}
+        />
+      )}
     </div>
   );
 }
