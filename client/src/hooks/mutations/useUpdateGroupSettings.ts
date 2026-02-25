@@ -9,11 +9,12 @@ export interface UpdateGroupSettingsInput {
   groupIconUrl?: string;
 }
 
-export function useUpdateGroupSettings(): UseMutationResult<any, Error, UpdateGroupSettingsInput> {
+export function useUpdateGroupSettings(): UseMutationResult<any, Error, FormData> {
   const qc = useQueryClient();
-  return useMutation<any, Error, UpdateGroupSettingsInput>({
-    mutationFn: async ({ groupId, ...data }) => {
-      const { data: res } = await api.patch(UPDATE_GROUP_SETTINGS_ROUTE(groupId), data);
+  return useMutation<any, Error, FormData>({
+    mutationFn: async (formData) => {
+      const groupId = formData.get("groupId");
+      const { data: res } = await api.patch(UPDATE_GROUP_SETTINGS_ROUTE(groupId as string), formData);
       return res;
     },
     onSuccess: () => {

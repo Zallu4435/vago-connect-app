@@ -120,6 +120,8 @@ export function useMessageSocketHandlers() {
               message: message.content || c.message,
               timestamp: message.createdAt || new Date().toISOString(),
               senderId: message.senderId,
+              isSystemMessage: Boolean((message as any).isSystemMessage),
+              systemMessageType: (message as any).systemMessageType || null,
             };
           });
         });

@@ -36,8 +36,13 @@ function ChatListItem({ data, isContactsPage = false }) {
   const lastTime = data?.timestamp ? calculateTime(data.timestamp) : "";
   let preview = "";
 
+  const isSystemMsg = !!data?.isSystemMessage;
+
   if (isContactsPage) {
     preview = data?.about || "Available";
+  } else if (isSystemMsg) {
+    // System messages (joined/left group) shown as italic text, no sender prefix
+    preview = data?.message || "";
   } else {
     if (data?.type === "image") preview = "📷 Image";
     else if (data?.type === "video") preview = "🎬 Video";
@@ -144,12 +149,16 @@ function ChatListItem({ data, isContactsPage = false }) {
         </div>
         <div className="flex items-center gap-2 w-full">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            {isSenderLast && (
+            {/* Only show status ticks for normal messages (not system messages) */}
+            {isSenderLast && !isSystemMsg && (
               <span className="text-ancient-text-muted text-xs">
                 <MessageStatus status={data?.messageStatus} />
               </span>
             )}
-            <span className="text-ancient-text-muted line-clamp-1 text-xs sm:text-sm break-all w-full">
+            <span className={`line-clamp-1 text-xs sm:text-sm break-all w-full ${isSystemMsg
+                ? "text-ancient-text-muted italic"
+                : "text-ancient-text-muted"
+              }`}>
               {preview}
             </span>
           </div>

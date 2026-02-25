@@ -71,6 +71,8 @@ export function useContactsPaginated(userId?: string, opts: Options = {}): UseIn
             timestamp: m?.timestamp,
             senderId: m?.senderId,
             messageStatus: m?.status,
+            isSystemMessage: Boolean(m?.isSystemMessage),
+            systemMessageType: m?.systemMessageType || null,
             totalUnreadMessages: ps?.unreadCount || 0,
           } as any;
         })

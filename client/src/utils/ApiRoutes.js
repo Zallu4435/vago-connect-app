@@ -50,4 +50,5 @@ export const MUTE_CHAT_ROUTE = (chatId) => `${MESSAGE_ROUTES}/chats/${chatId}/mu
 // Media gallery and download
 export const GET_CHAT_MEDIA_ROUTE = (chatId) => `${MESSAGE_ROUTES}/chats/${chatId}/media`
 export const SEARCH_CHAT_MEDIA_ROUTE = (chatId) => `${MESSAGE_ROUTES}/chats/${chatId}/media/search`
+export const SEARCH_MESSAGES_ROUTE = (chatId) => `${MESSAGE_ROUTES}/chats/${chatId}/messages/search`
 export const DOWNLOAD_MEDIA_ROUTE = (mediaId) => `${MESSAGE_ROUTES}/media/${mediaId}/download`

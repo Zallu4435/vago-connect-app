@@ -29,7 +29,8 @@ import {
   updateGroupSettings,
   leaveGroup,
   deleteGroup,
-  getCallHistory
+  getCallHistory,
+  searchMessages
 } from "../controllers/MessageController.js";
 import multer from "multer";
 import { verifyAccessToken } from "../middlewares/AuthMiddleware.js";
@@ -90,7 +91,7 @@ messageRouter.post("/groups/:groupId/members/remove", verifyAccessToken, removeG
 // Group roles
 messageRouter.post("/groups/:groupId/roles", verifyAccessToken, updateGroupRole);
 // Group settings
-messageRouter.patch("/groups/:groupId/settings", verifyAccessToken, updateGroupSettings);
+messageRouter.patch("/groups/:groupId/settings", verifyAccessToken, imageUpload.single("groupIcon"), updateGroupSettings);
 messageRouter.post("/groups/:groupId/leave", verifyAccessToken, leaveGroup);
 messageRouter.delete("/groups/:groupId", verifyAccessToken, deleteGroup);
 
@@ -109,6 +110,7 @@ messageRouter.post("/chats/:id/mute", verifyAccessToken, muteChat);
 // Media gallery and download
 messageRouter.get("/chats/:id/media", verifyAccessToken, getChatMedia);
 messageRouter.get("/chats/:id/media/search", verifyAccessToken, searchChatMedia);
+messageRouter.get("/chats/:id/messages/search", verifyAccessToken, searchMessages);
 messageRouter.get("/media/:mediaId/download", verifyAccessToken, downloadMedia);
 // Calls Route
 messageRouter.get("/calls/:userId", verifyAccessToken, getCallHistory);

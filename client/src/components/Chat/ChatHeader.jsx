@@ -14,7 +14,6 @@ import { useClearChat, useDeleteChat } from "@/hooks/mutations/useChatActions";
 import { usePinChat } from "@/hooks/mutations/usePinChat";
 import { useLeaveGroup } from "@/hooks/mutations/useGroupActions";
 import { useBlockUser } from "@/hooks/mutations/useBlockUser";
-import GroupManageModal from "./GroupManageModal";
 import ActionSheet from "@/components/common/ActionSheet";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { getAbsoluteUrl } from "@/lib/url";
@@ -36,17 +35,17 @@ const getAvatarUrl = (currentChatUser, userInfo, isSelfChat) => {
   );
 };
 
-function ChatHeader({ onOpenMedia }) {
+function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   const currentChatUser = useChatStore((s) => s.currentChatUser);
   const setCurrentChatUser = useChatStore((s) => s.setCurrentChatUser);
   const userInfo = useAuthStore((s) => s.userInfo);
+  const messages = useChatStore((s) => s.messages);
   const onlineUsers = useChatStore((s) => s.onlineUsers);
   const socket = useSocketStore((s) => s.socket);
   const initiateCall = useCallStore((s) => s.initiateCall);
   const callToastIdRef = useRef(null);
   const menuButtonRef = useRef(null);
   const [showMenu, setShowMenu] = useState(false);
-  const [showGroupManage, setShowGroupManage] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
@@ -61,6 +60,7 @@ function ChatHeader({ onOpenMedia }) {
   const isPinned = Boolean(contactEntry?.isPinned);
   const isOnline = onlineUsers?.some((u) => String(u) === String(currentChatUser?.id));
   const isGroupChat = conversationType === "group" || currentChatUser?.isGroup;
+  const hasMessages = messages && messages.length > 0;
 
   // Chat actions
   const clearChat = useClearChat();
@@ -131,7 +131,7 @@ function ChatHeader({ onOpenMedia }) {
           />
         )}
 
-        <div className="flex flex-col min-w-0 flex-1 cursor-pointer" onClick={() => (conversationType === "group" || currentChatUser?.isGroup) && setShowGroupManage(true)}>
+        <div className="flex flex-col min-w-0 flex-1 cursor-pointer" onClick={() => (conversationType === "group" || currentChatUser?.isGroup) && onOpenGroupManage?.()}>
           <span className="text-ancient-text-light text-base sm:text-lg font-semibold truncate hover:underline">
             {isSelfChat
               ? (isPinned ? "Saved messages" : "You")
@@ -164,9 +164,10 @@ function ChatHeader({ onOpenMedia }) {
         )}
 
         <button
-          className="p-2 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95"
+          className={`p-2 rounded-full transition-all active:scale-95 ${hasMessages ? "hover:bg-ancient-bg-dark/60" : "opacity-50 cursor-not-allowed"}`}
           title="Search"
-          onClick={() => useChatStore.setState({ messageSearch: true })}
+          onClick={() => hasMessages && useChatStore.setState({ messageSearch: true })}
+          disabled={!hasMessages}
         >
           <BiSearchAlt2 className="text-ancient-icon-inactive hover:text-ancient-icon-glow text-xl sm:text-2xl transition-colors" />
         </button>
@@ -190,6 +191,7 @@ function ChatHeader({ onOpenMedia }) {
               {
                 label: "Media",
                 icon: MdPermMedia,
+                disabled: !hasMessages,
                 onClick: () => onOpenMedia?.(),
               },
               ...(isGroupChat ? [] : [{
@@ -200,12 +202,12 @@ function ChatHeader({ onOpenMedia }) {
               ...(isGroupChat
                 ? [{
                   label: "Manage Group",
-                  onClick: () => setShowGroupManage(true),
+                  onClick: () => onOpenGroupManage?.(),
                 }]
                 : []),
               {
                 label: "Clear Chat",
-                disabled: !conversationId || clearChat.isPending,
+                disabled: !conversationId || clearChat.isPending || !hasMessages,
                 onClick: () => {
                   if (!conversationId) return;
                   setShowClearConfirm(true);
@@ -244,8 +246,6 @@ function ChatHeader({ onOpenMedia }) {
           />
         </div>
       </div>
-
-      <GroupManageModal open={showGroupManage} onClose={() => setShowGroupManage(false)} groupId={conversationId} />
 
       {/* Confirm: Clear Chat */}
       <ConfirmModal

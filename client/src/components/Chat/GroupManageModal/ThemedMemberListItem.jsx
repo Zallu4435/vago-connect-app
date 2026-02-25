@@ -5,9 +5,17 @@ import { IoRemove } from "react-icons/io5";
 import { useAuthStore } from "@/stores/authStore";
 
 export default function ThemedMemberListItem({ member, currentUserIsAdmin, groupAdminId, onRemove, onChangeRole }) {
-  const isSelf = member.id === useAuthStore((s) => s.userInfo.id);
-  const isAdmin = member.role === 'admin';
-  const isGroupCreator = member.id === groupAdminId;
+  const selfId = useAuthStore((s) => s.userInfo?.id);
+  // String comparison to avoid number/string type mismatch
+  const isSelf = String(member.id) === String(selfId);
+  const isAdmin = member.role === "admin";
+  const isGroupCreator = String(member.id) === String(groupAdminId);
+
+  // Actions are only visible to admins on other members
+  const showActions = currentUserIsAdmin && !isSelf;
+
+  // An admin cannot remove another admin — they must demote first
+  const canRemove = !isAdmin;
 
   return (
     <div className="flex items-center justify-between p-3 rounded-lg hover:bg-ancient-input-bg transition-colors duration-200 group">
@@ -20,23 +28,35 @@ export default function ThemedMemberListItem({ member, currentUserIsAdmin, group
             {member.name} {isSelf && <span className="text-ancient-text-muted text-xs">(You)</span>}
           </span>
           <span className="text-ancient-text-muted text-xs italic">
-            {isAdmin ? "Conclave Elder" : "Disciple"} {isGroupCreator && <span className="font-bold text-ancient-icon-glow">(Founder)</span>}
+            {isAdmin ? "Admin" : "Member"} {isGroupCreator && <span className="font-bold text-ancient-icon-glow">(Creator)</span>}
           </span>
         </div>
       </div>
-      {currentUserIsAdmin && !isSelf && (
+
+      {showActions && (
         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          {/* Promote / Demote */}
           <button
-            onClick={() => onChangeRole(member.id, isAdmin ? 'member' : 'admin')}
+            onClick={() => onChangeRole(member.id, isAdmin ? "member" : "admin")}
             className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-200
-              ${isAdmin ? 'bg-ancient-border-stone text-ancient-text-light hover:bg-ancient-input-border' : 'bg-ancient-icon-glow text-ancient-bg-dark hover:bg-ancient-bubble-user-light'}`}
-            disabled={isGroupCreator}
+              ${isAdmin
+                ? "bg-ancient-border-stone text-ancient-text-light hover:bg-ancient-input-border"
+                : "bg-ancient-icon-glow text-ancient-bg-dark hover:bg-ancient-bubble-user-light"
+              }`}
           >
-            {isAdmin ? 'Demote' : 'Promote'}
+            {isAdmin ? "Demote" : "Promote"}
           </button>
+
+          {/* Remove — disabled with tooltip if target is an admin */}
           <button
-            onClick={() => onRemove(member.id)}
-            className="p-2 rounded-full bg-red-700/70 hover:bg-red-600 text-white transition-colors duration-200"
+            onClick={() => onRemove(member.id, isAdmin)}
+            disabled={!canRemove}
+            title={!canRemove ? "Demote this admin before removing them" : `Remove ${member.name}`}
+            className={`p-2 rounded-full text-white transition-colors duration-200
+              ${canRemove
+                ? "bg-red-700/70 hover:bg-red-600 cursor-pointer"
+                : "bg-gray-600/50 cursor-not-allowed opacity-50"
+              }`}
           >
             <IoRemove className="h-4 w-4" />
           </button>

@@ -166,6 +166,9 @@ function ChatContainer() {
       showToast.error("Cannot select a deleted message");
       return;
     }
+    if (message.isSystemMessage) {
+      return;
+    }
 
     setSelectedIds((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
@@ -294,7 +297,7 @@ function ChatContainer() {
             </div>
           </div>
           {/* Select messages control bar (sticky) */}
-          {filteredMessages.length > 0 && (
+          {filteredMessages.some(m => !m.isSystemMessage) && (
             <SelectMessagesBar
               selectMode={selectMode}
               selectedCount={selectedIds.length}

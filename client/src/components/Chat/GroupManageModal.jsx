@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
-import { useAllContacts } from "@/hooks/queries/useAllContacts";
+
 import { useUpdateGroupSettings } from "@/hooks/mutations/useUpdateGroupSettings";
 import { useAddGroupMembers, useRemoveGroupMembers } from "@/hooks/mutations/useGroupMembers";
 import { useUpdateGroupRole } from "@/hooks/mutations/useUpdateGroupRole";
@@ -36,6 +36,10 @@ export default function GroupManageModal({ open, onClose, groupId }) {
   const [showAddParticipantsModal, setShowAddParticipantsModal] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Confirm: Remove member
+  const [confirmRemove, setConfirmRemove] = useState({ open: false, memberId: null, memberName: "" });
+  // Confirm: Demote admin
+  const [confirmDemote, setConfirmDemote] = useState({ open: false, userId: null, memberName: "" });
 
   // Hooks for mutations
   const updateSettings = useUpdateGroupSettings();
@@ -45,36 +49,23 @@ export default function GroupManageModal({ open, onClose, groupId }) {
   const leaveGroup = useLeaveGroup();
   const deleteGroup = useDeleteGroup();
 
-  // Fetch all contacts for adding new members
-  const { data: allContactsSections = {}, isLoading: isLoadingContacts } = useAllContacts();
-  const flatAllContacts = useMemo(() => {
-    return Object.values(allContactsSections)
-      .flat()
-      .filter((u) => String(u.id) !== String(userInfo?.id))
-      .map((u) => ({
-        id: u.id,
-        name: u.name,
-        about: u.about,
-        image: u.profileImage,
-      }));
-  }, [allContactsSections, userInfo]);
 
   // Derive group data from currentChatUser if it's the target group
   // Assuming currentChatUser contains group details (members, name, description, icon, adminId, etc.)
   const groupData = useMemo(() => {
-    if (currentChatUser?.isGroup && currentChatUser.id === groupId) {
+    if (currentChatUser && (currentChatUser.id === groupId || currentChatUser.conversationId === groupId)) {
       return currentChatUser;
     }
     return null;
   }, [currentChatUser, groupId]);
 
   const currentUserIsAdmin = useMemo(() => {
-    return groupData?.members?.some(
-      (m) => m.id === userInfo?.id && m.role === 'admin'
+    return groupData?.participants?.some(
+      (p) => String(p.userId) === String(userInfo?.id) && p.role === 'admin'
     );
   }, [groupData, userInfo]);
 
-  const groupCreatorId = groupData?.adminId; // Assuming adminId is the original creator
+  const groupCreatorId = groupData?.createdById; // original creator
 
 
   // Initialize local state with groupData
@@ -82,7 +73,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     if (groupData) {
       setLocalGroupName(groupData.name || "");
       setLocalGroupDescription(groupData.description || "");
-      setLocalGroupIconUrl(groupData.profileImage || "");
+      setLocalGroupIconUrl(groupData.profilePicture || "");
       setLocalGroupIconFile(null); // Clear file input on group change
     }
   }, [groupData]);
@@ -97,8 +88,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     if (localGroupIconFile) {
       formData.append("groupIcon", localGroupIconFile);
     } else if (localGroupIconUrl) {
-      // If icon was just a URL and no new file was selected, send the URL back
-      // Or handle this in your backend to keep existing if no file/new URL
+      formData.append("groupIconUrl", localGroupIconUrl);
     }
 
     updateSettings.mutate(formData, {
@@ -116,24 +106,70 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         showToast.success("Members added.");
         setShowAddParticipantsModal(false);
       },
-      onError: () => showToast.error("Failed to add members."),
+      onError: (err) => {
+        const errorMsg = err?.response?.data?.message || "Failed to add members.";
+        showToast.error(errorMsg);
+      },
     });
   }, [addMembers, groupId]);
 
 
+  // Stage a removal confirmation — admins are already blocked in ThemedMemberListItem
   const handleRemoveMember = (memberId) => {
     if (!groupId || !memberId) return;
-    removeMembers.mutate({ groupId, members: [memberId] }, {
-      onSuccess: () => showToast.success("Member removed."),
+    const participant = groupData?.participants?.find(
+      (p) => String(p.userId) === String(memberId)
+    );
+    setConfirmRemove({
+      open: true,
+      memberId,
+      memberName: participant?.user?.name || "this member",
+    });
+  };
+
+  const executeRemoveMember = () => {
+    if (!confirmRemove.memberId) return;
+    removeMembers.mutate({ groupId, members: [confirmRemove.memberId] }, {
+      onSuccess: () => {
+        showToast.success("Member removed.");
+        setConfirmRemove({ open: false, memberId: null, memberName: "" });
+      },
       onError: () => showToast.error("Failed to remove member."),
     });
   };
 
   const handleChangeMemberRole = (userId, role) => {
     if (!groupId || !userId) return;
+    // Demoting an admin — ask for confirmation first
+    if (role === "member") {
+      const participant = groupData?.participants?.find(
+        (p) => String(p.userId) === String(userId)
+      );
+      setConfirmDemote({
+        open: true,
+        userId,
+        memberName: participant?.user?.name || "this admin",
+      });
+      return;
+    }
+    // Promoting a member — no confirm needed
     updateRole.mutate({ groupId, userId, role }, {
-      onSuccess: () => showToast.success("Role updated."),
-      onError: () => showToast.error("Failed to update role."),
+      onSuccess: () => showToast.success("Member promoted to admin."),
+      onError: (err) => showToast.error(err?.response?.data?.message || "Failed to update role."),
+    });
+  };
+
+  const executeDemote = () => {
+    if (!confirmDemote.userId) return;
+    updateRole.mutate({ groupId, userId: confirmDemote.userId, role: "member" }, {
+      onSuccess: () => {
+        showToast.success("Admin demoted to member.");
+        setConfirmDemote({ open: false, userId: null, memberName: "" });
+      },
+      onError: (err) => {
+        showToast.error(err?.response?.data?.message || "Failed to demote admin.");
+        setConfirmDemote({ open: false, userId: null, memberName: "" });
+      },
     });
   };
 
@@ -178,7 +214,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
   if (!open || !groupData) return null; // Ensure groupData is available
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ancient-bg-dark text-ancient-text-light animate-fade-in">
+    <div className="h-full w-full z-50 flex flex-col bg-ancient-bg-dark text-ancient-text-light animate-fade-in">
       {/* Header */}
       <ModalHeader
         title="Group settings"
@@ -233,7 +269,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         <div className="bg-ancient-bg-medium rounded-xl p-6 border border-ancient-border-stone shadow-xl">
           <div className="flex items-center justify-between mb-4 pb-4 border-b border-ancient-input-border">
             <h4 className="text-ancient-text-light text-2xl font-bold flex items-center gap-3">
-              <FaUsers className="text-ancient-icon-glow" /> Members ({groupData.members?.length || 0})
+              <FaUsers className="text-ancient-icon-glow" /> Members ({groupData.participants?.filter(p => !p.leftAt).length || 0})
             </h4>
             {currentUserIsAdmin && (
               <button
@@ -246,13 +282,18 @@ export default function GroupManageModal({ open, onClose, groupId }) {
             )}
           </div>
           <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
-            {groupData.members?.length === 0 && (
+            {groupData.participants?.filter(p => !p.leftAt).length === 0 && (
               <div className="text-ancient-text-muted text-center py-4">No members yet.</div>
             )}
-            {groupData.members?.map((member) => (
+            {groupData.participants?.filter(p => !p.leftAt).map((p) => (
               <ThemedMemberListItem
-                key={member.id}
-                member={member}
+                key={p.userId}
+                member={{
+                  id: p.userId,
+                  name: p.user?.name || "Unknown",
+                  profileImage: p.user?.profileImage,
+                  role: p.role
+                }}
                 currentUserIsAdmin={currentUserIsAdmin}
                 groupAdminId={groupCreatorId}
                 onRemove={handleRemoveMember}
@@ -316,10 +357,8 @@ export default function GroupManageModal({ open, onClose, groupId }) {
       <AddParticipantModal
         open={showAddParticipantsModal}
         onClose={() => setShowAddParticipantsModal(false)}
-        existingMembers={groupData.members || []}
+        existingMembers={groupData.participants?.filter(p => !p.leftAt).map(p => ({ id: p.userId })) || []}
         onAddMembers={handleAddMembers}
-        isLoadingContacts={isLoadingContacts}
-        flatContacts={flatAllContacts}
         isAddingMembers={addMembers.isPending}
       />
 
@@ -347,6 +386,32 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         cancelText="Cancel"
         confirmLoading={deleteGroup.isPending}
         variant="danger"
+      />
+
+      {/* Confirm: Remove Member */}
+      <ConfirmModal
+        open={confirmRemove.open}
+        onClose={() => setConfirmRemove({ open: false, memberId: null, memberName: "" })}
+        onConfirm={executeRemoveMember}
+        title={`Remove ${confirmRemove.memberName}?`}
+        description={`${confirmRemove.memberName} will be removed from this group and will no longer receive messages.`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmLoading={removeMembers.isPending}
+        variant="danger"
+      />
+
+      {/* Confirm: Demote Admin */}
+      <ConfirmModal
+        open={confirmDemote.open}
+        onClose={() => setConfirmDemote({ open: false, userId: null, memberName: "" })}
+        onConfirm={executeDemote}
+        title={`Demote ${confirmDemote.memberName}?`}
+        description={`${confirmDemote.memberName} will lose admin privileges and become a regular member.`}
+        confirmText="Demote"
+        cancelText="Cancel"
+        confirmLoading={updateRole.isPending}
+        variant="warning"
       />
     </div>
   );

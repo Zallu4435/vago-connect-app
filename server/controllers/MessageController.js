@@ -1,6 +1,7 @@
 export { addMessage, addImage, addAudio, addFile, addVideo, addLocation } from "./messages/send.js";
 export { getMessages, getInitialContactswithMessages, getCallHistory } from "./messages/fetch.js";
 export { updateMessageStatus } from "./messages/status.js";
+export { searchMessages } from "./messages/search.js";
 export { editMessage } from "./messages/edit.js";
 export { deleteMessage } from "./messages/delete.js";
 export { forwardMessages } from "./messages/forward.js";

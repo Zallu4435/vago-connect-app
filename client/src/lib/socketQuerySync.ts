@@ -25,6 +25,8 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
           type: (message as any).type || 'text',
           timestamp: (message as any).timestamp || new Date().toISOString(),
           senderId: (message as any).senderId,
+          isSystemMessage: Boolean((message as any).isSystemMessage),
+          systemMessageType: (message as any).systemMessageType || null,
           messageStatus: (message as any).messageStatus || contact.messageStatus,
           totalUnreadMessages: (Number(contact.totalUnreadMessages) || 0) + 1,
         };

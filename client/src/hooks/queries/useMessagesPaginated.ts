@@ -47,6 +47,9 @@ export function useMessagesPaginated(userId?: string, peerId?: string, opts: Opt
         timestamp: String(m.createdAt),
         isForwarded: Boolean(m.isForwarded),
         isDeletedForEveryone: Boolean(m.isDeletedForEveryone),
+        // System message flags — must be carried through or MessageWrapper won't detect them
+        isSystemMessage: Boolean(m.isSystemMessage),
+        systemMessageType: m.systemMessageType ?? null,
         replyToMessageId: m.replyToMessageId,
         quotedMessage: m.quotedMessage,
         reactions: m.reactions,
@@ -55,6 +58,7 @@ export function useMessagesPaginated(userId?: string, peerId?: string, opts: Opt
         duration: m.duration,
         isEdited: m.isEdited,
         sender: m.sender || null,
+        deletedBy: m.deletedBy,
       } as any));
       return { messages: mapped, nextCursor: (data?.nextCursor as string | null) ?? null };
     },

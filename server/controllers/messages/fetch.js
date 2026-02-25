@@ -161,7 +161,8 @@ export const getInitialContactswithMessages = async (req, res, next) => {
       return {
         conversationId: convo.id,
         type: convo.type,
-        participants: convo.participants.map(p => ({
+        createdById: convo.createdById,
+        participants: convo.participants.filter(p => !p.leftAt).map(p => ({
           userId: p.userId,
           role: p.role,
           user: p.user ? {
@@ -181,6 +182,8 @@ export const getInitialContactswithMessages = async (req, res, next) => {
           status: lastMsg.status,
           timestamp: lastMsg.createdAt,
           senderId: lastMsg.senderId,
+          isSystemMessage: lastMsg.isSystemMessage || false,
+          systemMessageType: lastMsg.systemMessageType || null,
         } : null,
         participantState: {
           isPinned: p.isPinned,

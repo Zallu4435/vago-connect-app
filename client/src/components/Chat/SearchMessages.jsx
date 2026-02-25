@@ -2,35 +2,25 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IoClose } from "react-icons/io5";
 import { BiSearchAlt2 } from "react-icons/bi";
-import { calculateTime } from "@/utils/CalculateTime";
 import { useChatStore } from "@/stores/chatStore";
 import { FaAngleUp, FaAngleDown } from "react-icons/fa";
 import { getThematicDayLabel } from "@/utils/dateLabels";
 import { MdImage, MdVideocam, MdAudiotrack, MdInsertDriveFile, MdLocationOn } from "react-icons/md";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useSearchMessages } from "@/hooks/queries/useSearchMessages";
+import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 function SearchMessages() {
-  const messages = useChatStore((s) => s.messages);
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const messageRefs = useRef([]);
 
-  const filtered = useMemo(() => {
-    const term = debouncedSearchTerm.trim().toLowerCase();
-    if (!term) return [];
+  const { data, isLoading } = useSearchMessages(currentChatUser?.id, debouncedSearchTerm);
+  const filtered = useMemo(() => data?.messages || [], [data]);
 
-    const list = Array.isArray(messages) ? messages : [];
-    const results = list.filter((m) => {
-      // For media, the content is a URL, so we search the caption or filename instead if possible
-      const searchableText = String(m.type === "text" ? m.content : (m.caption || m.fileName || m.type || "")).toLowerCase();
-      return searchableText.includes(term);
-    });
-    return results.sort(
-      (a, b) =>
-        new Date(a.createdAt || a.timestamp) - new Date(b.createdAt || b.timestamp)
-    );
-  }, [messages, debouncedSearchTerm]);
+
 
   const grouped = useMemo(() => {
     const groups = {};
@@ -157,8 +147,14 @@ function SearchMessages() {
       )}
 
       {/* Message Results */}
-      <div className="flex-grow flex flex-col overflow-y-auto custom-scrollbar p-2 sm:p-4 space-y-2">
-        {filtered.length === 0 && debouncedSearchTerm && (
+      <div className="flex-grow flex flex-col overflow-y-auto custom-scrollbar p-2 sm:p-4 space-y-2 relative">
+        {isLoading && debouncedSearchTerm && (
+          <div className="absolute inset-0 flex items-center justify-center bg-ancient-bg-dark/50 z-10 backdrop-blur-sm">
+            <LoadingSpinner size={32} className="text-ancient-icon-glow" label="Searching..." />
+          </div>
+        )}
+
+        {!isLoading && filtered.length === 0 && debouncedSearchTerm && (
           <div className="text-ancient-text-muted text-center text-base sm:text-lg py-4">
             No results found.
           </div>

@@ -23,7 +23,7 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
             u = {
               id: row.conversationId,
               name: row.groupName,
-              about: row.groupDescription,
+              description: row.groupDescription,
               profileImage: row.groupIcon,
               participants: row.participants || [],
             };
@@ -43,6 +43,7 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
             id: String(u.id),
             name: u.name,
             profilePicture: u.profileImage,
+            description: (u as any).description,
             about: u.about,
             participants: u.participants,
             conversationId: row?.conversationId,
@@ -56,6 +57,8 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
             timestamp: m?.timestamp,
             senderId: m?.senderId,
             messageStatus: m?.status,
+            isSystemMessage: Boolean(m?.isSystemMessage),
+            systemMessageType: m?.systemMessageType || null,
             totalUnreadMessages: ps?.unreadCount || 0,
           } as any;
         })

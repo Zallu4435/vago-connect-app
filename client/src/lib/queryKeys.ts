@@ -9,4 +9,8 @@ export const queryKeys = {
   user: {
     byEmail: (email: string) => ['user', email] as const,
   },
+  messageSearch: {
+    all: ['messageSearch'] as const,
+    byChat: (chatId: string | number) => ['messageSearch', String(chatId)] as const,
+  },
 } as const;

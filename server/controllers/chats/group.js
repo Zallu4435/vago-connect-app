@@ -122,7 +122,7 @@ export const addGroupMembers = async (req, res, next) => {
     const adminPart = convo.participants.find((p) => p.userId === adminId);
     if (!adminPart || adminPart.role !== 'admin') return res.status(403).json({ message: "Only admins can add members" });
 
-    const existingIds = new Set(convo.participants.map((p) => p.userId));
+    const existingIds = new Set(convo.participants.filter((p) => !p.leftAt).map((p) => p.userId));
     const toAddIds = members.filter((id) => !existingIds.has(id));
     if (toAddIds.length === 0) {
       return res.status(200).json({ participants: convo.participants });
@@ -162,7 +162,7 @@ export const addGroupMembers = async (req, res, next) => {
       include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
 
-    const minimalParts = updated.participants.map(p => ({ user: p.user, role: p.role }));
+    const minimalParts = updated.participants.filter(p => !p.leftAt).map(p => ({ user: p.user, role: p.role }));
     emitToUsers(updated.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
     return res.status(200).json({ conversationId: groupId, participants: minimalParts });
   } catch (error) {
@@ -217,8 +217,8 @@ export const removeGroupMembers = async (req, res, next) => {
       where: { id: groupId },
       include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
-    const minimalParts = updated.participants.map(p => ({ user: p.user, role: p.role }));
-    emitToUsers(updated.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+    const minimalParts = updated.participants.filter(p => !p.leftAt).map(p => ({ user: p.user, role: p.role }));
+    emitToUsers(updated.participants.filter(p => !p.leftAt).map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
     return res.status(200).json({ conversationId: groupId, participants: minimalParts });
   } catch (error) {
     next(error);
@@ -243,10 +243,21 @@ export const updateGroupSettings = async (req, res, next) => {
     const adminPart = convo.participants.find((p) => p.userId === adminId);
     if (!adminPart || adminPart.role !== 'admin') return res.status(403).json({ message: 'Only admins can update group settings' });
 
+    let iconUrl = undefined;
+    if (req.file && req.file.buffer) {
+      const cld = await uploadBuffer(req.file.buffer, {
+        folder: process.env.CLOUDINARY_FOLDER || undefined,
+        resource_type: "image",
+      });
+      iconUrl = cld.secure_url;
+    } else if (typeof groupIconUrl === "string" && groupIconUrl.trim()) {
+      iconUrl = groupIconUrl.trim();
+    }
+
     const data = { updatedAt: new Date() };
     if (typeof groupName === 'string' && groupName.trim()) data.groupName = groupName.trim();
     if (typeof groupDescription === 'string') data.groupDescription = groupDescription.trim();
-    if (typeof groupIconUrl === 'string' && groupIconUrl.trim()) data.groupIcon = groupIconUrl.trim();
+    if (iconUrl) data.groupIcon = iconUrl;
 
     const updatedConversation = await prisma.conversation.update({ where: { id: groupId }, data });
     const full = await prisma.conversation.findUnique({
@@ -259,6 +270,7 @@ export const updateGroupSettings = async (req, res, next) => {
       groupName: full.groupName,
       groupDescription: full.groupDescription,
       groupIcon: full.groupIcon,
+      createdById: full.createdById,
       updatedAt: full.updatedAt,
       participants: full.participants.map(p => ({ user: p.user, role: p.role })),
     };
@@ -311,7 +323,7 @@ export const updateGroupRole = async (req, res, next) => {
       include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
 
-    emitToUsers(updated.participants.map((p) => p.userId), 'group-role-updated', { conversationId: groupId, userId: Number(userId), role });
+    emitToUsers(updated.participants.filter(p => !p.leftAt).map((p) => p.userId), 'group-role-updated', { conversationId: groupId, userId: Number(userId), role });
     return res.status(200).json({ conversationId: groupId, userId: Number(userId), role });
   } catch (error) {
     next(error);
@@ -377,10 +389,10 @@ export const leaveGroup = async (req, res, next) => {
       where: { id: groupId },
       include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
     });
-    const minimalParts = updated.participants.map(p => ({ user: p.user, role: p.role }));
+    const minimalParts = updated.participants.filter(p => !p.leftAt).map(p => ({ user: p.user, role: p.role }));
 
-    // Notify remaining and leaving
-    emitToUsers(convo.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+    // Notify remaining active members (not the one who just left)
+    emitToUsers(updated.participants.filter(p => !p.leftAt).map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
     return res.status(200).json({ message: "Left group successfully", conversationId: groupId });
   } catch (error) {
     next(error);

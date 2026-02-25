@@ -10,6 +10,7 @@ import VideoMessage from "./messages/VideoMessage";
 import DocumentMessage from "./messages/DocumentMessage";
 import DeletedMessage from "./messages/DeletedMessage";
 import CallMessage from "./messages/CallMessage";
+import SystemMessage from "./messages/SystemMessage";
 
 /**
  * MessageWrapper - Unified wrapper for all single message types
@@ -29,6 +30,10 @@ function MessageWrapper({
     const senderAvatar = message?.sender?.profileImage || "/default_avatar.png";
     const isSelected = selectedIds?.includes(message.id);
     const isCall = message.type === "call";
+
+    if (message.isSystemMessage) {
+        return <SystemMessage message={message} />;
+    }
 
     return (
         <BaseMessageLayout
