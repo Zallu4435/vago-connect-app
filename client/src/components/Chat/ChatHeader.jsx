@@ -10,7 +10,10 @@ import { useSocketStore } from "@/stores/socketStore";
 import { showToast } from "@/lib/toast";
 import { useRef, useState } from "react";
 import { useContacts } from "@/hooks/queries/useContacts";
-import { useClearChat, useDeleteChat, useArchiveChat, usePinChat, useMuteChat } from "@/hooks/mutations/useChatActions";
+import { useClearChat, useDeleteChat } from "@/hooks/mutations/useChatActions";
+import { usePinChat } from "@/hooks/mutations/usePinChat";
+import { useLeaveGroup } from "@/hooks/mutations/useGroupActions";
+import { useBlockUser } from "@/hooks/mutations/useBlockUser";
 import GroupManageModal from "./GroupManageModal";
 import ActionSheet from "@/components/common/ActionSheet";
 import ConfirmModal from "@/components/common/ConfirmModal";
@@ -46,6 +49,8 @@ function ChatHeader({ onOpenMedia }) {
   const [showGroupManage, setShowGroupManage] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   // Get conversation details
   const { data: contacts = [] } = useContacts(userInfo?.id);
@@ -59,9 +64,9 @@ function ChatHeader({ onOpenMedia }) {
   // Chat actions
   const clearChat = useClearChat();
   const deleteChat = useDeleteChat();
-  const archiveChat = useArchiveChat();
   const pinChat = usePinChat();
-  const muteChat = useMuteChat();
+  const leaveGroup = useLeaveGroup();
+  const blockUser = useBlockUser();
 
   const setCallToast = (fn) => {
     if (callToastIdRef.current) {
@@ -212,31 +217,26 @@ function ChatHeader({ onOpenMedia }) {
                 },
                 danger: true,
               },
-              {
-                label: "Archive Chat",
-                disabled: !conversationId || archiveChat.isPending,
-                onClick: () => {
-                  if (!conversationId) return;
-                  archiveChat.mutate({ chatId: conversationId, archive: true });
-                },
-              },
-              {
+              ...(isSelfChat ? [] : [{
                 label: isPinned ? "Unpin Chat" : "Pin Chat",
                 disabled: !conversationId || pinChat.isPending,
                 onClick: () => {
                   if (!conversationId) return;
-                  pinChat.mutate({ chatId: conversationId, pin: !isPinned });
+                  pinChat.mutate({ conversationId, pinned: !isPinned, userId: userInfo?.id });
                 },
-              },
-              {
-                label: "Mute for 24 hours",
-                disabled: !conversationId || muteChat.isPending,
-                onClick: () => {
-                  if (!conversationId) return;
-                  const until = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-                  muteChat.mutate({ chatId: conversationId, mutedUntil: until });
-                },
-              },
+              }]),
+              ...(conversationType === "group" || isSelfChat ? [] : [{
+                label: "Block User",
+                disabled: !currentChatUser?.id || blockUser.isPending,
+                onClick: () => setShowBlockConfirm(true),
+                danger: true,
+              }]),
+              ...(conversationType === "group" ? [{
+                label: "Exit Group",
+                disabled: !conversationId || leaveGroup.isPending,
+                onClick: () => setShowExitConfirm(true),
+                danger: true,
+              }] : []),
             ]}
           />
         </div>
@@ -270,13 +270,50 @@ function ChatHeader({ onOpenMedia }) {
           if (!conversationId) return;
           deleteChat.mutate(
             { chatId: conversationId },
-            { onSuccess: () => setShowDeleteConfirm(false) }
+            { onSuccess: () => { setShowDeleteConfirm(false); setCurrentChatUser(null); } }
           );
         }}
         title="Delete this chat?"
         description="This will permanently delete the conversation from your chats list. It does not delete messages for the other participant."
         confirmText={deleteChat.isPending ? "Deleting..." : "Delete"}
         confirmLoading={deleteChat.isPending}
+        variant="danger"
+      />
+
+      {/* Confirm: Block User */}
+      <ConfirmModal
+        open={showBlockConfirm}
+        onClose={() => setShowBlockConfirm(false)}
+        onConfirm={() => {
+          const targetId = currentChatUser?.id;
+          if (!targetId) return;
+          blockUser.mutate(
+            { userId: targetId, block: true },
+            { onSuccess: () => setShowBlockConfirm(false) }
+          );
+        }}
+        title={`Block ${currentChatUser?.name || currentChatUser?.username}?`}
+        description="Blocked contacts will no longer be able to call you or send you messages."
+        confirmText={blockUser.isPending ? "Blocking..." : "Block"}
+        confirmLoading={blockUser.isPending}
+        variant="danger"
+      />
+
+      {/* Confirm: Exit Group */}
+      <ConfirmModal
+        open={showExitConfirm}
+        onClose={() => setShowExitConfirm(false)}
+        onConfirm={() => {
+          if (!conversationId) return;
+          leaveGroup.mutate(
+            conversationId,
+            { onSuccess: () => { setShowExitConfirm(false); setCurrentChatUser(null); } }
+          );
+        }}
+        title={`Exit "${currentChatUser?.name || currentChatUser?.username || 'Group'}"?`}
+        description="Are you sure you want to exit this group? You will no longer receive messages from this group."
+        confirmText={leaveGroup.isPending ? "Exiting..." : "Exit Group"}
+        confirmLoading={leaveGroup.isPending}
         variant="danger"
       />
     </div>

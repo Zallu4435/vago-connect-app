@@ -1,6 +1,7 @@
 import { useMutation, UseMutationResult, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { PIN_CHAT_ROUTE } from '@/utils/ApiRoutes';
+import { showToast } from '@/lib/toast';
 
 interface PinChatInput {
   conversationId: number | string;
@@ -17,6 +18,7 @@ export function usePinChat(): UseMutationResult<any, Error, PinChatInput> {
       return data;
     },
     onSuccess: (updated, variables) => {
+      showToast.success(variables.pinned ? "Chat pinned" : "Chat unpinned");
       const contactsKey = ['contacts', String(variables.userId)];
       qc.setQueryData<any[]>(contactsKey, (old = []) => {
         if (!Array.isArray(old)) return old;

@@ -8,7 +8,6 @@ import { useRouter } from "next/router";
 import { useAuthStore } from "@/stores/authStore";
 import { showToast } from "@/lib/toast";
 import { isTokenExpired } from "@/lib/tokenManager";
-import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 function Login() {
   const router = useRouter();
@@ -94,7 +93,12 @@ function Login() {
         disabled={isLoading}
       >
         {isLoading ? (
-          <LoadingSpinner label="Authenticating..." size={32} />
+          <>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 border-[3px] border-ancient-icon-glow border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            <span className="text-ancient-text-light text-lg sm:text-2xl md:text-3xl font-bold select-none tracking-wider">
+              Authenticating…
+            </span>
+          </>
         ) : (
           <>
             <FcGoogle className="text-3xl sm:text-4xl md:text-5xl transition-transform duration-300 group-hover:scale-125 group-hover:rotate-6 drop-shadow-md flex-shrink-0" />

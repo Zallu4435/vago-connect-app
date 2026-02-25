@@ -61,3 +61,20 @@ export async function isBlockedBetweenUsers(prisma, userAId, userBId) {
   });
   return Boolean(blocked);
 }
+
+export async function unhideConversationParticipants(prisma, conversationId) {
+  try {
+    await prisma.conversationParticipant.updateMany({
+      where: {
+        conversationId: Number(conversationId),
+        isDeleted: true,
+      },
+      data: {
+        isDeleted: false,
+        deletedAt: null,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to unhide conversation:", error);
+  }
+}

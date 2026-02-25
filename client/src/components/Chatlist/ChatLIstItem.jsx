@@ -9,6 +9,10 @@ import { IoChevronDown } from "react-icons/io5";
 import { FaThumbtack } from "react-icons/fa";
 import ActionSheet from "@/components/common/ActionSheet";
 import { usePinChat } from "@/hooks/mutations/usePinChat";
+import { useDeleteChat, useClearChat } from "@/hooks/mutations/useChatActions";
+import { useLeaveGroup } from "@/hooks/mutations/useGroupActions";
+import { useBlockUser } from "@/hooks/mutations/useBlockUser";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import { showToast } from "@/lib/toast";
 
 function ChatListItem({ data, isContactsPage = false }) {
@@ -16,9 +20,14 @@ function ChatListItem({ data, isContactsPage = false }) {
   const setCurrentChatUser = useChatStore((s) => s.setCurrentChatUser);
   const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const menuBtnRef = useRef(null);
 
   const handleContactClick = () => {
+    if (showDeleteConfirm || showClearConfirm || showBlockConfirm || showExitConfirm) return;
     setCurrentChatUser(data);
     if (isContactsPage) setAllContactsPage(false);
   };
@@ -37,16 +46,21 @@ function ChatListItem({ data, isContactsPage = false }) {
 
   const pinMutation = usePinChat();
   const onTogglePin = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation?.();
     if (!data?.conversationId || !userInfo?.id) return;
     pinMutation.mutate({ conversationId: data.conversationId, pinned: !data?.isPinned, userId: userInfo.id });
     setMenuOpen(false);
   };
 
-  const onArchive = (e) => { e.stopPropagation(); showToast.info("Archive coming soon"); setMenuOpen(false); };
-  const onDelete = (e) => { e.stopPropagation(); showToast.info("Delete coming soon"); setMenuOpen(false); };
-  const onBlock = (e) => { e.stopPropagation(); showToast.info("Block coming soon"); setMenuOpen(false); };
-  const onExit = (e) => { e.stopPropagation(); showToast.info("Exit coming soon"); setMenuOpen(false); };
+  const deleteChat = useDeleteChat();
+  const clearChat = useClearChat();
+  const leaveGroup = useLeaveGroup();
+  const blockUser = useBlockUser();
+
+  const onDelete = (e) => { e?.stopPropagation?.(); setShowDeleteConfirm(true); setMenuOpen(false); };
+  const onClear = (e) => { e?.stopPropagation?.(); setShowClearConfirm(true); setMenuOpen(false); };
+  const onBlock = (e) => { e?.stopPropagation?.(); setShowBlockConfirm(true); setMenuOpen(false); };
+  const onExit = (e) => { e?.stopPropagation?.(); setShowExitConfirm(true); setMenuOpen(false); };
 
   const displayName = data?.isSelf
     ? (data?.isPinned ? "Saved messages" : ((data?.name || data?.username || userInfo?.name) ? `${data?.name || data?.username || userInfo?.name} (You)` : "You"))
@@ -89,7 +103,7 @@ function ChatListItem({ data, isContactsPage = false }) {
                 hover:bg-ancient-input-bg text-ancient-text-muted
                 transition
               "
-              onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+              onClick={(e) => { e?.stopPropagation?.(); setMenuOpen((v) => !v); }}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               ref={menuBtnRef}
@@ -100,14 +114,17 @@ function ChatListItem({ data, isContactsPage = false }) {
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
               align="right"
-              placement="below"
+              placement="bottom"
               anchorRef={menuBtnRef}
               items={[
-                { label: "Archive", onClick: onArchive },
-                { label: data?.isPinned ? "Unpin" : "Pin", onClick: onTogglePin },
+                // Hide Pin for Self Chat
+                ...(data?.isSelf ? [] : [{ label: data?.isPinned ? "Unpin" : "Pin", onClick: onTogglePin }]),
+                { label: "Clear Chat", onClick: onClear },
                 { label: "Delete", onClick: onDelete, danger: true },
-                { label: "Block", onClick: onBlock, danger: true },
-                { label: "Exit", onClick: onExit },
+                // Hide Block for Groups and Self Chat
+                ...(data?.isGroup || data?.type === "group" || data?.isSelf ? [] : [{ label: "Block", onClick: onBlock, danger: true }]),
+                // Show Exit ONLY for Groups
+                ...(data?.isGroup || data?.type === "group" ? [{ label: "Exit Group", onClick: onExit, danger: true }] : []),
               ]}
             />
           </div>
@@ -133,6 +150,83 @@ function ChatListItem({ data, isContactsPage = false }) {
           )}
         </div>
       </div>
+
+      {/* Confirm: Clear Chat */}
+      <ConfirmModal
+        open={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={(e) => {
+          e?.stopPropagation?.();
+          if (!data?.conversationId) return;
+          clearChat.mutate(
+            { chatId: data.conversationId },
+            { onSuccess: () => setShowClearConfirm(false) }
+          );
+        }}
+        title="Clear this chat?"
+        description="This will remove messages from your device for this conversation."
+        confirmText={clearChat.isPending ? "Clearing..." : "Clear"}
+        confirmLoading={clearChat.isPending}
+        variant="warning"
+      />
+
+      {/* Confirm: Delete Chat */}
+      <ConfirmModal
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={(e) => {
+          e?.stopPropagation?.();
+          if (!data?.conversationId) return;
+          deleteChat.mutate(
+            { chatId: data.conversationId },
+            { onSuccess: () => setShowDeleteConfirm(false) }
+          );
+        }}
+        title="Delete this chat?"
+        description="This will permanently delete the conversation from your chats list."
+        confirmText={deleteChat.isPending ? "Deleting..." : "Delete"}
+        confirmLoading={deleteChat.isPending}
+        variant="danger"
+      />
+
+      {/* Confirm: Block User */}
+      <ConfirmModal
+        open={showBlockConfirm}
+        onClose={() => setShowBlockConfirm(false)}
+        onConfirm={(e) => {
+          e?.stopPropagation?.();
+          const targetId = data?.id || data?.user?.id;
+          if (!targetId) return;
+          blockUser.mutate(
+            { userId: targetId, block: true },
+            { onSuccess: () => setShowBlockConfirm(false) }
+          );
+        }}
+        title={`Block ${displayName}?`}
+        description="Blocked contacts will no longer be able to call you or send you messages."
+        confirmText={blockUser.isPending ? "Blocking..." : "Block"}
+        confirmLoading={blockUser.isPending}
+        variant="danger"
+      />
+
+      {/* Confirm: Exit Group */}
+      <ConfirmModal
+        open={showExitConfirm}
+        onClose={() => setShowExitConfirm(false)}
+        onConfirm={(e) => {
+          e?.stopPropagation?.();
+          if (!data?.conversationId) return;
+          leaveGroup.mutate(
+            data.conversationId,
+            { onSuccess: () => setShowExitConfirm(false) }
+          );
+        }}
+        title={`Exit "${displayName}"?`}
+        description="Are you sure you want to exit this group? You will no longer receive messages from this group."
+        confirmText={leaveGroup.isPending ? "Exiting..." : "Exit Group"}
+        confirmLoading={leaveGroup.isPending}
+        variant="danger"
+      />
     </div>
   );
 }

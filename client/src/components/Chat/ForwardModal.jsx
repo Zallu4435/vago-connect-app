@@ -1,24 +1,48 @@
 "use client";
-import React, { useMemo, useState, useEffect } from "react";
-import { useContacts } from "@/hooks/queries/useContacts";
+import React, { useMemo, useState, useEffect, useRef } from "react";
+import { useContactsPaginated } from "@/hooks/queries/useContactsPaginated";
 import { useForwardMessages } from "@/hooks/mutations/useForwardMessages";
 import { useAuthStore } from "@/stores/authStore";
+import { useDebounce } from "@/hooks/useDebounce";
 import { showToast } from "@/lib/toast";
-import Image from "next/image";
 import { IoClose } from "react-icons/io5";
-import { FaPaperPlane, FaSearch, FaUserCircle } from "react-icons/fa";
+import { FaPaperPlane, FaSearch, FaUsers } from "react-icons/fa";
+import { MdPersonSearch, MdCheckCircle } from "react-icons/md";
 import ModalShell from "@/components/common/ModalShell";
 import ModalHeader from "@/components/common/ModalHeader";
-import ThemedInput from "@/components/common/ThemedInput";
 import Avatar from "@/components/common/Avatar";
+
+const MAX_SELECTIONS = 5;
 
 export default function ForwardModal({ open, onClose, initialMessageIds = [] }) {
   const userInfo = useAuthStore((s) => s.userInfo);
-  const { data: contacts = [], isLoading } = useContacts(userInfo?.id);
   const [selectedConvoIds, setSelectedConvoIds] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const searchRef = useRef(null);
   const forwardMutation = useForwardMessages();
 
+  // Debounce the search term before sending to backend (400ms)
+  const debouncedQ = useDebounce(searchTerm, 400);
+  const isSearching = searchTerm !== debouncedQ; // true while user is typing
+
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useContactsPaginated(userInfo?.id, {
+    limit: 30,
+    q: debouncedQ.trim(),
+  });
+
+  // Flatten paginated pages into a single contacts array
+  const contacts = useMemo(
+    () => data?.pages?.flatMap((p) => p.contacts ?? []) ?? [],
+    [data]
+  );
+
+  // Reset on close
   useEffect(() => {
     if (!open) {
       setSelectedConvoIds([]);
@@ -26,21 +50,19 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
     }
   }, [open]);
 
-  const filteredContacts = useMemo(() => {
-    if (!searchTerm) return contacts;
-    const q = searchTerm.toLowerCase();
-    return contacts.filter((c) =>
-      c.name.toLowerCase().includes(q) ||
-      c.about?.toLowerCase()?.includes(q)
-    );
-  }, [contacts, searchTerm]);
+  // Auto-focus search when modal opens
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => searchRef.current?.focus(), 100);
+    }
+  }, [open]);
 
   const toggleSelection = (convoId) => {
     if (!convoId) return;
     setSelectedConvoIds((prev) => {
       if (prev.includes(convoId)) return prev.filter((id) => id !== convoId);
-      if (prev.length >= 5) {
-        showToast.info("You can forward to up to 5 chats at once");
+      if (prev.length >= MAX_SELECTIONS) {
+        showToast.info(`You can forward to up to ${MAX_SELECTIONS} chats at once`);
         return prev;
       }
       return [...prev, convoId];
@@ -49,92 +71,242 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
 
   const handleForward = () => {
     if (!selectedConvoIds.length || !initialMessageIds.length) return;
-
     forwardMutation.mutate(
-      {
-        messageIds: initialMessageIds,
-        toConversationIds: selectedConvoIds,
-      },
+      { messageIds: initialMessageIds, toConversationIds: selectedConvoIds },
       {
         onSuccess: () => {
-          showToast.success("Messages forwarded");
+          showToast.success("Messages forwarded successfully");
           onClose?.();
         },
-        onError: (err) => {
-          showToast.error(err?.message || "Failed to forward messages");
-        },
+        onError: (err) =>
+          showToast.error(err?.message || "Failed to forward messages"),
       }
     );
   };
 
+  // Build a lookup map for selected contacts (for chips)
+  const selectedContacts = useMemo(
+    () => contacts.filter((c) => selectedConvoIds.includes(c.conversationId)),
+    [contacts, selectedConvoIds]
+  );
+
+  const isLoadingAny = isLoading || isSearching;
+
   return (
     <ModalShell open={open} onClose={onClose} maxWidth="max-w-md">
-      <div className="flex flex-col h-[60vh] sm:h-[70vh]">
+      <div className="flex flex-col h-[65vh] sm:h-[72vh]">
+
+        {/* Header */}
         <ModalHeader
-          title="Forward to..."
+          title="Forward to…"
           Icon={FaPaperPlane}
           onClose={onClose}
           centerTitle
         />
 
-        <div className="p-4 border-b border-ancient-border-stone bg-ancient-input-bg">
-          <ThemedInput
-            name="Search chats"
-            state={searchTerm}
-            setState={setSearchTerm}
-            placeholder="Search recent chats..."
-            Icon={FaSearch}
-          />
+        {/* Search box */}
+        <div className="px-4 pt-3 pb-2 border-b border-ancient-border-stone/50 bg-ancient-bg-dark">
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ancient-text-muted text-sm pointer-events-none" />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder="Search chats or groups…"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-ancient-input-bg border border-ancient-input-border focus:border-ancient-icon-glow rounded-full pl-9 pr-9 py-2 text-[14px] text-ancient-text-light placeholder:text-ancient-text-muted outline-none transition-all"
+              aria-label="Search chats"
+            />
+            {/* Clear button */}
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ancient-text-muted hover:text-ancient-text-light transition-colors"
+                aria-label="Clear search"
+              >
+                <IoClose className="text-base" />
+              </button>
+            )}
+            {/* Debounce spinner */}
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="w-3.5 h-3.5 border-2 border-ancient-icon-glow border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-          {isLoading ? (
-            <div className="p-8 text-center text-ancient-text-muted">Loading chats...</div>
-          ) : filteredContacts.length === 0 ? (
-            <div className="p-8 text-center text-ancient-text-muted">No recent chats found</div>
-          ) : (
-            filteredContacts.map((contact) => (
-              <div
-                key={contact.id}
-                onClick={() => toggleSelection(contact.conversationId)}
-                className={`
-                  flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200
-                  ${selectedConvoIds.includes(contact.conversationId)
-                    ? "bg-ancient-icon-glow/20 border border-ancient-icon-glow/40 shadow-inner"
-                    : "hover:bg-ancient-bg-medium border border-transparent"}
-                `}
+        {/* Selected chips row */}
+        {selectedContacts.length > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto custom-scrollbar border-b border-ancient-border-stone/30 bg-ancient-bg-dark">
+            {selectedContacts.map((c) => (
+              <button
+                key={c.conversationId}
+                onClick={() => toggleSelection(c.conversationId)}
+                className="flex-shrink-0 flex items-center gap-1.5 pl-1.5 pr-2 py-1 bg-ancient-icon-glow/15 border border-ancient-icon-glow/40 rounded-full text-[12px] text-ancient-text-light hover:bg-red-500/20 hover:border-red-400/50 transition-all group"
+                title={`Remove ${c.name}`}
+                aria-label={`Deselect ${c.name}`}
               >
                 <Avatar
-                  image={contact.profilePicture}
-                  type="sm"
+                  image={c.profilePicture}
+                  type="xs"
                   defaultImage="/default_avatar.png"
                 />
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-ancient-text-light font-medium truncate">{contact.name}</h4>
-                  <p className="text-xs text-ancient-text-muted truncate">{contact.about || "Available"}</p>
-                </div>
-                {selectedConvoIds.includes(contact.conversationId) && (
-                  <div className="h-5 w-5 rounded-full bg-ancient-icon-glow flex items-center justify-center text-ancient-bg-dark shadow-sm">
-                    <span className="text-[10px] font-bold">✓</span>
+                <span className="max-w-[80px] truncate font-medium">{c.name}</span>
+                <IoClose className="text-[10px] text-ancient-text-muted group-hover:text-red-400 transition-colors" />
+              </button>
+            ))}
+            <span className="ml-auto flex-shrink-0 text-[11px] text-ancient-text-muted whitespace-nowrap">
+              {selectedConvoIds.length}/{MAX_SELECTIONS}
+            </span>
+          </div>
+        )}
+
+        {/* Contact list */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {isLoadingAny ? (
+            /* Skeleton loader */
+            <div className="p-3 space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl animate-pulse">
+                  <div className="w-10 h-10 rounded-full bg-ancient-input-bg flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-ancient-input-bg rounded w-2/5" />
+                    <div className="h-2.5 bg-ancient-input-bg/60 rounded w-3/5" />
                   </div>
-                )}
-              </div>
-            ))
+                </div>
+              ))}
+            </div>
+          ) : contacts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-ancient-text-muted py-10">
+              <MdPersonSearch className="text-5xl opacity-40" />
+              <p className="text-sm font-medium">
+                {debouncedQ ? `No results for "${debouncedQ}"` : "No chats found"}
+              </p>
+              {debouncedQ && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="text-xs text-ancient-icon-glow hover:underline"
+                >
+                  Clear search
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="p-2 space-y-0.5">
+              {contacts.map((contact) => {
+                const isSelected = selectedConvoIds.includes(contact.conversationId);
+                return (
+                  <div
+                    key={contact.conversationId ?? contact.id}
+                    onClick={() => toggleSelection(contact.conversationId)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleSelection(contact.conversationId);
+                      }
+                    }}
+                    aria-pressed={isSelected}
+                    aria-label={`${isSelected ? "Deselect" : "Select"} ${contact.name}`}
+                    className={`
+                      flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer
+                      transition-all duration-150 select-none
+                      ${isSelected
+                        ? "bg-ancient-icon-glow/15 border border-ancient-icon-glow/40"
+                        : "hover:bg-ancient-input-bg border border-transparent"}
+                    `}
+                  >
+                    {/* Avatar */}
+                    <div className="relative flex-shrink-0">
+                      <Avatar
+                        image={contact.profilePicture}
+                        type="sm"
+                        defaultImage="/default_avatar.png"
+                      />
+                      {/* Group badge */}
+                      {contact.isGroup && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-ancient-bg-dark border border-ancient-border-stone flex items-center justify-center">
+                          <FaUsers className="text-[8px] text-ancient-icon-glow" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-[14px] text-ancient-text-light font-medium truncate leading-tight">
+                          {contact.name}
+                        </h4>
+                        {contact.isSelf && (
+                          <span className="text-[10px] text-ancient-icon-glow font-semibold flex-shrink-0">
+                            (You)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[12px] text-ancient-text-muted truncate leading-tight">
+                        {contact.about || (contact.isGroup ? "Group" : "Online")}
+                      </p>
+                    </div>
+
+                    {/* Checkmark */}
+                    {isSelected && (
+                      <MdCheckCircle className="text-xl text-ancient-icon-glow flex-shrink-0" />
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Load more */}
+              {hasNextPage && (
+                <div className="pt-2 pb-1 flex justify-center">
+                  <button
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                    className="text-[12px] text-ancient-icon-glow hover:underline disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {isFetchingNextPage ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-ancient-icon-glow border-t-transparent rounded-full animate-spin" />
+                        Loading…
+                      </>
+                    ) : (
+                      "Load more"
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
+        {/* Footer — forward action */}
         {selectedConvoIds.length > 0 && (
-          <div className="p-4 bg-ancient-bg-medium border-t border-ancient-border-stone flex items-center justify-between animate-in slide-in-from-bottom-2">
-            <div className="text-sm text-ancient-text-muted">
-              {selectedConvoIds.length} chat{selectedConvoIds.length > 1 ? "s" : ""} selected
+          <div className="flex-shrink-0 px-4 py-3 bg-ancient-bg-medium border-t border-ancient-border-stone/50 flex items-center justify-between animate-slide-in-up">
+            <div className="text-[13px] text-ancient-text-muted">
+              <span className="text-ancient-text-light font-semibold">
+                {selectedConvoIds.length}
+              </span>{" "}
+              chat{selectedConvoIds.length > 1 ? "s" : ""} selected
             </div>
             <button
               onClick={handleForward}
               disabled={forwardMutation.isPending}
-              className="bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold px-6 py-2 rounded-lg shadow-lg hover:shadow-ancient-icon-glow/20 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2 rounded-full bg-ancient-icon-glow hover:brightness-110 text-ancient-bg-dark font-semibold text-[13px] shadow-lg transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+              aria-label="Forward messages"
             >
-              {forwardMutation.isPending ? "Forwarding..." : "Forward"}
-              <FaPaperPlane className="text-xs" />
+              {forwardMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-ancient-bg-dark border-t-transparent rounded-full animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  Forward
+                  <FaPaperPlane className="text-xs" />
+                </>
+              )}
             </button>
           </div>
         )}

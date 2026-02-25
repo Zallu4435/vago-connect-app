@@ -9,6 +9,8 @@ const MESSAGE_ROUTES = `${API_PREFIX}/messages`
 export const CHECK_USER_ROUTE = `${AUTH_ROUTES}/check-user`
 export const ONBOARD_USER_ROUTE = `${AUTH_ROUTES}/onboard-user`
 export const GET_ALL_CONTACTS_ROUTE = `${AUTH_ROUTES}/all-users`
+export const BLOCK_USER_ROUTE = (userId) => `${API_PREFIX}/users/block/${userId}`
+export const UNBLOCK_USER_ROUTE = (userId) => `${API_PREFIX}/users/block/${userId}`
 export const ADD_MESSAGE_ROUTE = `${MESSAGE_ROUTES}/add-message`
 export const ADD_IMAGE_ROUTE = `${MESSAGE_ROUTES}/add-image`
 export const ADD_AUDIO_ROUTE = `${MESSAGE_ROUTES}/audio`

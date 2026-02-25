@@ -1,32 +1,70 @@
 /* ===== Utility animations and helpers ===== */
 /* Fade in up animation */
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.animate-fade-in-up { animation: fade-in-up 0.6s ease-out; }
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out;
+}
 
 /* Pulse light animation */
 @keyframes pulse-light {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
 }
-.animate-pulse-light { animation: pulse-light 3s ease-in-out infinite; }
+
+.animate-pulse-light {
+  animation: pulse-light 3s ease-in-out infinite;
+}
 
 /* Slow spin animation */
 @keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
-.animate-spin-slow { animation: spin-slow 2s linear infinite; }
+
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
+}
 
 /* Delay utility */
-.delay-500 { animation-delay: 500ms; }
+.delay-500 {
+  animation-delay: 500ms;
+}
 
 /* Safe area bottom padding */
-.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Firefox-specific fixes */
-@-moz-document url-prefix() { .message-bubble { word-break: break-word; } }
+@-moz-document url-prefix() {
+  .message-bubble {
+    word-break: break-word;
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -56,16 +94,26 @@
 /* Emoji Picker Ancient Theme Overrides */
 .EmojiPickerReact,
 .EmojiPickerReact.epr-dark-theme {
-  --epr-bg-color: #292b30;            /* ancient-bg-medium */
-  --epr-text-color: #e0e0e0;          /* ancient-text-light */
-  --epr-category-label-bg-color: #1e2024; /* ancient-bg-dark */
-  --epr-picker-border-color: #4b4f57; /* ancient-border-stone */
-  --epr-hover-bg-color: #33363d;      /* ancient-input-bg */
-  --epr-search-bg-color: #33363d;     /* ancient-input-bg */
-  --epr-search-border-color: #444850; /* ancient-input-border */
-  --epr-search-placeholder-color: #a0a0a0; /* ancient-text-muted */
-  --epr-highlight-color: #4ade80;     /* ancient-icon-glow */
-  --epr-scrollbar-color: #4b4f57;     /* ancient-border-stone */
+  --epr-bg-color: #292b30;
+  /* ancient-bg-medium */
+  --epr-text-color: #e0e0e0;
+  /* ancient-text-light */
+  --epr-category-label-bg-color: #1e2024;
+  /* ancient-bg-dark */
+  --epr-picker-border-color: #4b4f57;
+  /* ancient-border-stone */
+  --epr-hover-bg-color: #33363d;
+  /* ancient-input-bg */
+  --epr-search-bg-color: #33363d;
+  /* ancient-input-bg */
+  --epr-search-border-color: #444850;
+  /* ancient-input-border */
+  --epr-search-placeholder-color: #a0a0a0;
+  /* ancient-text-muted */
+  --epr-highlight-color: #4ade80;
+  /* ancient-icon-glow */
+  --epr-scrollbar-color: #4b4f57;
+  /* ancient-border-stone */
 
 
   background-color: var(--epr-bg-color) !important;
@@ -107,9 +155,20 @@
 
 /* Animations for simulated waves */
 @keyframes pulse-waves {
-  0% { transform: scaleY(1); opacity: 1; }
-  50% { transform: scaleY(1.2); opacity: 0.8; }
-  100% { transform: scaleY(1); opacity: 1; }
+  0% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scaleY(1.2);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
 }
 
 
@@ -118,8 +177,15 @@
 }
 
 @keyframes audio-wave {
-  0%, 100% { transform: scaleY(0.2); }
-  50% { transform: scaleY(1); }
+
+  0%,
+  100% {
+    transform: scaleY(0.2);
+  }
+
+  50% {
+    transform: scaleY(1);
+  }
 }
 
 
@@ -142,8 +208,15 @@
 
 /* Slide in up animation for bottom trays (e.g., CaptureAudio) */
 @keyframes slide-in-up {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 
@@ -154,8 +227,13 @@
 
 /* Sidebar slide-in (from left) */
 @keyframes slide-in {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
 }
 
 
@@ -166,11 +244,53 @@
 
 /* Backdrop fade-in */
 @keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 
 .animate-fade-in {
   animation: fade-in 0.3s ease-out forwards;
+}
+
+
+/* ── Modal body lock — page blur ── */
+/* When a modal is open, blur and dim the underlying page content.
+   Only targets direct body children that are NOT our modal portal. */
+html[data-modal-open] body>*:not(#modal-portal) {
+  filter: blur(4px) brightness(0.7);
+  transition: filter 0.2s ease;
+  pointer-events: none;
+  /* Prevent interaction with page beneath modal */
+  user-select: none;
+}
+
+/* Restore instantly when closed */
+html:not([data-modal-open]) body>*:not(#modal-portal) {
+  filter: none;
+  pointer-events: auto;
+  user-select: auto;
+  transition: filter 0.15s ease;
+}
+
+/* Zoom in animation for modal panels */
+@keyframes zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-zoom-in {
+  animation: zoom-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }

@@ -7,18 +7,27 @@
   box-shadow: none;
 }
 
-.message-bubble-video > div { width: 100%; }
+.message-bubble-video>div {
+  width: 100%;
+}
 
 /* Video sparkles */
 .message-bubble-video .sparkle-1,
 .message-bubble-video .sparkle-2,
-.message-bubble-video .sparkle-3 { font-size: 11px; }
+.message-bubble-video .sparkle-3 {
+  font-size: 11px;
+}
 
 /* Video player custom controls enhancement */
-.message-bubble-video video { display: block; background: #000; }
-.message-bubble-video video::-webkit-media-controls-panel {
-  background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.7));
+.message-bubble-video video {
+  display: block;
+  background: #000;
 }
+
+.message-bubble-video video::-webkit-media-controls-panel {
+  background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.7));
+}
+
 .message-bubble-video video::-webkit-media-controls-play-button {
   background-color: var(--ancient-icon-glow, #4ade80);
   border-radius: 50%;
@@ -29,16 +38,32 @@
   transform-origin: center;
   will-change: transform;
 }
-.message-bubble-video button[aria-label="Play video"]:active { transform: scale(0.95); }
+
+.message-bubble-video button[aria-label="Play video"]:active {
+  transform: scale(0.95);
+}
 
 /* Responsive video adjustments */
 @media (max-width: 640px) {
-  .message-bubble-video video { max-height: 350px; }
-  .message-bubble-video button[aria-label="Play video"] { width: 56px; height: 56px; }
+  .message-bubble-video video {
+    max-height: 350px;
+  }
+
+  .message-bubble-video button[aria-label="Play video"] {
+    width: 56px;
+    height: 56px;
+  }
 }
+
 @media (max-width: 480px) {
-  .message-bubble-video video { max-height: 300px; }
-  .message-bubble-video .line-clamp-3 { -webkit-line-clamp: 2; font-size: 13px; }
+  .message-bubble-video video {
+    max-height: 300px;
+  }
+
+  .message-bubble-video .line-clamp-3 {
+    -webkit-line-clamp: 2;
+    font-size: 13px;
+  }
 }
 
 /* Focus styles for accessibility */
@@ -47,6 +72,7 @@
   outline-offset: 3px;
   border-radius: 14px;
 }
+
 .message-bubble-video button:focus-visible {
   outline: 3px solid var(--ancient-icon-glow, #4ade80);
   outline-offset: 3px;
@@ -54,25 +80,36 @@
 
 /* Video loading shimmer effect */
 @keyframes videoShimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
+
 .message-bubble-video .animate-pulse {
-  background: linear-gradient(
-    90deg,
-    var(--ancient-input-bg, #374151) 25%,
-    var(--ancient-bg-medium, #1f2937) 50%,
-    var(--ancient-input-bg, #374151) 75%
-  );
+  background: linear-gradient(90deg,
+      var(--ancient-input-bg, #374151) 25%,
+      var(--ancient-bg-medium, #1f2937) 50%,
+      var(--ancient-input-bg, #374151) 75%);
   background-size: 200% 100%;
   animation: videoShimmer 1.5s infinite;
 }
 
 /* Prevent video controls from overlapping status */
-.message-bubble-video video::-webkit-media-controls { padding-bottom: 40px; }
+.message-bubble-video video::-webkit-media-controls {
+  padding-bottom: 40px;
+}
 
 /* High contrast mode support */
-@media (prefers-contrast: high) { .message-bubble-video video { border: 2px solid currentColor; } }
+@media (prefers-contrast: high) {
+  .message-bubble-video video {
+    border: 2px solid currentColor;
+  }
+}
+
 /* Image message bubble specific styling */
 .message-bubble-image {
   padding: 0;
@@ -81,12 +118,16 @@
   box-shadow: none;
 }
 
-.message-bubble-image > div { width: 100%; }
+.message-bubble-image>div {
+  width: 100%;
+}
 
 /* Image sparkles */
 .message-bubble-image .sparkle-1,
 .message-bubble-image .sparkle-2,
-.message-bubble-image .sparkle-3 { font-size: 11px; }
+.message-bubble-image .sparkle-3 {
+  font-size: 11px;
+}
 
 /* Caption text clamping */
 .line-clamp-3 {
@@ -99,26 +140,40 @@
 
 /* Image loading animation */
 @keyframes imageShimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .message-bubble-image .animate-pulse {
-  background: linear-gradient(
-    90deg,
-    var(--ancient-input-bg, #374151) 25%,
-    var(--ancient-bg-medium, #1f2937) 50%,
-    var(--ancient-input-bg, #374151) 75%
-  );
+  background: linear-gradient(90deg,
+      var(--ancient-input-bg, #374151) 25%,
+      var(--ancient-bg-medium, #1f2937) 50%,
+      var(--ancient-input-bg, #374151) 75%);
   background-size: 200% 100%;
   animation: imageShimmer 1.5s infinite;
 }
 
 /* Responsive image adjustments */
-@media (max-width: 640px) { .message-bubble-image img { max-height: 350px; } }
+@media (max-width: 640px) {
+  .message-bubble-image img {
+    max-height: 350px;
+  }
+}
+
 @media (max-width: 480px) {
-  .message-bubble-image img { max-height: 300px; }
-  .message-bubble-image .line-clamp-3 { -webkit-line-clamp: 2; font-size: 13px; }
+  .message-bubble-image img {
+    max-height: 300px;
+  }
+
+  .message-bubble-image .line-clamp-3 {
+    -webkit-line-clamp: 2;
+    font-size: 13px;
+  }
 }
 
 /* Focus styles for accessibility */
@@ -129,11 +184,21 @@
 }
 
 /* High contrast mode support */
-@media (prefers-contrast: high) { .message-bubble-image img { border: 2px solid currentColor; } }
+@media (prefers-contrast: high) {
+  .message-bubble-image img {
+    border: 2px solid currentColor;
+  }
+}
 
 /* Lazy loading blur-up effect */
-.message-bubble-image img[loading="lazy"] { transition: filter 0.3s ease; }
-.message-bubble-image img[loading="lazy"]:not([src]) { filter: blur(10px); }
+.message-bubble-image img[loading="lazy"] {
+  transition: filter 0.3s ease;
+}
+
+.message-bubble-image img[loading="lazy"]:not([src]) {
+  filter: blur(10px);
+}
+
 /* Document message bubble specific styling */
 .message-bubble-document {
   padding: 0;
@@ -142,7 +207,7 @@
   box-shadow: none;
 }
 
-.message-bubble-document > div {
+.message-bubble-document>div {
   width: 100%;
   max-width: 420px;
 }
@@ -151,6 +216,7 @@
 .message-bubble-document span[class*="absolute"] {
   transition: transform 0.2s ease;
 }
+
 .message-bubble-document:hover span[class*="absolute"] {
   transform: scale(1.1);
 }
@@ -158,15 +224,28 @@
 /* Document sparkles */
 .message-bubble-document .sparkle-1,
 .message-bubble-document .sparkle-2,
-.message-bubble-document .sparkle-3 { font-size: 10px; }
+.message-bubble-document .sparkle-3 {
+  font-size: 10px;
+}
 
 /* Responsive document message adjustments */
 @media (max-width: 640px) {
-  .message-bubble-document > div { max-width: 100%; padding: 12px; }
+  .message-bubble-document>div {
+    max-width: 100%;
+    padding: 12px;
+  }
 }
+
 @media (max-width: 480px) {
-  .message-bubble-document > div { padding: 10px; gap: 8px; }
-  .message-bubble-document .flex-shrink-0 > div { width: 44px; height: 44px; }
+  .message-bubble-document>div {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .message-bubble-document .flex-shrink-0>div {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 /* Keyboard focus styles */
@@ -181,26 +260,39 @@
   outline: 2px solid var(--ancient-icon-glow, #4ade80);
   outline-offset: 2px;
 }
+
 /* Audio message bubble specific styling */
 .message-bubble-audio {
   padding: 0;
   overflow: visible;
   background: transparent;
   box-shadow: none;
+  border: none;
+  filter: none;
+  /* remove organic-blob filter */
 }
 
-.message-bubble-audio > div { width: 100%; }
+/* Strip the bubble tail pseudo-elements for audio */
+.message-bubble-audio::before {
+  display: none;
+  content: none;
+}
 
-/* Ensure audio player fits naturally in bubble */
-.message-bubble-audio .relative { border-radius: 16px; }
+.message-bubble-audio>div {
+  width: 100%;
+}
 
 /* Music note sparkles for audio messages */
 .message-bubble-audio .sparkle-1,
-.message-bubble-audio .sparkle-2 { font-size: 10px; }
+.message-bubble-audio .sparkle-2 {
+  font-size: 10px;
+}
 
 /* Responsive audio player adjustments */
 @media (max-width: 640px) {
-  .message-bubble-audio { max-width: 90%; }
+  .message-bubble-audio {
+    max-width: 90%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -215,15 +307,18 @@
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
 /* ===================================
    CROSS-BROWSER MESSAGE BUBBLES
    Tested on: Chrome, Firefox, Safari, Edge
    =================================== */
 .message-bubble {
   position: relative;
-  padding: 10px 14px; /* compact */
+  padding: 10px 14px;
+  /* compact */
   border-radius: 18px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14); /* softer */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+  /* softer */
   max-width: 100%;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -234,13 +329,17 @@
 }
 
 /* Incoming message bubble (left-aligned) */
-.message-bubble-incoming { border-bottom-left-radius: 4px; margin-left: 6px; }
+.message-bubble-incoming {
+  border-bottom-left-radius: 4px;
+  margin-left: 6px;
+}
 
 /* Tail for incoming messages */
 .message-bubble-incoming::before {
   content: '';
   position: absolute;
-  left: -8px; /* symmetric with outgoing */
+  left: -8px;
+  /* symmetric with outgoing */
   bottom: 0;
   width: 20px;
   height: 25px;
@@ -252,13 +351,17 @@
 }
 
 /* Outgoing message bubble (right-aligned) */
-.message-bubble-outgoing { border-bottom-right-radius: 4px; margin-right: 6px; }
+.message-bubble-outgoing {
+  border-bottom-right-radius: 4px;
+  margin-right: 6px;
+}
 
 /* Tail for outgoing messages */
 .message-bubble-outgoing::before {
   content: '';
   position: absolute;
-  right: -8px; /* symmetric with incoming */
+  right: -8px;
+  /* symmetric with incoming */
   bottom: 0;
   width: 20px;
   height: 25px;
@@ -270,7 +373,10 @@
 }
 
 /* Sparkle particles container */
-.sparkles { display: none; }
+.sparkles {
+  display: none;
+}
+
 .sparkle {
   position: absolute;
   font-size: 8px;
@@ -281,58 +387,162 @@
   -moz-animation: sparkleFloat 3s ease-in-out infinite;
   animation: sparkleFloat 3s ease-in-out infinite;
 }
-.sparkle-1 { top: -5px; left: 10%; -webkit-animation-delay: 0s; animation-delay: 0s; }
-.sparkle-2 { top: 50%; right: -8px; -webkit-animation-delay: 1s; animation-delay: 1s; }
-.sparkle-3 { bottom: -5px; left: 70%; -webkit-animation-delay: 2s; animation-delay: 2s; }
+
+.sparkle-1 {
+  top: -5px;
+  left: 10%;
+  -webkit-animation-delay: 0s;
+  animation-delay: 0s;
+}
+
+.sparkle-2 {
+  top: 50%;
+  right: -8px;
+  -webkit-animation-delay: 1s;
+  animation-delay: 1s;
+}
+
+.sparkle-3 {
+  bottom: -5px;
+  left: 70%;
+  -webkit-animation-delay: 2s;
+  animation-delay: 2s;
+}
 
 /* Sparkle animation with vendor prefixes */
 @-webkit-keyframes sparkleFloat {
-  0%, 100% { opacity: 0; -webkit-transform: translateY(0) scale(0.8); transform: translateY(0) scale(0.8); }
-  50% { opacity: 0.6; -webkit-transform: translateY(-10px) scale(1); transform: translateY(-10px) scale(1); }
+
+  0%,
+  100% {
+    opacity: 0;
+    -webkit-transform: translateY(0) scale(0.8);
+    transform: translateY(0) scale(0.8);
+  }
+
+  50% {
+    opacity: 0.6;
+    -webkit-transform: translateY(-10px) scale(1);
+    transform: translateY(-10px) scale(1);
+  }
 }
+
 @-moz-keyframes sparkleFloat {
-  0%, 100% { opacity: 0; -moz-transform: translateY(0) scale(0.8); transform: translateY(0) scale(0.8); }
-  50% { opacity: 0.6; -moz-transform: translateY(-10px) scale(1); transform: translateY(0) scale(1); }
+
+  0%,
+  100% {
+    opacity: 0;
+    -moz-transform: translateY(0) scale(0.8);
+    transform: translateY(0) scale(0.8);
+  }
+
+  50% {
+    opacity: 0.6;
+    -moz-transform: translateY(-10px) scale(1);
+    transform: translateY(0) scale(1);
+  }
 }
+
 @keyframes sparkleFloat {
-  0%, 100% { opacity: 0; transform: translateY(0) scale(0.8); }
-  50% { opacity: 0.6; transform: translateY(-10px) scale(1); }
+
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(0) scale(0.8);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: translateY(-10px) scale(1);
+  }
 }
 
 /* Fade in animation with vendor prefixes */
 @-webkit-keyframes fadeInMessage {
-  from { opacity: 0; -webkit-transform: translateY(10px); transform: translateY(10px); }
-  to { opacity: 1; -webkit-transform: translateY(0); transform: translateY(0); }
+  from {
+    opacity: 0;
+    -webkit-transform: translateY(10px);
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+  }
 }
+
 @-moz-keyframes fadeInMessage {
-  from { opacity: 0; -moz-transform: translateY(10px); transform: translateY(10px); }
-  to { opacity: 1; -moz-transform: translateY(0); transform: translateY(0); }
+  from {
+    opacity: 0;
+    -moz-transform: translateY(10px);
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    -moz-transform: translateY(0);
+    transform: translateY(0);
+  }
 }
+
 @keyframes fadeInMessage {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Responsive adjustments */
 @media (max-width: 640px) {
-  .message-bubble { padding: 10px 14px; font-size: 14px; max-width: 85%; }
+  .message-bubble {
+    padding: 10px 14px;
+    font-size: 14px;
+    max-width: 85%;
+  }
 }
+
 @media (max-width: 480px) {
-  .message-bubble { padding: 8px 12px; font-size: 13px; }
-  .message-bubble-incoming::before, .message-bubble-outgoing::before { width: 16px; height: 20px; }
+  .message-bubble {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .message-bubble-incoming::before,
+  .message-bubble-outgoing::before {
+    width: 16px;
+    height: 20px;
+  }
 }
 
 /* High contrast mode support */
-@media (prefers-contrast: high) { .message-bubble { border: 2px solid currentColor; } }
+@media (prefers-contrast: high) {
+  .message-bubble {
+    border: 2px solid currentColor;
+  }
+}
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .message-bubble, .sparkle { animation: none; -webkit-animation: none; -moz-animation: none; }
+
+  .message-bubble,
+  .sparkle {
+    animation: none;
+    -webkit-animation: none;
+    -moz-animation: none;
+  }
 }
 
 /* Safari-specific fixes */
 @supports (-webkit-hyphens:none) {
-  .message-bubble::before { transform: translateZ(0); -webkit-transform: translateZ(0); }
+  .message-bubble::before {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
 }
 
 /* Organic message bubble styling */
@@ -410,10 +620,13 @@
 }
 
 @keyframes sparkleFloat {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0;
     transform: translateY(0) scale(0.8);
   }
+
   50% {
     opacity: 0.6;
     transform: translateY(-10px) scale(1);
@@ -425,6 +638,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -434,4 +648,23 @@
 /* Optional: Add irregular border effect */
 .message-bubble {
   filter: url(#organic-blob);
+}
+
+/* Strip organic-blob and all outer styling for media/audio bubbles that use self-contained inner borders */
+.message-bubble-audio,
+.message-bubble-image,
+.message-bubble-video,
+.message-bubble-document {
+  filter: none;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  padding: 0;
+}
+.message-bubble-audio::before,
+.message-bubble-image::before,
+.message-bubble-video::before,
+.message-bubble-document::before {
+  display: none;
+  content: none;
 }

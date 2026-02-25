@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { createPortal } from "react-dom";
+import { useModalLock } from "@/hooks/useModalLock";
 
 const getModalPortalRoot = () => {
   if (typeof document === 'undefined') return null;
@@ -31,6 +32,7 @@ export default function ModalShell({
   }, []);
 
   useClickOutside(open, onClose, [ref]);
+  useModalLock(open);
 
   if (!open || !portalRoot) return null;
 

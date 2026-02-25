@@ -1,6 +1,6 @@
 import getPrismaInstance from "../../utils/PrismaClient.js";
 import { uploadBuffer, deleteCloudinaryFile } from "../../utils/Cloudinary.js";
-import { getOrCreateDirectConversation, isBlockedBetweenUsers, resolveConversation } from "./helpers.js";
+import { getOrCreateDirectConversation, isBlockedBetweenUsers, resolveConversation, unhideConversationParticipants } from "./helpers.js";
 
 function buildMediaFileData(messageId, cld, file, extra = {}) {
   return {
@@ -93,6 +93,7 @@ export const addMessage = async (req, res, next) => {
         quotedMessage: replyData.quotedMessage,
       },
     });
+    await unhideConversationParticipants(prisma, convo.id);
     emitMessageSent(convo, newMessage);
     return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {
@@ -144,6 +145,7 @@ export const addVideo = async (req, res, next) => {
         },
       });
       try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, req.file) }); } catch (_) { }
+      await unhideConversationParticipants(prisma, convo.id);
       emitMessageSent(convo, newMessage);
       return res.status(201).json(toMinimalMessage(newMessage));
     } catch (insertError) {
@@ -239,6 +241,7 @@ export const addImage = async (req, res, next) => {
       } catch (e) {
         try { console.warn('[Image:addImage] mediaFile persist failed', { message: e?.message }); } catch (_) { }
       }
+      await unhideConversationParticipants(prisma, convo.id);
       emitMessageSent(convo, newMessage);
       try { console.log('[Image:addImage] done', { messageId: newMessage?.id }); } catch (_) { }
       return res.status(201).json(toMinimalMessage(newMessage));
@@ -310,6 +313,7 @@ export const addAudio = async (req, res, next) => {
           },
         });
       } catch (_) { }
+      await unhideConversationParticipants(prisma, convo.id);
       emitMessageSent(convo, newMessage);
       return res.status(201).json(toMinimalMessage(newMessage));
     } catch (insertError) {
@@ -429,6 +433,7 @@ export const addLocation = async (req, res, next) => {
         quotedMessage: replyData.quotedMessage,
       },
     });
+    await unhideConversationParticipants(prisma, convo.id);
     emitMessageSent(convo, newMessage);
     return res.status(201).json(toMinimalMessage(newMessage));
   } catch (error) {

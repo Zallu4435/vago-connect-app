@@ -4,8 +4,10 @@ import { IoSettingsOutline } from "react-icons/io5";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import dynamic from "next/dynamic";
 import { getAbsoluteUrl } from "@/lib/url";
+import LogoutOverlay from "@/components/common/LogoutOverlay";
 
 const GroupCreateModal = dynamic(() => import("./GroupCreateModal"), { ssr: false });
 const SidebarMenu = dynamic(() => import("./SidebarMenu"), { ssr: false });
@@ -16,7 +18,15 @@ function ChatListHeader() {
   const [showGroupCreate, setShowGroupCreate] = useState(false);
   const [showSidebarMenu, setShowSidebarMenu] = useState(false);
 
+  // Get the actual logout function and its loading state
+  const { logout, isLoggingOut } = useAuth();
+
   const handleAllContactsPage = () => setAllContactsPage(true);
+
+  const handleLogout = async () => {
+    setShowSidebarMenu(false);
+    await logout();
+  };
 
   return (
     <div className="
@@ -58,12 +68,16 @@ function ChatListHeader() {
         open={showSidebarMenu}
         onClose={() => setShowSidebarMenu(false)}
         user={userInfo}
+        isLoggingOut={isLoggingOut}
         onNewGroup={() => { setShowSidebarMenu(false); setShowGroupCreate(true); }}
         onProfile={() => { setShowSidebarMenu(false); }}
         onCalls={() => { setShowSidebarMenu(false); }}
         onSettings={() => { setShowSidebarMenu(false); }}
-        onLogout={() => { setShowSidebarMenu(false); }}
+        onLogout={handleLogout}
       />
+
+      {/* Full-screen overlay during logout — no jarring page reload */}
+      <LogoutOverlay visible={isLoggingOut} />
     </div>
   );
 }

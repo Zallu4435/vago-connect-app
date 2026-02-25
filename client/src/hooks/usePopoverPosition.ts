@@ -33,6 +33,7 @@ export function usePopoverPosition({ open, anchorRef, popoverRef, placement = 't
             let top = 0;
             let left = 0;
 
+            // Using fixed positioning relative to viewport
             if (placement === 'top') {
                 top = rect.top - popoverRect.height - gap;
                 // Flip to bottom if it goes off top edge
@@ -42,7 +43,7 @@ export function usePopoverPosition({ open, anchorRef, popoverRef, placement = 't
             } else if (placement === 'bottom') {
                 top = rect.bottom + gap;
                 // Flip to top if it goes off bottom edge
-                if (top + popoverRect.height > window.innerHeight - gap) {
+                if (rect.bottom + popoverRect.height > window.innerHeight - gap) {
                     top = rect.top - popoverRect.height - gap;
                 }
             }
@@ -51,12 +52,13 @@ export function usePopoverPosition({ open, anchorRef, popoverRef, placement = 't
             if (align === 'center') {
                 left = rect.left + (rect.width / 2) - (popoverRect.width / 2);
             } else if (align === 'right') {
+                // Ensure the right edge of popover aligns with the right edge of the button
                 left = rect.right - popoverRect.width;
             } else if (align === 'left') {
                 left = rect.left;
             }
 
-            // Constrain horizontal
+            // Constrain horizontal to viewport bounds securely
             if (left < gap) left = gap;
             if (left + popoverRect.width > window.innerWidth - gap) {
                 left = window.innerWidth - popoverRect.width - gap;

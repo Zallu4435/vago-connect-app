@@ -1,23 +1,36 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { IoAdd, IoClose, IoChevronBack, IoChevronForward, IoDocumentTextOutline, IoSend, IoFilmOutline } from "react-icons/io5";
+import {
+  IoAdd, IoClose, IoChevronBack, IoChevronForward,
+  IoDocumentTextOutline, IoSend, IoFilmOutline,
+} from "react-icons/io5";
+import { useModalLock } from "@/hooks/useModalLock";
 
-export default function MediaPreviewModal({ open, onClose, files = [], context = 'any', onSend }) {
+/** Ensures a single #modal-portal div exists on <body> for blur-safe portaling */
+const getModalPortalRoot = () => {
+  if (typeof document === "undefined") return null;
+  let root = document.getElementById("modal-portal");
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "modal-portal";
+    document.body.appendChild(root);
+  }
+  return root;
+};
+
+export default function MediaPreviewModal({ open, onClose, files = [], context = "any", onSend }) {
   const [index, setIndex] = useState(0);
   const [items, setItems] = useState(files || []);
   const [captions, setCaptions] = useState([]);
   const [isSending, setIsSending] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [portalRoot, setPortalRoot] = useState(null);
   const inputRef = useRef(null);
 
-  const current = items?.[index] || null;
-  const url = useMemo(() => (current ? URL.createObjectURL(current) : null), [current]);
+  useModalLock(open);
+  useEffect(() => setPortalRoot(getModalPortalRoot()), []);
 
-  // Handle SSR hydration
-  useEffect(() => setMounted(true), []);
-
-  // Clean initialization
+  // Sync items when files prop changes
   useEffect(() => {
     if (open) {
       setItems(files || []);
@@ -26,189 +39,212 @@ export default function MediaPreviewModal({ open, onClose, files = [], context =
     }
   }, [files, open]);
 
-  // Manage captions array parallel scale
+  // Keep captions array in sync with items
   useEffect(() => {
     setCaptions((prev) => {
-      const next = [...prev];
-      next.length = items.length;
-      for (let i = 0; i < items.length; i++) {
-        if (typeof next[i] !== "string") next[i] = "";
-      }
+      const next = Array.from({ length: items.length }, (_, i) =>
+        typeof prev[i] === "string" ? prev[i] : ""
+      );
       return next;
     });
   }, [items]);
 
-  // Memory leak protection - revoke url on cycle
-  useEffect(() => {
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [url]);
+  // Revoke object URLs on cleanup
+  const current = items?.[index] || null;
+  const url = useMemo(() => (current ? URL.createObjectURL(current) : null), [current]);
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
 
-  // Format bytes to human readable
+  // Byte formatter
   const formatBytes = (bytes) => {
-    if (!bytes || bytes === 0) return '0 Bytes';
-    const k = 1024, sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    if (!bytes) return "";
+    const k = 1024, sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
   };
 
-  // Add more files
-  const handleAddMoreFiles = useCallback((e) => {
-    const list = Array.from(e.target.files || []);
-    if (list.length) {
-      // Re-enforce strict context just in case OS file picker bypassed `accept`
-      const valid = list.filter(f => {
+  // Add more files — blocked for video context (single only)
+  const handleAddMoreFiles = useCallback(
+    (e) => {
+      const list = Array.from(e.target.files || []);
+      if (!list.length) return;
+
+      const valid = list.filter((f) => {
         const mime = f.type || "";
-        if (context === 'image') return mime.startsWith('image/');
-        if (context === 'video') return mime.startsWith('video/');
-        if (context === 'file') return !mime.startsWith('image/') && !mime.startsWith('video/');
+        if (context === "image") return mime.startsWith("image/");
+        if (context === "video") return mime.startsWith("video/");
+        if (context === "file") return !mime.startsWith("image/") && !mime.startsWith("video/");
         return true;
       });
 
-      if (valid.length < list.length) {
-        // ideally we would show a toast here, but dropping it silently is safer than crashing
-        console.warn(`Dropped ${list.length - valid.length} files that violated the ${context} context.`);
-      }
-
       const map = new Map();
-      [...items, ...valid].forEach((f) => {
-        map.set(`${f.name}-${f.size}-${f.type}`, f); // Dedupe
-      });
+      [...items, ...valid].forEach((f) =>
+        map.set(`${f.name}-${f.size}-${f.type}`, f)
+      );
       const merged = Array.from(map.values());
       setItems(merged);
-      setIndex(merged.length - 1); // Move to newest
-    }
-    e.target.value = "";
-  }, [items, context]);
+      setIndex(merged.length - 1);
+      e.target.value = "";
+    },
+    [items, context]
+  );
 
-  // Remove individual item
-  const handleRemoveItem = useCallback((idxToRemove, ev) => {
-    ev.stopPropagation();
-    setItems((prev) => {
-      const next = prev.filter((_, i) => i !== idxToRemove);
-      if (next.length === 0) {
-        onClose(); // Auto-close if empty
-      } else {
-        const newIdx = Math.min(index, next.length - 1);
-        setIndex(newIdx < 0 ? 0 : newIdx);
-      }
-      return next;
-    });
-    setCaptions((prev) => prev.filter((_, i) => i !== idxToRemove));
-  }, [index, onClose]);
+  // Remove a file
+  const handleRemoveItem = useCallback(
+    (idxToRemove, ev) => {
+      ev.stopPropagation();
+      setItems((prev) => {
+        const next = prev.filter((_, i) => i !== idxToRemove);
+        if (next.length === 0) onClose();
+        else setIndex(Math.min(index, next.length - 1));
+        return next;
+      });
+      setCaptions((prev) => prev.filter((_, i) => i !== idxToRemove));
+    },
+    [index, onClose]
+  );
 
-  // Keyboard Navigation
+  // Keyboard nav
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Don't intercept if user is typing a caption
-      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
-        return;
-      }
+    const onKey = (e) => {
       if (!open || items.length <= 1) return;
-      if (e.key === "ArrowLeft") {
-        setIndex((prev) => (prev - 1 + items.length) % items.length);
-      } else if (e.key === "ArrowRight") {
-        setIndex((prev) => (prev + 1) % items.length);
-      }
+      if (document.activeElement?.tagName === "INPUT") return;
+      if (e.key === "ArrowLeft") setIndex((p) => (p - 1 + items.length) % items.length);
+      if (e.key === "ArrowRight") setIndex((p) => (p + 1) % items.length);
     };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open, items.length]);
 
   const handleSendAll = useCallback(() => {
-    if (isSending) return; // Prevent double-clicks
+    if (isSending) return;
     setIsSending(true);
     onSend?.({ files: items, captions });
   }, [items, captions, onSend, isSending]);
 
-  // Require mounting for portal and open state
-  if (!open || !mounted) return null;
+  if (!open || !portalRoot) return null;
 
-  const isImage = current && current.type?.startsWith("image/");
-  const isVideo = current && current.type?.startsWith("video/");
+  const isImage = current?.type?.startsWith("image/");
+  const isVideo = current?.type?.startsWith("video/");
 
   const modalContent = (
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-[#0b141a]/95 backdrop-blur-md animate-fade-in text-ancient-text-light">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-transparent shrink-0">
-        <div className="flex items-center gap-4">
+    <div
+      className="fixed inset-0 z-[9999] flex flex-col bg-ancient-bg-dark/98 backdrop-blur-md animate-fade-in text-ancient-text-light"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Send media preview"
+    >
+      {/* ── Header ── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-ancient-border-stone/40 bg-ancient-bg-dark">
+        <div className="flex items-center gap-3">
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-black/30 hover:bg-black/60 transition-colors"
+            className="p-2 rounded-full hover:bg-ancient-input-bg border border-transparent hover:border-ancient-border-stone/40 text-ancient-text-muted hover:text-ancient-text-light transition-all active:scale-95"
             title="Cancel"
+            aria-label="Cancel"
           >
-            <IoClose className="text-2xl text-ancient-text-light" />
+            <IoClose className="text-xl" />
           </button>
-          <span className="text-xl font-medium tracking-wide drop-shadow-md">
-            {items.length === 0 ? "No media selected" : `Preview ${index + 1} of ${items.length}`}
-          </span>
+          <div>
+            <span className="text-[15px] font-semibold text-ancient-text-light">
+              {items.length === 0 ? "No media" : `Send ${items.length} ${items.length === 1 ? "file" : "files"}`}
+            </span>
+            {items.length > 1 && (
+              <span className="text-[11px] text-ancient-text-muted ml-2">
+                ({index + 1} of {items.length})
+              </span>
+            )}
+          </div>
         </div>
-        <button
-          onClick={() => inputRef.current?.click()}
-          className="flex items-center gap-2 px-4 py-2 bg-black/40 hover:bg-black/60 border border-white/10 rounded-full shadow-md transition-colors"
-          title="Add additional files"
-        >
-          <IoAdd className="text-xl" />
-          <span className="font-semibold">Add File</span>
-        </button>
+
+        {/* Add more files — hidden for video */}
+        {context !== "video" && (
+          <button
+            onClick={() => inputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ancient-input-bg hover:bg-ancient-input-border border border-ancient-border-stone/50 text-ancient-text-light text-sm transition-all active:scale-95"
+            title="Add more files"
+          >
+            <IoAdd className="text-base" />
+            <span className="font-medium text-[13px]">Add</span>
+          </button>
+        )}
+
+        {/* Hidden file input */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept={
+            context === "image" ? "image/*" :
+              context === "video" ? "video/*" : "*"
+          }
+          multiple={context !== "video"}
+          className="hidden"
+          onChange={handleAddMoreFiles}
+        />
       </div>
 
-      {/* Hidden File Input matched dynamically to active context */}
-      <input
-        ref={inputRef}
-        type="file"
-        accept={context === 'image' ? 'image/*' : context === 'video' ? 'video/*' : '*'}
-        multiple
-        className="hidden"
-        onChange={handleAddMoreFiles}
-      />
-
-      {/* Main Preview Container */}
-      <div className="flex-1 overflow-hidden flex flex-col items-center justify-center p-4 relative">
+      {/* ── Main preview ── */}
+      <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden">
         {items.length === 0 ? (
-          <div className="flex flex-col items-center text-ancient-text-muted">
-            <IoDocumentTextOutline className="text-6xl mb-4 opacity-50" />
-            <p className="text-xl font-medium">No files attached</p>
+          <div className="flex flex-col items-center text-ancient-text-muted gap-3">
+            <IoDocumentTextOutline className="text-6xl opacity-40" />
+            <span className="text-base">No files selected</span>
           </div>
         ) : (
-          <div className="relative flex items-center justify-center w-full h-full max-h-[65vh] sm:max-h-[75vh]">
+          <div className="relative flex items-center justify-center w-full h-full max-h-[65vh] sm:max-h-[72vh]">
             {isImage && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={url || ""} alt={current?.name} className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-md" />
+              <img
+                src={url || ""}
+                alt={current?.name}
+                className="max-w-full max-h-full object-contain rounded-xl drop-shadow-2xl"
+              />
             )}
             {isVideo && (
-              <video src={url || ""} controls className="max-w-full max-h-full object-contain drop-shadow-2xl rounded-md" />
+              <video
+                src={url || ""}
+                controls
+                className="max-w-full max-h-full object-contain rounded-xl drop-shadow-2xl"
+              />
             )}
-            {/* Non-Media File Display */}
             {!isImage && !isVideo && (
-              <div className="flex flex-col items-center justify-center w-64 h-72 bg-ancient-bg-medium rounded-2xl border border-ancient-border-stone/50 drop-shadow-2xl shadow-xl transition-all">
-                <div className="w-20 h-20 bg-ancient-bg-dark rounded-full flex items-center justify-center mb-6 shadow-inner">
+              <div className="flex flex-col items-center justify-center w-64 bg-ancient-bg-medium border border-ancient-border-stone rounded-2xl p-8 shadow-2xl gap-4">
+                <div className="w-16 h-16 bg-ancient-input-bg rounded-xl flex items-center justify-center">
                   <IoDocumentTextOutline className="text-4xl text-ancient-icon-glow" />
                 </div>
-                <span className="text-[17px] font-medium truncate w-10/12 text-center text-ancient-text-light">{current?.name}</span>
-                <span className="text-sm text-ancient-text-muted mt-2 font-semibold">
-                  {formatBytes(current?.size)} • {(current?.name?.split('.').pop() || "FILE").toUpperCase()}
-                </span>
+                <div className="text-center">
+                  <p className="text-[15px] font-semibold text-ancient-text-light truncate max-w-[200px]">
+                    {current?.name}
+                  </p>
+                  <p className="text-[12px] text-ancient-text-muted mt-1">
+                    {formatBytes(current?.size)}
+                    {current?.name?.includes(".") && (
+                      <span className="ml-1 font-bold text-ancient-icon-glow">
+                        .{current.name.split(".").pop().toUpperCase()}
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
             )}
 
-            {/* Navigation Flow Hints */}
+            {/* Prev / Next navigation */}
             {items.length > 1 && (
               <>
                 <button
                   type="button"
-                  onClick={() => setIndex((prev) => (prev - 1 + items.length) % items.length)}
-                  className="absolute left-2 sm:left-6 p-3 bg-black/50 hover:bg-black/80 rounded-full backdrop-blur-sm transition-all shadow-xl z-20"
+                  onClick={() => setIndex((p) => (p - 1 + items.length) % items.length)}
+                  className="absolute left-2 sm:left-4 p-2 rounded-full bg-ancient-bg-dark/80 hover:bg-ancient-input-bg border border-ancient-border-stone/40 backdrop-blur-sm transition-all active:scale-95 shadow-lg"
+                  aria-label="Previous"
                 >
-                  <IoChevronBack className="text-2xl" />
+                  <IoChevronBack className="text-xl text-ancient-text-light" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIndex((prev) => (prev + 1) % items.length)}
-                  className="absolute right-2 sm:right-6 p-3 bg-black/50 hover:bg-black/80 rounded-full backdrop-blur-sm transition-all shadow-xl z-20"
+                  onClick={() => setIndex((p) => (p + 1) % items.length)}
+                  className="absolute right-2 sm:right-4 p-2 rounded-full bg-ancient-bg-dark/80 hover:bg-ancient-input-bg border border-ancient-border-stone/40 backdrop-blur-sm transition-all active:scale-95 shadow-lg"
+                  aria-label="Next"
                 >
-                  <IoChevronForward className="text-2xl" />
+                  <IoChevronForward className="text-xl text-ancient-text-light" />
                 </button>
               </>
             )}
@@ -216,87 +252,98 @@ export default function MediaPreviewModal({ open, onClose, files = [], context =
         )}
       </div>
 
-      {/* Footer Area - Caption, Gallery, and Send */}
+      {/* ── Footer: caption + thumbnail strip + send ── */}
       {items.length > 0 && (
-        <div className="shrink-0 pt-4 pb-6 bg-[#202c33]/95 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] flex flex-col items-center w-full z-50">
-
-          {/* Caption Input */}
-          <div className="w-full max-w-2xl px-4 relative mb-4">
+        <div className="flex-shrink-0 border-t border-ancient-border-stone/40 bg-ancient-bg-medium px-4 pt-3 pb-5">
+          {/* Caption input */}
+          <div className="w-full max-w-2xl mx-auto mb-4">
             <input
               type="text"
-              placeholder={isImage ? "Add a caption..." : "Add a file description..."}
-              className="w-full bg-[#2a3942] border border-transparent focus:border-ancient-icon-glow text-white text-[15px] px-4 py-3 outline-none transition-all shadow-inner rounded-xl focus:bg-ancient-bg-dark"
+              placeholder={isImage ? "Add a caption…" : isVideo ? "Add a description…" : "Add a note…"}
+              className="w-full bg-ancient-input-bg border border-ancient-input-border focus:border-ancient-icon-glow rounded-xl px-4 py-2.5 text-[14px] text-ancient-text-light placeholder:text-ancient-text-muted outline-none transition-all"
               value={captions[index] || ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                setCaptions(prev => {
+              onChange={(e) =>
+                setCaptions((prev) => {
                   const next = [...prev];
-                  next[index] = v;
+                  next[index] = e.target.value;
                   return next;
-                });
-              }}
+                })
+              }
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendAll();
+                if (e.key === "Enter") handleSendAll();
               }}
             />
           </div>
 
-          {/* Bottom Dock Control Row */}
-          <div className="w-full relative flex items-center justify-center px-4">
-
-            {/* Thumbnail Scroll Gallery */}
-            <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar pt-2 pb-4 px-1 max-w-[calc(100vw-120px)] sm:max-w-[70vw]">
+          {/* Thumbnail row + send button */}
+          <div className="relative flex items-center justify-center">
+            {/* Thumbnails */}
+            <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar py-1 max-w-[calc(100vw-100px)] sm:max-w-[70vw]">
               {items.map((f, i) => {
-                const isImg = f.type?.startsWith("image/") || f.type?.startsWith("video/");
-                const sel = i === index;
-                const tnUrl = isImg ? URL.createObjectURL(f) : null;
+                const isImg = f.type?.startsWith("image/");
+                const isVid = f.type?.startsWith("video/");
+                const isSel = i === index;
+                const tnUrl = (isImg || isVid) ? URL.createObjectURL(f) : null;
                 return (
-                  <div key={`${f.name}-${i}`} className="relative group shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl shadow-md transition-all">
+                  <div
+                    key={`${f.name}-${i}`}
+                    className="relative group flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16"
+                  >
                     <button
                       type="button"
                       onClick={() => setIndex(i)}
-                      className={`w-full h-full transform rounded-xl overflow-hidden transition-all duration-300 ${sel ? "ring-2 ring-ancient-icon-glow scale-100 opacity-100" : "opacity-50 hover:opacity-100 border-2 border-transparent scale-95"
+                      className={`w-full h-full rounded-xl overflow-hidden border-2 transition-all duration-200 ${isSel
+                        ? "border-ancient-icon-glow scale-100 opacity-100 shadow-[0_0_0_2px_var(--ancient-icon-glow)]"
+                        : "border-ancient-border-stone/40 opacity-50 hover:opacity-80 scale-95"
                         }`}
                     >
-                      {isImg ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        f.type.startsWith('video/') ? (
-                          <div className="relative w-full h-full bg-black">
-                            <video src={tnUrl} className="w-full h-full object-cover opacity-80" />
-                            <IoFilmOutline className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white/80 text-2xl drop-shadow-md" />
+                      {tnUrl ? (
+                        isVid ? (
+                          <div className="relative w-full h-full bg-ancient-bg-dark">
+                            <video src={tnUrl} className="w-full h-full object-cover opacity-75" preload="metadata" />
+                            <IoFilmOutline className="absolute inset-0 m-auto text-white/80 text-xl drop-shadow" />
                           </div>
                         ) : (
-                          <img src={tnUrl} alt="tn" className="w-full h-full object-cover" onLoad={() => URL.revokeObjectURL(tnUrl)} />
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={tnUrl}
+                            alt="thumbnail"
+                            className="w-full h-full object-cover"
+                            onLoad={() => URL.revokeObjectURL(tnUrl)}
+                          />
                         )
                       ) : (
-                        <div className="w-full h-full bg-[#111b21] flex items-center justify-center">
-                          <IoDocumentTextOutline className="text-2xl text-ancient-text-muted" />
+                        <div className="w-full h-full bg-ancient-input-bg flex items-center justify-center">
+                          <IoDocumentTextOutline className="text-2xl text-ancient-icon-glow" />
                         </div>
                       )}
                     </button>
-                    {/* Fixed X button placed absolutely INSIDE the div bounds */}
+
+                    {/* Remove button */}
                     <button
                       type="button"
                       onClick={(ev) => handleRemoveItem(i, ev)}
-                      className="absolute top-0 right-0 p-1 bg-black/60 hover:bg-red-500 rounded-bl-lg rounded-tr-xl text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-ancient-bg-dark border border-ancient-border-stone rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:border-red-500 z-10 shadow"
                       title="Remove"
+                      aria-label="Remove file"
                     >
-                      <IoClose size={12} />
+                      <IoClose size={10} className="text-white" />
                     </button>
                   </div>
                 );
               })}
             </div>
 
-            {/* Send Control anchored reliably to the right */}
-            <div className="absolute right-4 sm:right-8 bottom-3 sm:bottom-4">
+            {/* Send button — anchored right */}
+            <div className="absolute right-0 bottom-0">
               <button
                 onClick={handleSendAll}
                 disabled={isSending || items.length === 0}
-                className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 shrink-0 bg-ancient-icon-glow hover:bg-green-500 text-ancient-bg-dark rounded-full shadow-xl transition-transform transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Send Attachments"
+                className="w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center rounded-full bg-ancient-icon-glow hover:brightness-110 text-ancient-bg-dark shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Send"
+                aria-label="Send files"
               >
-                <IoSend className="text-xl sm:text-2xl ml-1" />
+                <IoSend className="text-xl ml-0.5" />
               </button>
             </div>
           </div>
@@ -305,5 +352,5 @@ export default function MediaPreviewModal({ open, onClose, files = [], context =
     </div>
   );
 
-  return createPortal(modalContent, document.body);
+  return createPortal(modalContent, portalRoot);
 }

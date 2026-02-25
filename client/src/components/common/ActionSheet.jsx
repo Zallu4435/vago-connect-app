@@ -54,10 +54,10 @@ export default function ActionSheet({
     <div
       ref={ref}
       className={`
-        fixed z-50 bg-ancient-bg-dark border border-ancient-border-stone
+        fixed z-[9999] bg-ancient-bg-dark border border-ancient-border-stone
         rounded-xl shadow-xl
         p-1 sm:p-2
-        min-w-[64vw] max-w-[94vw] sm:min-w-[14rem] sm:max-w-[20rem]
+        min-w-[12rem] max-w-[94vw] sm:min-w-[14rem] sm:max-w-[20rem]
         animate-fade-in-down
         ${className}
       `}

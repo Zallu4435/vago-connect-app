@@ -10,18 +10,7 @@ function AudioMessage({ message, isIncoming }) {
   const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
 
   return (
-    <div className={`message-bubble message-bubble-audio ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} min-w-[280px] max-w-[420px]`}>
-      {isGroup && isIncoming && message.sender?.name && (
-        <div className="text-[11px] sm:text-[12px] font-bold text-ancient-text-muted opacity-90 truncate mb-1">
-          ~ {message.sender.name}
-        </div>
-      )}
-      {message.isForwarded && (
-        <div className="flex items-center gap-1 text-[11px] sm:text-[12px] text-ancient-text-muted mb-1 italic">
-          <RiShareForwardFill />
-          <span>Forwarded</span>
-        </div>
-      )}
+    <div className={`message-bubble message-bubble-audio ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} min-w-[240px] max-w-[360px]`}>
       {message.quotedMessage && (
         <div className="mb-2 w-full max-w-[420px]">
           <RepliedMessageQuote quotedMessage={message.quotedMessage} />
@@ -30,6 +19,8 @@ function AudioMessage({ message, isIncoming }) {
       <BaseVoicePlayer
         src={message?.content}
         isIncoming={isIncoming}
+        isForwarded={!!message.isForwarded}
+        senderName={isGroup && isIncoming ? message.sender?.name : undefined}
       />
 
       {/* Sparkle particles */}

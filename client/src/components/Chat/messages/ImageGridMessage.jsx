@@ -3,83 +3,145 @@ import { calculateTime } from "@/utils/CalculateTime";
 import { downloadMedia } from "@/utils/downloadMedia";
 import MessageStatus from "@/components/common/MessageStatus";
 import { useAuthStore } from "@/stores/authStore";
+import { useChatStore } from "@/stores/chatStore";
 import dynamic from "next/dynamic";
 import { RiShareForwardFill } from "react-icons/ri";
 
-const MediaCarouselView = dynamic(() => import("../MediaGallery/MediaCarouselView"), {
-    ssr: false,
-});
+const MediaCarouselView = dynamic(
+    () => import("../MediaGallery/MediaCarouselView"),
+    { ssr: false }
+);
 
 /**
- * ImageGridMessage renders an array of image messages in a WhatsApp-style clustered grid.
+ * ImageGridMessage — WhatsApp-style clustered image grid.
+ *
+ * Layout logic:
+ *   1 image  → full bleed single
+ *   2 images → side by side (2 cols, 1 row)
+ *   3 images → 1 large left + 2 stacked right
+ *   4 images → 2×2 grid (with +N overflow badge on 4th tile)
  */
 function ImageGridMessage({ messagesArray, isIncoming, chatMessages = [] }) {
     const userInfo = useAuthStore((s) => s.userInfo);
+    const currentChatUser = useChatStore((s) => s.currentChatUser);
+    const isGroup = currentChatUser?.isGroup || currentChatUser?.type === "group";
+
     const [showImageViewer, setShowImageViewer] = useState(false);
     const [activeMediaId, setActiveMediaId] = useState(null);
 
-    // Use the last message in the array as the anchor for timestamps/status
     const lastMessage = messagesArray[messagesArray.length - 1];
+    const firstMessage = messagesArray[0];
 
-    // Show up to 4 images natively in a 2x2 grid. The rest hide behind a +X overlay.
+    // Show max 4 in the grid, rest hidden behind +N badge
     const displayMessages = messagesArray.slice(0, 4);
     const overflowCount = messagesArray.length > 4 ? messagesArray.length - 4 : 0;
+    const count = displayMessages.length;
 
-    // Global Media array for the CarouselViewer to traverse
-    const mediaItems = React.useMemo(() => {
-        const list = chatMessages;
-        return (Array.isArray(list) ? list : [])
-            .filter((m) => String(m?.type || "").startsWith("image"))
-            .map((m) => ({
-                mediaId: m?.id,
-                url: m?.content || m?.message || "",
-                type: m?.type || "image",
-                fileName: (typeof m?.caption === 'string' && m.caption) ? m.caption : "Image",
-                caption: (typeof m?.caption === 'string' && m.caption?.trim()) ? m.caption.trim() : undefined,
-                createdAt: m?.timestamp || m?.createdAt || new Date().toISOString(),
-            }));
-    }, [chatMessages]);
+    // Global media list for the carousel viewer
+    const mediaItems = React.useMemo(
+        () =>
+            (Array.isArray(chatMessages) ? chatMessages : [])
+                .filter((m) => String(m?.type || "").startsWith("image"))
+                .map((m) => ({
+                    mediaId: m?.id,
+                    url: m?.content || m?.message || "",
+                    type: m?.type || "image",
+                    fileName:
+                        typeof m?.caption === "string" && m.caption ? m.caption : "Image",
+                    caption:
+                        typeof m?.caption === "string" && m.caption?.trim()
+                            ? m.caption.trim()
+                            : undefined,
+                    createdAt: m?.timestamp || m?.createdAt || new Date().toISOString(),
+                })),
+        [chatMessages]
+    );
 
-    const handleImageClick = (clickedId) => {
-        setActiveMediaId(clickedId);
+    const initialMediaIndex = React.useMemo(
+        () => mediaItems.findIndex((mi) => Number(mi.mediaId) === Number(activeMediaId)),
+        [mediaItems, activeMediaId]
+    );
+
+    const handleImageClick = (id) => {
+        setActiveMediaId(id);
         setShowImageViewer(true);
     };
 
-    const initialMediaIndex = React.useMemo(() => {
-        return mediaItems.findIndex((mi) => Number(mi.mediaId) === Number(activeMediaId));
-    }, [mediaItems, activeMediaId]);
+    // ── Grid layout definitions ───────────────────────────────
+    // Returns className for the outer grid container and a fn that returns
+    // className for each cell by index.
+    function getGridConfig(n) {
+        if (n === 1) {
+            return {
+                gridClass: "grid-cols-1 grid-rows-1",
+                cellClass: () => "",
+                containerH: "h-[250px] sm:h-[300px]",
+            };
+        }
+        if (n === 2) {
+            return {
+                gridClass: "grid-cols-2 grid-rows-1",
+                cellClass: () => "",
+                containerH: "h-[220px] sm:h-[260px]",
+            };
+        }
+        if (n === 3) {
+            return {
+                gridClass: "grid-cols-2 grid-rows-2",
+                cellClass: (i) => (i === 0 ? "row-span-2" : ""),
+                containerH: "h-[260px] sm:h-[310px]",
+            };
+        }
+        // 4 images
+        return {
+            gridClass: "grid-cols-2 grid-rows-2",
+            cellClass: () => "",
+            containerH: "h-[280px] sm:h-[330px]",
+        };
+    }
 
-    // Determine grid template strictly
-    let gridClass = "grid-cols-2 grid-rows-2"; // default 4-grid and 3-grid
-    if (messagesArray.length === 2) gridClass = "grid-cols-2 grid-rows-1";
+    const { gridClass, cellClass, containerH } = getGridConfig(count);
 
     return (
         <>
-            <div className={`message-bubble message-bubble-image ${isIncoming ? 'message-bubble-incoming' : 'message-bubble-outgoing'} p-[3px] w-[300px] sm:w-[350px]`}>
+            <div
+                className={`
+          message-bubble message-bubble-image
+          ${isIncoming ? "message-bubble-incoming" : "message-bubble-outgoing"}
+          p-[3px] w-[290px] sm:w-[340px]
+        `}
+            >
+                {/* Group sender name */}
+                {isGroup && isIncoming && firstMessage?.sender?.name && (
+                    <div className="text-[11px] font-bold text-ancient-icon-glow truncate px-1 pt-1 pb-0.5">
+                        {firstMessage.sender.name}
+                    </div>
+                )}
+
+                {/* Forwarded banner */}
                 {lastMessage.isForwarded && (
-                    <div className="flex items-center gap-1 text-[11px] sm:text-[12px] text-ancient-text-muted mb-1 px-1 italic">
-                        <RiShareForwardFill />
+                    <div className="flex items-center gap-1 text-[11px] text-ancient-text-muted italic border-l-2 border-ancient-text-muted/40 pl-2 px-1 pt-0.5 pb-1 -ml-0.5">
+                        <RiShareForwardFill className="text-[12px] flex-shrink-0" />
                         <span>Forwarded</span>
                     </div>
                 )}
 
-                <div className="relative rounded-xl overflow-hidden shadow-sm bg-ancient-input-bg w-full h-[294px] sm:h-[344px] flex">
-                    {/* Grid Container */}
-                    <div className={`grid gap-[3px] ${gridClass} w-full h-full`}>
+                {/* Grid */}
+                <div
+                    className={`relative rounded-[10px] overflow-hidden bg-ancient-input-bg w-full ${containerH}`}
+                >
+                    <div className={`grid gap-[2px] ${gridClass} w-full h-full`}>
                         {displayMessages.map((msg, index) => {
-                            const isLastTile = index === 3;
-                            const isThirdInThreeGrid = messagesArray.length === 3 && index === 2;
-
+                            const isLast4th = index === 3;
                             return (
                                 <div
                                     key={msg.id}
                                     onClick={() => handleImageClick(msg.id)}
-                                    className={`relative cursor-pointer overflow-hidden group transition-all w-full h-full ${isThirdInThreeGrid ? "col-span-2" : "col-span-1"
-                                        }`}
+                                    className={`relative cursor-pointer overflow-hidden group w-full h-full ${cellClass(index)}`}
                                     role="button"
                                     tabIndex={0}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
+                                        if (e.key === "Enter" || e.key === " ") {
                                             e.preventDefault();
                                             handleImageClick(msg.id);
                                         }
@@ -88,34 +150,37 @@ function ImageGridMessage({ messagesArray, isIncoming, chatMessages = [] }) {
                                 >
                                     <img
                                         src={msg.content || msg.message || ""}
-                                        alt="Grid sent image"
+                                        alt="Grouped image"
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                                         loading="lazy"
                                     />
 
-                                    {/* Overlay for +X overflow on the 4th tile */}
-                                    {isLastTile && overflowCount > 0 && (
-                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
-                                            <span className="text-white text-3xl font-light tracking-wide shadow-sm">+{overflowCount}</span>
+                                    {/* +N overflow overlay on 4th tile */}
+                                    {isLast4th && overflowCount > 0 && (
+                                        <div className="absolute inset-0 bg-black/65 backdrop-blur-[2px] flex items-center justify-center">
+                                            <span className="text-white text-3xl font-light tracking-wide drop-shadow">
+                                                +{overflowCount}
+                                            </span>
                                         </div>
                                     )}
 
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 pointer-events-none" />
+                                    {/* Hover dim */}
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/12 transition-colors duration-200 pointer-events-none" />
                                 </div>
                             );
                         })}
                     </div>
 
-                    {/* Singular Time and status overlay anchored to the bottom right of the entire Grid Frame */}
-                    <div
-                        className="absolute bottom-1.5 right-1.5 flex items-center gap-1.5 px-2 py-1 rounded-full backdrop-blur-sm transition-opacity bg-black/40 hover:bg-black/60 shadow-md"
-                    >
-                        <span className="text-[10px] sm:text-[11px] text-white/90 font-medium tabular-nums drop-shadow-md">
+                    {/* Time + status badge — always bottom-right of grid frame */}
+                    <div className="absolute bottom-2 right-2 z-10 flex items-center gap-1 px-2 py-[3px] rounded-full bg-black/55 backdrop-blur-sm">
+                        <span className="text-[10px] text-white/90 tabular-nums font-medium drop-shadow">
                             {calculateTime(lastMessage.timestamp || lastMessage.createdAt)}
                         </span>
-                        {!isIncoming && lastMessage.senderId === userInfo.id && (
-                            <div className="drop-shadow-md">
-                                <MessageStatus status={lastMessage.messageStatus || lastMessage.status} />
+                        {!isIncoming && lastMessage.senderId === userInfo?.id && (
+                            <div className="drop-shadow">
+                                <MessageStatus
+                                    status={lastMessage.messageStatus || lastMessage.status}
+                                />
                             </div>
                         )}
                     </div>
@@ -128,7 +193,9 @@ function ImageGridMessage({ messagesArray, isIncoming, chatMessages = [] }) {
                     initialIndex={initialMediaIndex >= 0 ? initialMediaIndex : 0}
                     onClose={() => setShowImageViewer(false)}
                     onDownload={(mediaId) => {
-                        const item = mediaItems.find((m) => Number(m.mediaId) === Number(mediaId));
+                        const item = mediaItems.find(
+                            (m) => Number(m.mediaId) === Number(mediaId)
+                        );
                         if (item?.url) downloadMedia(item.url, item.fileName || "photo.jpg");
                     }}
                 />
