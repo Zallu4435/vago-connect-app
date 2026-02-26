@@ -47,8 +47,8 @@ function MessageWrapper({
             isSelected={isSelected}
             onSelectToggle={() => onToggleSelect?.(message.id)}
             reactions={isCall ? [] : (message.isDeletedForEveryone ? [] : message.reactions)}
-            reactionAnchorMessage={isCall ? null : message}
-            actionAnchorMessage={isCall ? null : message}
+            reactionAnchorMessage={message}
+            actionAnchorMessage={message}
             showActions={!message.isDeletedForEveryone && !isCall}
             onReply={isCall ? undefined : onReply}
             onForward={isCall ? undefined : onForward}

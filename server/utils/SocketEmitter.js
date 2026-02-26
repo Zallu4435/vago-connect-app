@@ -3,18 +3,15 @@
  * Checks for global.io and global.onlineUsers before emitting.
  */
 export class SocketEmitter {
-    /**
-     * Emit an event to a specific user by their ID.
-     * @param {number|string} userId - The user ID to emit to.
-     * @param {string} event - The socket event name.
-     * @param {any} payload - The event payload.
-     */
     static emitToUser(userId, event, payload) {
         try {
             if (global?.io && global?.onlineUsers) {
-                const sid = global.onlineUsers.get(String(userId)) || global.onlineUsers.get(userId);
-                if (sid) {
-                    global.io.to(sid).emit(event, payload);
+                // Now that users join rooms named by their userId, we can emit directly to the room.
+                // We still check if they are "online" (in the map) to avoid unnecessary work, 
+                // but we emit to the room (which broadcasts to all their active tabs/devices).
+                const uidStr = String(userId);
+                if (global.onlineUsers.has(uidStr)) {
+                    global.io.to(uidStr).emit(event, payload);
                     return true;
                 }
             }
@@ -31,8 +28,23 @@ export class SocketEmitter {
      */
     static emitMessageSent(conversation, message) {
         if (!conversation || !Array.isArray(conversation.participants)) return;
+
+        const isDirect = conversation.type === 'direct';
+        const senderId = Number(message.senderId);
+
         conversation.participants.forEach(p => {
-            this.emitToUser(p.userId, "message-sent", { message });
+            const uid = Number(p.userId);
+            if (!uid) return;
+
+            // For direct messages, try to inject receiverId if missing so frontend can match accurately
+            let payload = { ...message };
+            if (isDirect && !payload.receiverId) {
+                const other = conversation.participants.find(part => Number(part.userId) !== senderId);
+                if (other) payload.receiverId = Number(other.userId);
+                else payload.receiverId = senderId; // Self-chat case
+            }
+
+            this.emitToUser(uid, "message-sent", { message: payload });
         });
     }
 

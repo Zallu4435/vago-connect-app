@@ -152,14 +152,7 @@ function CaptureAudio({ onChange }) {
       onSuccess: (data) => {
         showToast.dismiss(toastId);
         showToast.success("Voice message sent!");
-        socket.current?.emit("send-msg", {
-          to: currentChatUser.id,
-          from: userInfo.id,
-          message: data.content,
-          type: data.type || "audio",
-          timestamp: Date.now(),
-          messageStatus: "sent",
-        });
+        // send-msg removed, relying on message-sent from server
         setMessages([...(messages || []), data]);
         cancel();
       },
@@ -168,7 +161,7 @@ function CaptureAudio({ onChange }) {
         showToast.error("Failed to send. Try again.");
       },
     });
-  }, [recordedBlob, userInfo, currentChatUser, uploadAudioMutation, socket, messages, setMessages, cancel]);
+  }, [recordedBlob, userInfo, currentChatUser, uploadAudioMutation, messages, setMessages, cancel]);
 
   const playbackProgress = playbackDuration ? (playbackTime / playbackDuration) * 100 : 0;
 

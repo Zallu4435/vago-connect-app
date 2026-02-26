@@ -6,6 +6,7 @@ import { useDeleteMessage } from '@/hooks/messages/useDeleteMessage';
 import { useReactToMessage } from '@/hooks/messages/useReactToMessage';
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
+import { useContacts } from "@/hooks/contacts/useContacts";
 import {
   FaStar,
   FaEdit,
@@ -32,6 +33,13 @@ function MessageActions({
   const userInfo = useAuthStore((s) => s.userInfo);
   const isMine = useMemo(() => String(message?.senderId) === String(userInfo?.id), [message, userInfo]);
   const setEditMessage = useChatStore((s) => s.setEditMessage);
+
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const { data: contacts = [] } = useContacts(userInfo?.id);
+  const contactEntry = contacts.find((c) => String(c?.id) === String(currentChatUser?.id));
+  const isChatBlocked = Boolean(contactEntry?.isBlocked || contactEntry?.blockedBy);
+
+  if (isChatBlocked) return null;
 
   const [showReactionsMenu, setShowReactionsMenu] = useState(false);
   const [showDropdownMenu, setShowDropdownMenu] = useState(false);
@@ -65,10 +73,11 @@ function MessageActions({
   }, [message, setEditMessage]);
 
   const onReact = useCallback((emoji) => {
-    reactMutation.mutate({ id: message.id, emoji });
+    const peerId = currentChatUser?.id || currentChatUser?.conversationId;
+    reactMutation.mutate({ id: message.id, emoji, peerId });
     setShowReactionsMenu(false);
     setShowDropdownMenu(false);
-  }, [message, reactMutation]);
+  }, [message, reactMutation, currentChatUser]);
 
   const handleReply = useCallback(() => {
     onReply?.(message);

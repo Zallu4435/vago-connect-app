@@ -1,58 +1,57 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSocketStore } from '@/stores/socketStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { createSocketQuerySync } from '@/lib/socketQuerySync';
-import { updateMessagesCache, upsertMessageInCache, updateContactProfileInCache, updateGroupProfileInCache } from '@/lib/cacheHelpers';
+import { upsertMessageInCache, updateContactProfileInCache, updateGroupProfileInCache, updateContactFieldsInCache } from '@/lib/cacheHelpers';
 import type { Message } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
-import { useRef } from 'react';
+import { showToast } from '@/lib/toast';
 
 export function useMessageSocketHandlers() {
   const socket = useSocketStore((s) => s.socket);
-  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  // Use a ref for currentChatUser to avoid stale closures in event handlers
+  // This is the CRITICAL fix: closures inside useEffect capture the value at attachment
+  // time, not at call time. Using a ref ensures we always read the latest value.
+  const currentChatUserRef = useRef(useChatStore.getState().currentChatUser);
   const addMessage = useChatStore((s) => s.addMessage);
   const authUserId = useAuthStore((s) => s.userInfo?.id);
+  const authUserIdRef = useRef(authUserId);
 
   const qc = useQueryClient();
-  const socketSync = createSocketQuerySync(qc);
-  const attachedRef = useRef(false);
+
+  // Keep refs in sync with latest state without re-creating handlers
+  useEffect(() => {
+    // Plain Zustand subscribe — always reads all state updates
+    const unsub = useChatStore.subscribe((state) => {
+      currentChatUserRef.current = state.currentChatUser;
+    });
+    return unsub;
+  }, []);
+
+
+  useEffect(() => {
+    authUserIdRef.current = authUserId;
+  }, [authUserId]);
+
+  // Keep addMessage ref stable
+  const addMessageRef = useRef(addMessage);
+  useEffect(() => {
+    addMessageRef.current = addMessage;
+  }, [addMessage]);
 
   useEffect(() => {
     const s = socket.current;
-    if (!s || attachedRef.current) return;
-    const onMsgReceive = (data: any) => {
-      const t = (data?.type || 'text').toLowerCase();
-      // Allowed real message types — do NOT map 'call' to 'text'
-      const knownTypes = ['text', 'audio', 'image', 'video', 'voice', 'document', 'location', 'call'];
-      const mappedType: Message['type'] = knownTypes.includes(t) ? (t as Message['type']) : 'text';
-      const normalized: Message = {
-        id: Number(data?.messageId),
-        senderId: Number(data?.from),
-        receiverId: Number(data?.to ?? 0),
-        type: mappedType,
-        message: String(data?.message ?? ''),
-        content: String(data?.message ?? ''),
-        messageStatus: 'delivered',
-        createdAt: new Date().toISOString(),
-        timestamp: new Date().toISOString(),
-        isForwarded: Boolean(data?.isForwarded),
-        replyToMessageId: data?.replyToMessageId,
-        quotedMessage: data?.quotedMessage,
-        caption: data?.caption,
-      };
-      socketSync.onMessageReceive(normalized, String(normalized.receiverId), currentChatUser?.id);
-      addMessage(normalized);
+    if (!s) return;
+
+    const socketSync = createSocketQuerySync(qc);
+
+    const onStatusUpdate = ({ messageId, status, conversationId }: any) => {
+      socketSync.onMessageStatusUpdate(messageId, status, conversationId);
     };
-    // Ensure no duplicate handlers before attaching
-    s.off('msg-recieve', onMsgReceive);
-    s.on('msg-recieve', onMsgReceive);
-    const onStatusUpdate = ({ messageId, status }: any) => {
-      socketSync.onMessageStatusUpdate(messageId, status);
-    };
-    const onMessagesRead = ({ messageIds }: any) => {
+    const onMessagesRead = ({ messageIds, conversationId }: any) => {
       if (Array.isArray(messageIds)) {
-        socketSync.onMessagesRead(messageIds);
+        socketSync.onMessagesRead(messageIds, conversationId, String(authUserIdRef.current));
       }
     };
     const onEdited = ({ messageId, newContent, editedAt }: any) => {
@@ -67,25 +66,65 @@ export function useMessageSocketHandlers() {
       socketSync.onMessageReacted(messageId, reactions || []);
     };
     const onStarred = ({ messageId, starred }: any) => {
-      socketSync.onMessageStarred(messageId, starred, String(authUserId || ''));
+      socketSync.onMessageStarred(messageId, starred, String(authUserIdRef.current || ''));
+    };
+    const onChatPinned = ({ conversationId, pinned, pinOrder }: any) => {
+      socketSync.onChatPinned(conversationId, pinned, pinOrder);
+    };
+    const onChatCleared = ({ conversationId, clearedAt }: any) => {
+      socketSync.onChatCleared(conversationId, clearedAt);
+    };
+    const onChatArchived = ({ conversationId, archived }: any) => {
+      socketSync.onChatArchived(conversationId, archived);
+    };
+    const onChatMuted = ({ conversationId, muted, mutedUntil }: any) => {
+      socketSync.onChatMuted(conversationId, muted, mutedUntil);
+    };
+    const onChatDeleted = ({ conversationId }: any) => {
+      socketSync.onChatDeleted(conversationId);
     };
     const onForwarded = (payload: any) => {
       socketSync.onMessageForwarded(payload);
     };
-    s.off('message-status-update', onStatusUpdate);
-    s.off('messages-read', onMessagesRead);
-    s.off('message-edited', onEdited);
-    s.off('message-deleted', onDeleted);
-    s.off('message-reacted', onReacted);
-    s.off('message-starred', onStarred);
-    s.off('message-forwarded', onForwarded);
-    s.on('message-status-update', onStatusUpdate);
-    s.on('messages-read', onMessagesRead);
-    s.on('message-edited', onEdited);
-    s.on('message-deleted', onDeleted);
-    s.on('message-reacted', onReacted);
-    s.on('message-starred', onStarred);
-    s.on('message-forwarded', onForwarded);
+
+    const updateCurrentChatBlockStatus = (userId: string | number, blocked: boolean, isBy: boolean) => {
+      const current = useChatStore.getState().currentChatUser;
+      if (current && String(current.id) === String(userId)) {
+        useChatStore.getState().setCurrentChatUser({
+          ...current,
+          ...(isBy ? { blockedBy: blocked } : { isBlocked: blocked })
+        });
+      }
+    };
+
+    const onContactBlocked = ({ userId }: any) => {
+      socketSync.onContactBlocked(userId, 'blocked');
+      updateCurrentChatBlockStatus(userId, true, false);
+    };
+    const onContactBlockedBy = ({ userId }: any) => {
+      socketSync.onContactBlocked(userId, 'blockedBy');
+      updateCurrentChatBlockStatus(userId, true, true);
+    };
+    const onContactUnblocked = ({ userId }: any) => {
+      socketSync.onContactUnblocked(userId, 'blocked');
+      updateCurrentChatBlockStatus(userId, false, false);
+    };
+    const onContactUnblockedBy = ({ userId }: any) => {
+      socketSync.onContactUnblocked(userId, 'blockedBy');
+      updateCurrentChatBlockStatus(userId, false, true);
+    };
+    const onMessageError = (data: any) => {
+      const { tempId, error } = data;
+      if (tempId) {
+        socketSync.onMessageStatusUpdate(tempId, 'error');
+        const currentMsgs = useChatStore.getState().messages;
+        useChatStore.getState().setMessages(
+          (currentMsgs || []).map(m => String(m.id) === String(tempId) ? { ...m, messageStatus: 'error' } : m)
+        );
+      }
+      showToast.error(error || "An error occurred");
+      console.error("Socket error:", error);
+    };
 
     const onGroupUpdated = ({ conversation }: any) => {
       if (!conversation?.id) return;
@@ -104,15 +143,44 @@ export function useMessageSocketHandlers() {
       }
       updateGroupProfileInCache(qc, conversation.id, conversation);
     };
-    s.off('group-updated', onGroupUpdated);
-    s.on('group-updated', onGroupUpdated);
+
+    const onGroupCreated = (payload: any) => {
+      if (payload?.conversation) {
+        socketSync.onGroupCreated(payload.conversation);
+      }
+    };
+
+    const onGroupMembersUpdated = ({ conversationId, participants }: any) => {
+      if (!conversationId || !participants) return;
+      const current = useChatStore.getState().currentChatUser;
+      if (current && (current.id === conversationId || (current as any).conversationId === conversationId)) {
+        useChatStore.getState().setCurrentChatUser({
+          ...current,
+          participants
+        } as any);
+      }
+      socketSync.onGroupMembersUpdated(conversationId, participants);
+    };
+
+    const onGroupRoleUpdated = ({ conversationId, userId, role }: any) => {
+      if (!conversationId || !userId || !role) return;
+      const current = useChatStore.getState().currentChatUser;
+      if (current && (current.id === conversationId || (current as any).conversationId === conversationId)) {
+        const updatedParticipants = (current as any).participants?.map((p: any) =>
+          String(p.userId) === String(userId) ? { ...p, role } : p
+        );
+        useChatStore.getState().setCurrentChatUser({
+          ...current,
+          participants: updatedParticipants
+        } as any);
+      }
+      socketSync.onGroupRoleUpdated(conversationId, userId, role);
+    };
 
     const onProfileUpdated = ({ user }: any) => {
       if (!user?.id) return;
-
-      // 1. If we are currently chatting with this user, update active chat header
       const current = useChatStore.getState().currentChatUser;
-      if (current && current.id === user.id && !(current as any).conversationId) { // Not a group
+      if (current && current.id === user.id && !(current as any).conversationId) {
         useChatStore.getState().setCurrentChatUser({
           ...current,
           name: user.name,
@@ -121,58 +189,164 @@ export function useMessageSocketHandlers() {
           image: user.profileImage || user.image,
         } as any);
       }
-
-      // 2. If it's our OWN profile that someone updated from another session
       const authStore = useAuthStore.getState();
       if (authStore.userInfo?.id === user.id) {
         authStore.setUserInfo({ ...authStore.userInfo, ...user } as any);
       }
-
-      // 3. Force contact list and sidebar to re-render instantly instead of refetching
       updateContactProfileInCache(qc, user.id, user);
     };
-    s.off('profile-updated', onProfileUpdated);
-    s.on('profile-updated', onProfileUpdated);
 
-    attachedRef.current = true;
-
-    // ── message-sent: full DB-persisted message (call records, own sent messages) ──
+    // ── message-sent: full DB-persisted message (own sent, incoming, call records) ──
     const onMessageSent = (data: any) => {
       const message: Message = data?.message || data;
       if (!message?.id) return;
 
-      // Determine which conversation this belongs to — use conversationId on the message
+      // Always read from refs to get the latest values (no stale closure)
+      const myAuthId = authUserIdRef.current;
+      const currentChatUser = currentChatUserRef.current;
+
+      // Real-time status for incoming
+      if (Number(message.senderId) !== Number(myAuthId)) {
+        const isGroup = (currentChatUser as any)?.isGroup || (currentChatUser as any)?.type === 'group';
+        const activeConvId = (currentChatUser as any)?.conversationId || currentChatUser?.id;
+        const msgConvId = (message as any)?.conversationId;
+
+        const isActiveChat = Boolean(currentChatUser?.id) && (
+          isGroup
+            ? String(activeConvId) === String(msgConvId)
+            : (String(message.senderId) === String(currentChatUser?.id) ||
+              (String(message.senderId) === String(myAuthId) && String(message.receiverId) === String(currentChatUser?.id)))
+        );
+
+        if (isActiveChat) {
+          s.emit('mark-read', { messageId: message.id, senderId: message.senderId });
+          socketSync.onMessageStatusUpdate(message.id, 'read');
+        } else {
+          s.emit('mark-delivered', { messageId: message.id, senderId: message.senderId });
+        }
+      }
+
       const convId = (message as any)?.conversationId;
       if (!convId) return;
 
-      // Upsert into any matching messages cache
-      upsertMessageInCache(qc, message);
+      const tempId = (message as any)?.tempId;
 
-      // Also update the contacts preview row
-      if (authUserId) {
-        const contactsKey = ['contacts', String(authUserId)];
-        qc.setQueryData<any[]>(contactsKey, (old = []) => {
-          if (!Array.isArray(old)) return old;
-          return old.map((c: any) => {
-            if (String(c?.conversationId) !== String(convId)) return c;
-            return {
-              ...c,
-              type: message.type,
-              message: message.content || c.message,
-              timestamp: message.createdAt || new Date().toISOString(),
-              senderId: message.senderId,
-              isSystemMessage: Boolean((message as any).isSystemMessage),
-              systemMessageType: (message as any).systemMessageType || null,
-            };
-          });
+      // Upsert into the cache (replaces tempId if present)
+      upsertMessageInCache(qc, message, tempId);
+
+      // Determine if this message belongs to the currently active chat
+      const isMeReceiver = Number(message.receiverId) === Number(myAuthId);
+      const isPeerSender = Number(message.senderId) === Number(currentChatUserRef.current?.id);
+      const isMeSender = Number(message.senderId) === Number(myAuthId);
+      const isPeerReceiver = Number(message.receiverId) === Number(currentChatUserRef.current?.id);
+
+      const currentUser = currentChatUserRef.current;
+      const isDirectMatch =
+        (message.conversationId && currentUser?.conversationId && String(message.conversationId) === String(currentUser.conversationId)) ||
+        ((Number(message.senderId) === Number(currentUser?.id) && Number(message.receiverId) === Number(myAuthId)) ||
+          (Number(message.senderId) === Number(myAuthId) && Number(message.receiverId) === Number(currentUser?.id)));
+      const isGroupMatch = (currentUser as any)?.isGroup && String((currentUser as any).conversationId) === String(convId);
+
+      if (isDirectMatch || isGroupMatch) {
+        const currentMsgs = useChatStore.getState().messages || [];
+
+        if (tempId) {
+          useChatStore.getState().setMessages(
+            currentMsgs.map(m => String(m.id) === String(tempId) ? message : m)
+          );
+        } else {
+          const hasMsg = currentMsgs.some(m => String(m.id) === String(message.id));
+          if (!hasMsg) {
+            addMessageRef.current(message);
+          }
+        }
+      }
+
+      // Update the contacts preview row
+      if (myAuthId) {
+        updateContactFieldsInCache(qc, (c: any) => {
+          if (String(c?.conversationId) !== String(convId)) return c;
+
+          const activeChatId = useChatStore.getState().currentChatUser?.id;
+          const isGroupContact = (useChatStore.getState().currentChatUser as any)?.isGroup;
+          const activeConvId = (useChatStore.getState().currentChatUser as any)?.conversationId;
+
+          const isActiveChat = Boolean(activeChatId) && (
+            isGroupContact
+              ? String(activeConvId) === String(convId)
+              : (String(message.senderId) === String(activeChatId) || String(message.receiverId) === String(activeChatId))
+          );
+
+          const isIncoming = Number(message.senderId) !== Number(myAuthId);
+
+          return {
+            ...c,
+            type: message.type,
+            message: message.content || c.message,
+            timestamp: message.createdAt || new Date().toISOString(),
+            senderId: message.senderId,
+            isSystemMessage: Boolean((message as any).isSystemMessage),
+            systemMessageType: (message as any).systemMessageType || null,
+            messageStatus: message.messageStatus || 'sent',
+            totalUnreadMessages: isIncoming && !isActiveChat
+              ? (Number(c.totalUnreadMessages) || 0) + 1
+              : (isActiveChat ? 0 : c.totalUnreadMessages),
+          };
         });
       }
     };
 
+    // Remove all existing handlers before re-attaching (clean slate)
+    s.off('message-status-update', onStatusUpdate);
+    s.off('messages-read', onMessagesRead);
+    s.off('message-edited', onEdited);
+    s.off('message-deleted', onDeleted);
+    s.off('message-reacted', onReacted);
+    s.off('message-starred', onStarred);
+    s.off('message-forwarded', onForwarded);
+    s.off('message-error', onMessageError);
+    s.off('contact-blocked', onContactBlocked);
+    s.off('contact-blocked-by', onContactBlockedBy);
+    s.off('contact-unblocked', onContactUnblocked);
+    s.off('contact-unblocked-by', onContactUnblockedBy);
+    s.off('group-updated', onGroupUpdated);
+    s.off('profile-updated', onProfileUpdated);
+    s.off('chat-pinned', onChatPinned);
+    s.off('chat-cleared', onChatCleared);
+    s.off('chat-archived', onChatArchived);
+    s.off('chat-muted', onChatMuted);
+    s.off('chat-deleted', onChatDeleted);
     s.off('message-sent', onMessageSent);
+    s.off('group-created', onGroupCreated);
+    s.off('group-members-updated', onGroupMembersUpdated);
+    s.off('group-role-updated', onGroupRoleUpdated);
+
+    // Attach all fresh handlers
+    s.on('message-status-update', onStatusUpdate);
+    s.on('messages-read', onMessagesRead);
+    s.on('message-edited', onEdited);
+    s.on('message-deleted', onDeleted);
+    s.on('message-reacted', onReacted);
+    s.on('message-starred', onStarred);
+    s.on('message-forwarded', onForwarded);
+    s.on('message-error', onMessageError);
+    s.on('contact-blocked', onContactBlocked);
+    s.on('contact-blocked-by', onContactBlockedBy);
+    s.on('contact-unblocked', onContactUnblocked);
+    s.on('contact-unblocked-by', onContactUnblockedBy);
+    s.on('group-updated', onGroupUpdated);
+    s.on('profile-updated', onProfileUpdated);
+    s.on('chat-pinned', onChatPinned);
+    s.on('chat-cleared', onChatCleared);
+    s.on('chat-archived', onChatArchived);
+    s.on('chat-muted', onChatMuted);
+    s.on('chat-deleted', onChatDeleted);
     s.on('message-sent', onMessageSent);
+    s.on('group-created', onGroupCreated);
+    s.on('group-members-updated', onGroupMembersUpdated);
+    s.on('group-role-updated', onGroupRoleUpdated);
+
     return () => {
-      s.off('msg-recieve', onMsgReceive);
       s.off('message-status-update', onStatusUpdate);
       s.off('messages-read', onMessagesRead);
       s.off('message-edited', onEdited);
@@ -180,9 +354,24 @@ export function useMessageSocketHandlers() {
       s.off('message-reacted', onReacted);
       s.off('message-starred', onStarred);
       s.off('message-forwarded', onForwarded);
+      s.off('message-error', onMessageError);
       s.off('group-updated', onGroupUpdated);
       s.off('profile-updated', onProfileUpdated);
-      attachedRef.current = false;
+      s.off('chat-pinned', onChatPinned);
+      s.off('chat-cleared', onChatCleared);
+      s.off('chat-archived', onChatArchived);
+      s.off('chat-muted', onChatMuted);
+      s.off('chat-deleted', onChatDeleted);
+      s.off('message-sent', onMessageSent);
+      s.off('contact-blocked', onContactBlocked);
+      s.off('contact-blocked-by', onContactBlockedBy);
+      s.off('contact-unblocked', onContactUnblocked);
+      s.off('contact-unblocked-by', onContactUnblockedBy);
+      s.off('group-created', onGroupCreated);
+      s.off('group-members-updated', onGroupMembersUpdated);
+      s.off('group-role-updated', onGroupRoleUpdated);
     };
-  }, [socket, currentChatUser?.id, addMessage, socketSync, authUserId, qc]);
+    // Only depend on socket — currentChatUser is accessed via ref to prevent stale closures
+    // while still allowing the handler to read the latest value at call time
+  }, [socket, qc]);
 }

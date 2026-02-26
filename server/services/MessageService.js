@@ -9,7 +9,6 @@ import {
     prepareReply
 } from "../utils/messageHelpers.js";
 
-import { SocketEmitter } from "../utils/SocketEmitter.js";
 
 export class MessageService {
     static async addMessage({ content, from, to, type = "text", replyToMessageId, isGroup, recipientOnline }) {
@@ -20,28 +19,30 @@ export class MessageService {
         }
         if (blocked) throw Object.assign(new Error("Cannot send message. User is blocked."), { status: 403 });
 
-        const convo = await resolveConversation(prisma, from, to, isGroup);
-        const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
+        return await prisma.$transaction(async (tx) => {
+            const convo = await resolveConversation(tx, from, to, isGroup);
+            const replyData = await prepareReply(tx, convo.id, replyToMessageId, Number(from));
 
-        const newMessage = await prisma.message.create({
-            data: {
-                conversationId: convo.id,
-                senderId: Number(from),
-                type,
-                content,
-                status: recipientOnline ? "delivered" : "sent",
-                replyToMessageId: replyData.replyToMessageId,
-                quotedMessage: replyData.quotedMessage,
-            },
-        });
+            const newMessage = await tx.message.create({
+                data: {
+                    conversationId: convo.id,
+                    senderId: Number(from),
+                    type,
+                    content,
+                    status: recipientOnline ? "delivered" : "sent",
+                    replyToMessageId: replyData.replyToMessageId,
+                    quotedMessage: replyData.quotedMessage,
+                },
+            });
 
-        await prisma.conversationParticipant.updateMany({
-            where: { conversationId: convo.id, userId: { not: Number(from) } },
-            data: { unreadCount: { increment: 1 } }
-        });
+            await tx.conversationParticipant.updateMany({
+                where: { conversationId: convo.id, userId: { not: Number(from) } },
+                data: { unreadCount: { increment: 1 } }
+            });
 
-        await unhideConversationParticipants(prisma, convo.id);
-        return { convo, message: newMessage };
+            await unhideConversationParticipants(tx, convo.id);
+            return { convo, message: newMessage };
+        }, { timeout: 15000 });
     }
 
     static async addMediaMessage({ file, from, to, type, replyToMessageId, caption, isGroup, recipientOnline }) {
@@ -71,33 +72,35 @@ export class MessageService {
             }
             if (blocked) throw Object.assign(new Error("Cannot send message. User is blocked."), { status: 403 });
 
-            const convo = await resolveConversation(prisma, from, to, isGroup);
-            const replyData = await prepareReply(prisma, convo.id, replyToMessageId, Number(from));
+            return await prisma.$transaction(async (tx) => {
+                const convo = await resolveConversation(tx, from, to, isGroup);
+                const replyData = await prepareReply(tx, convo.id, replyToMessageId, Number(from));
 
-            const newMessage = await prisma.message.create({
-                data: {
-                    conversationId: convo.id,
-                    senderId: Number(from),
-                    type,
-                    content: contentUrl,
-                    status: recipientOnline ? "delivered" : "sent",
-                    caption: caption && String(caption).trim() ? String(caption).trim() : null,
-                    ...(durationSec ? { duration: Math.round(durationSec) } : {}),
-                    replyToMessageId: replyData.replyToMessageId,
-                    quotedMessage: replyData.quotedMessage,
-                },
-            });
+                const newMessage = await tx.message.create({
+                    data: {
+                        conversationId: convo.id,
+                        senderId: Number(from),
+                        type,
+                        content: contentUrl,
+                        status: recipientOnline ? "delivered" : "sent",
+                        caption: caption && String(caption).trim() ? String(caption).trim() : null,
+                        ...(durationSec ? { duration: Math.round(durationSec) } : {}),
+                        replyToMessageId: replyData.replyToMessageId,
+                        quotedMessage: replyData.quotedMessage,
+                    },
+                });
 
-            try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, file) }); } catch (_) { }
+                await tx.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, file) });
 
-            await prisma.conversationParticipant.updateMany({
-                where: { conversationId: convo.id, userId: { not: Number(from) } },
-                data: { unreadCount: { increment: 1 } }
-            });
+                await tx.conversationParticipant.updateMany({
+                    where: { conversationId: convo.id, userId: { not: Number(from) } },
+                    data: { unreadCount: { increment: 1 } }
+                });
 
-            await unhideConversationParticipants(prisma, convo.id);
+                await unhideConversationParticipants(tx, convo.id);
 
-            return { convo, message: newMessage };
+                return { convo, message: newMessage };
+            }, { timeout: 15000 });
         } catch (insertError) {
             try {
                 await deleteCloudinaryFile(cld.public_id, resource_type);
@@ -158,118 +161,158 @@ export class MessageService {
         const messages = direction === 'desc' ? page.slice().reverse() : page;
 
         let unreadMessages = [];
+        let emitRead = null;
         if (markRead) {
             const otherUserId = Number(to);
             const pending = messages.filter((m) => m.senderId === otherUserId && m.status !== 'read').map((m) => m.id);
             if (pending.length) {
-                await prisma.message.updateMany({ where: { id: { in: pending } }, data: { status: 'read' } });
+                await prisma.$transaction([
+                    prisma.message.updateMany({ where: { id: { in: pending } }, data: { status: 'read' } }),
+                    prisma.conversationParticipant.updateMany({
+                        where: { conversationId: convo.id, userId: Number(from) },
+                        data: { unreadCount: 0 }
+                    })
+                ]);
                 unreadMessages = pending;
 
-                await prisma.conversationParticipant.updateMany({
-                    where: { conversationId: convo.id, userId: Number(from) },
-                    data: { unreadCount: 0 }
-                });
-
-                SocketEmitter.emitToUser(otherUserId, 'messages-read', {
-                    conversationId: convo.id,
-                    readerId: Number(from),
-                    messageIds: pending
-                });
+                emitRead = {
+                    otherUserId,
+                    payload: {
+                        conversationId: convo.id,
+                        readerId: Number(from),
+                        messageIds: pending
+                    }
+                };
             }
         }
 
-        return { messages, nextCursor, unreadMessages: markRead ? unreadMessages : undefined };
+        return { messages, nextCursor, unreadMessages: markRead ? unreadMessages : undefined, emitRead };
     }
 
     static async reactToMessage({ messageId, emoji, requesterId }) {
         const prisma = getPrismaInstance();
+        const mId = Number(messageId);
+        const reqId = Number(requesterId);
+        if (isNaN(mId) || mId > 2147483647) throw Object.assign(new Error("Message is still sending or invalid"), { status: 400 });
+
+        // 1. Initial validation outside the transaction to release pressure
         const message = await prisma.message.findUnique({
-            where: { id: messageId },
-            include: { conversation: { include: { participants: true } }, reactions: true },
+            where: { id: mId },
+            include: { conversation: { include: { participants: true } } },
         });
         if (!message) throw Object.assign(new Error("Message not found"), { status: 404 });
 
-        const isParticipant = message.conversation.participants.some(p => p.userId === requesterId);
+        const isParticipant = message.conversation.participants.some(p => p.userId === reqId);
         if (!isParticipant) throw Object.assign(new Error("Not a participant"), { status: 403 });
 
-        const existing = await prisma.messageReaction.findUnique({
-            where: { messageId_userId: { messageId, userId: requesterId } },
-        });
-
-        let action = "created";
-        if (!existing) {
-            await prisma.messageReaction.create({
-                data: { messageId, userId: requesterId, emoji },
-            });
-        } else if (existing.emoji === emoji) {
-            await prisma.messageReaction.delete({
-                where: { messageId_userId: { messageId, userId: requesterId } },
-            });
-            action = "removed";
-        } else {
-            await prisma.messageReaction.update({
-                where: { messageId_userId: { messageId, userId: requesterId } },
-                data: { emoji },
-            });
-            action = "updated";
+        if (message.conversation.type === 'direct') {
+            const other = message.conversation.participants.find(p => p.userId !== reqId);
+            if (other && await isBlockedBetweenUsers(prisma, reqId, other.userId)) {
+                throw Object.assign(new Error("Cannot react to message. Contact is blocked."), { status: 403 });
+            }
         }
 
-        const reactions = await prisma.messageReaction.findMany({
-            where: { messageId },
-            include: { user: { select: { id: true, name: true, profileImage: true } } }
-        });
+        // 2. Perform the reaction update in a focused transaction
+        return await prisma.$transaction(async (tx) => {
+            const existing = await tx.messageReaction.findUnique({
+                where: { messageId_userId: { messageId: mId, userId: reqId } },
+            });
 
-        message.conversation.participants.forEach((p) => {
-            SocketEmitter.emitToUser(p.userId, "message-reacted", { messageId, emoji, userId: requesterId, action, reactions });
-        });
+            let action = "created";
+            if (!existing) {
+                await tx.messageReaction.create({
+                    data: { messageId: mId, userId: reqId, emoji },
+                });
+            } else if (existing.emoji === emoji) {
+                await tx.messageReaction.delete({
+                    where: { messageId_userId: { messageId: mId, userId: reqId } },
+                });
+                action = "removed";
+            } else {
+                await tx.messageReaction.update({
+                    where: { messageId_userId: { messageId: mId, userId: reqId } },
+                    data: { emoji },
+                });
+                action = "updated";
+            }
 
-        return { messageId, reactions };
+            // Fetch all reactions for the response
+            const reactions = await tx.messageReaction.findMany({
+                where: { messageId: mId },
+                include: { user: { select: { id: true, name: true, profileImage: true } } }
+            });
+
+            return { messageId: mId, emoji, userId: reqId, action, reactions, participants: message.conversation.participants };
+        }, { timeout: 30000 }); // Increased timeout to give queue more time if pool is full
     }
 
     static async starMessage({ messageId, starred, requesterId }) {
         const prisma = getPrismaInstance();
+        const mId = Number(messageId);
+        const reqId = Number(requesterId);
+        if (isNaN(mId) || mId > 2147483647) throw Object.assign(new Error("Message is still sending or invalid"), { status: 400 });
+
         const message = await prisma.message.findUnique({
-            where: { id: messageId },
+            where: { id: mId },
             include: { conversation: { include: { participants: true } } },
         });
         if (!message) throw Object.assign(new Error("Message not found"), { status: 404 });
 
-        const isParticipant = message.conversation.participants.some(p => p.userId === requesterId);
+        const isParticipant = message.conversation.participants.some(p => p.userId === reqId);
         if (!isParticipant) throw Object.assign(new Error("Not a participant"), { status: 403 });
 
-        const arr = Array.isArray(message.starredBy) ? message.starredBy : [];
-        let nextArr = arr;
-
-        if (starred) {
-            const exists = arr.some((e) => (e?.userId ?? e) === requesterId);
-            if (!exists) {
-                nextArr = [...arr, { userId: requesterId, starredAt: new Date().toISOString() }];
+        if (message.conversation.type === 'direct') {
+            const other = message.conversation.participants.find(p => p.userId !== reqId);
+            if (other && await isBlockedBetweenUsers(prisma, reqId, other.userId)) {
+                throw Object.assign(new Error("Cannot star message. Contact is blocked."), { status: 403 });
             }
-        } else {
-            nextArr = arr.filter((e) => (e?.userId ?? e) !== requesterId);
         }
 
-        const updated = await prisma.message.update({
-            where: { id: messageId },
-            data: { starredBy: nextArr },
-        });
+        return await prisma.$transaction(async (tx) => {
+            const arr = Array.isArray(message.starredBy) ? message.starredBy : [];
+            let nextArr = arr;
 
-        SocketEmitter.emitToUser(requesterId, "message-starred", { messageId: updated.id, starred });
+            if (starred) {
+                const exists = arr.some((e) => (e?.userId ?? e) === reqId);
+                if (!exists) {
+                    nextArr = [...arr, { userId: reqId, starredAt: new Date().toISOString() }];
+                }
+            } else {
+                nextArr = arr.filter((e) => (e?.userId ?? e) !== reqId);
+            }
 
-        return { id: updated.id, starred };
+            const updated = await tx.message.update({
+                where: { id: mId },
+                data: { starredBy: nextArr },
+            });
+
+            return { id: updated.id, starred, participants: message.conversation.participants };
+        }, { timeout: 30000 });
     }
 
     static async editMessage({ messageId, content, requesterId }) {
         const prisma = getPrismaInstance();
+        const mId = Number(messageId);
+        const reqId = Number(requesterId);
+        if (isNaN(mId) || mId > 2147483647) throw Object.assign(new Error("Message is still sending. Please wait a moment."), { status: 400 });
+
         const message = await prisma.message.findUnique({
-            where: { id: messageId },
+            where: { id: mId },
             include: { conversation: { include: { participants: true } } },
         });
         if (!message) throw Object.assign(new Error("Message not found"), { status: 404 });
 
-        if (message.senderId !== requesterId) {
+        if (message.senderId !== reqId) {
             throw Object.assign(new Error("Only sender can edit this message"), { status: 403 });
         }
+
+        if (message.conversation.type === 'direct') {
+            const other = message.conversation.participants.find(p => p.userId !== reqId);
+            if (other && await isBlockedBetweenUsers(prisma, reqId, other.userId)) {
+                throw Object.assign(new Error("Cannot edit message. Contact is blocked."), { status: 403 });
+            }
+        }
+
         if (message.isDeletedForEveryone) {
             throw Object.assign(new Error("Message was deleted"), { status: 400 });
         }
@@ -280,50 +323,59 @@ export class MessageService {
             throw Object.assign(new Error("Edit window expired"), { status: 400 });
         }
 
-        const history = Array.isArray(message.editHistory) ? message.editHistory : [];
-        history.push({ previousContent: message.content, editedAt: new Date().toISOString() });
+        return await prisma.$transaction(async (tx) => {
+            const history = Array.isArray(message.editHistory) ? message.editHistory : [];
+            history.push({ previousContent: message.content, editedAt: new Date().toISOString() });
 
-        const updated = await prisma.message.update({
-            where: { id: messageId },
-            data: {
-                content,
-                isEdited: true,
-                editedAt: new Date(),
-                originalContent: message.originalContent ?? message.content,
-                editHistory: history,
-            },
-        });
+            const updated = await tx.message.update({
+                where: { id: mId },
+                data: {
+                    content,
+                    isEdited: true,
+                    editedAt: new Date(),
+                    originalContent: message.originalContent ?? message.content,
+                    editHistory: history,
+                },
+            });
 
-        const participantUserIds = message.conversation.participants.map(p => p.userId);
-        participantUserIds.forEach((uid) => {
-            SocketEmitter.emitToUser(uid, 'message-edited', { messageId: updated.id, newContent: updated.content, editedAt: updated.editedAt });
-        });
-
-        return { id: updated.id, content: updated.content, editedAt: updated.editedAt };
+            return { id: updated.id, content: updated.content, editedAt: updated.editedAt, participants: message.conversation.participants };
+        }, { timeout: 30000 });
     }
 
     static async deleteMessage({ messageId, deleteType, requesterId }) {
         const prisma = getPrismaInstance();
+        const mId = Number(messageId);
+        const reqId = Number(requesterId);
+        if (isNaN(mId) || mId > 2147483647) throw Object.assign(new Error("Message is still sending. Please wait a moment."), { status: 400 });
+
         if (deleteType !== "forMe" && deleteType !== "forEveryone") {
             throw Object.assign(new Error("Invalid deleteType"), { status: 400 });
         }
 
         const message = await prisma.message.findUnique({
-            where: { id: messageId },
+            where: { id: mId },
             include: { conversation: { include: { participants: true } } },
         });
 
         if (!message) {
-            return { id: messageId, deleteType: "forEveryone", status: 'idempotent' };
+            return { id: mId, deleteType: "forEveryone", status: 'idempotent' };
         }
 
-        const isParticipant = message.conversation.participants.some(p => p.userId === requesterId);
+        const isParticipant = message.conversation.participants.some(p => p.userId === reqId);
         if (!isParticipant) throw Object.assign(new Error("Not a participant"), { status: 403 });
 
         if (deleteType === "forEveryone") {
-            if (message.senderId !== requesterId) {
+            if (message.senderId !== reqId) {
                 throw Object.assign(new Error("Only sender can delete for everyone"), { status: 403 });
             }
+
+            if (message.conversation.type === 'direct') {
+                const other = message.conversation.participants.find(p => p.userId !== reqId);
+                if (other && await isBlockedBetweenUsers(prisma, reqId, other.userId)) {
+                    throw Object.assign(new Error("Cannot delete for everyone. Contact is blocked."), { status: 403 });
+                }
+            }
+
             if (message.isDeletedForEveryone) {
                 return { id: message.id, deleteType: "forEveryone", status: 'idempotent' };
             }
@@ -333,44 +385,39 @@ export class MessageService {
                 throw Object.assign(new Error("Delete for everyone window expired"), { status: 400 });
             }
 
-            const updated = await prisma.message.update({
-                where: { id: messageId },
-                data: {
-                    isDeletedForEveryone: true,
-                    deletedForEveryoneAt: new Date(),
-                    content: "This message was deleted",
-                },
-            });
+            return await prisma.$transaction(async (tx) => {
+                const updated = await tx.message.update({
+                    where: { id: mId },
+                    data: {
+                        isDeletedForEveryone: true,
+                        deletedForEveryoneAt: new Date(),
+                        content: "This message was deleted",
+                    },
+                });
 
-            const userIds = message.conversation.participants.map(p => p.userId);
-            userIds.forEach((uid) => {
-                SocketEmitter.emitToUser(uid, "message-deleted", { messageId: updated.id, deleteType: "forEveryone" });
-            });
-
-            return { id: updated.id, deleteType: "forEveryone" };
-        }
-
-        // forMe
-        const deletedBy = Array.isArray(message.deletedBy) ? message.deletedBy : [];
-        if (!deletedBy.includes(requesterId)) {
-            deletedBy.push(requesterId);
+                return { id: updated.id, deleteType: "forEveryone", participants: message.conversation.participants };
+            }, { timeout: 30000 });
         } else {
-            return { message, status: 'idempotent' };
+            // deleteForMe
+            return await prisma.$transaction(async (tx) => {
+                const currentMsg = await tx.message.findUnique({ where: { id: mId } });
+                const deleted = Array.isArray(currentMsg?.deletedBy) ? currentMsg.deletedBy : [];
+                if (!deleted.includes(reqId)) {
+                    deleted.push(reqId);
+                }
+                const updated = await tx.message.update({
+                    where: { id: mId },
+                    data: { deletedBy: deleted },
+                });
+                return { id: updated.id, deleteType: "forMe", participants: message.conversation.participants };
+            }, { timeout: 30000 });
         }
-
-        const updated = await prisma.message.update({
-            where: { id: messageId },
-            data: { deletedBy },
-        });
-
-        SocketEmitter.emitToUser(requesterId, "message-deleted", { messageId: updated.id, deleteType: "forMe", deletedBy });
-
-        return { message: updated };
     }
 
     static async forwardMessages({ messageIds, toConversationIds, requesterId }) {
         const prisma = getPrismaInstance();
 
+        // 1. Resolve source messages and destination conversations outside transaction
         const msgs = await prisma.message.findMany({
             where: { id: { in: messageIds.map(Number) } },
             include: {
@@ -401,103 +448,121 @@ export class MessageService {
             if (!isParticipant) {
                 throw Object.assign(new Error(`No access to destination conversation ${c.id}`), { status: 403 });
             }
-        }
 
-        const created = [];
-
-        for (const m of msgs) {
-            for (const c of destConvos) {
-                const newMsg = await prisma.message.create({
-                    data: {
-                        conversationId: c.id,
-                        senderId: requesterId,
-                        type: m.type,
-                        content: m.content,
-                        caption: m.caption,
-                        fileName: m.fileName,
-                        fileSize: m.fileSize,
-                        mimeType: m.mimeType,
-                        duration: m.duration,
-                        thumbnailUrl: m.thumbnailUrl,
-                        status: "sent",
-                        isForwarded: true,
-                        originalMessageId: m.id,
-                        forwardCount: (m.forwardCount || 0) + 1,
-                    },
-                });
-
-                if (m.mediaFiles && m.mediaFiles.length) {
-                    for (const mf of m.mediaFiles) {
-                        await prisma.mediaFile.create({
-                            data: {
-                                messageId: newMsg.id,
-                                storageKey: mf.storageKey,
-                                storageProvider: mf.storageProvider,
-                                originalName: mf.originalName,
-                                mimeType: mf.mimeType,
-                                fileSize: mf.fileSize,
-                                width: mf.width,
-                                height: mf.height,
-                                duration: mf.duration,
-                                thumbnailKey: mf.thumbnailKey,
-                                thumbnailSize: mf.thumbnailSize,
-                                uploadStatus: mf.uploadStatus,
-                                downloadCount: 0,
-                                isCompressed: mf.isCompressed,
-                                originalFileSize: mf.originalFileSize,
-                                expiresAt: mf.expiresAt,
-                                cloudinaryPublicId: mf.cloudinaryPublicId,
-                                cloudinaryVersion: mf.cloudinaryVersion,
-                                cloudinaryResourceType: mf.cloudinaryResourceType,
-                                cloudinaryFormat: mf.cloudinaryFormat,
-                                cloudinaryFolder: mf.cloudinaryFolder,
-                                cloudinaryAssetId: mf.cloudinaryAssetId,
-                            },
-                        });
-                    }
+            if (c.type === 'direct') {
+                const other = c.participants.find(p => p.userId !== requesterId);
+                if (other && await isBlockedBetweenUsers(prisma, requesterId, other.userId)) {
+                    throw Object.assign(new Error(`Cannot forward to blocked contact`), { status: 403 });
                 }
-
-                created.push({
-                    id: newMsg.id,
-                    conversationId: c.id,
-                    senderId: requesterId,
-                    type: newMsg.type,
-                    content: newMsg.content,
-                    status: newMsg.status,
-                    createdAt: newMsg.createdAt,
-                    isForwarded: true,
-                    forwardCount: newMsg.forwardCount,
-                });
-
-                c.participants.forEach((p) => {
-                    SocketEmitter.emitToUser(p.userId, "message-forwarded", { messageId: newMsg.id, conversationId: c.id });
-                });
             }
         }
 
-        return created;
+        // 2. Perform creations in a transaction
+        return await prisma.$transaction(async (tx) => {
+            const created = [];
+            let emits = [];
+
+            for (const m of msgs) {
+                for (const c of destConvos) {
+                    const newMsg = await tx.message.create({
+                        data: {
+                            conversationId: c.id,
+                            senderId: requesterId,
+                            type: m.type,
+                            content: m.content,
+                            caption: m.caption,
+                            fileName: m.fileName,
+                            fileSize: m.fileSize,
+                            mimeType: m.mimeType,
+                            duration: m.duration,
+                            thumbnailUrl: m.thumbnailUrl,
+                            status: "sent",
+                            isForwarded: true,
+                            originalMessageId: m.id,
+                            forwardCount: (m.forwardCount || 0) + 1,
+                        },
+                    });
+
+                    if (m.mediaFiles && m.mediaFiles.length) {
+                        for (const mf of m.mediaFiles) {
+                            await tx.mediaFile.create({
+                                data: {
+                                    messageId: newMsg.id,
+                                    storageKey: mf.storageKey,
+                                    storageProvider: mf.storageProvider,
+                                    originalName: mf.originalName,
+                                    mimeType: mf.mimeType,
+                                    fileSize: mf.fileSize,
+                                    width: mf.width,
+                                    height: mf.height,
+                                    duration: mf.duration,
+                                    thumbnailKey: mf.thumbnailKey,
+                                    thumbnailSize: mf.thumbnailSize,
+                                    uploadStatus: mf.uploadStatus,
+                                    downloadCount: 0,
+                                    isCompressed: mf.isCompressed,
+                                    originalFileSize: mf.originalFileSize,
+                                    expiresAt: mf.expiresAt,
+                                    cloudinaryPublicId: mf.cloudinaryPublicId,
+                                    cloudinaryVersion: mf.cloudinaryVersion,
+                                    cloudinaryResourceType: mf.cloudinaryResourceType,
+                                    cloudinaryFormat: mf.cloudinaryFormat,
+                                    cloudinaryFolder: mf.cloudinaryFolder,
+                                    cloudinaryAssetId: mf.cloudinaryAssetId,
+                                },
+                            });
+                        }
+                    }
+
+                    created.push({
+                        id: newMsg.id,
+                        conversationId: c.id,
+                        senderId: requesterId,
+                        type: newMsg.type,
+                        content: newMsg.content,
+                        status: newMsg.status,
+                        createdAt: newMsg.createdAt,
+                        isForwarded: true,
+                        forwardCount: newMsg.forwardCount,
+                    });
+
+                    emits.push({ messageId: newMsg.id, conversationId: c.id, participants: c.participants });
+                }
+            }
+
+            return { created, emits };
+        }, { timeout: 60000 }); // Large timeout for bulk forwarding
     }
 
-    static async updateMessageStatus({ messageId, status }) {
+    static async updateMessageStatus({ messageId, status, readerId }) {
         const prisma = getPrismaInstance();
         const allowed = ["sent", "delivered", "read"];
         const idNum = parseInt(messageId);
         if (!idNum || !allowed.includes(status)) {
             throw Object.assign(new Error("Invalid payload"), { status: 400 });
         }
-        const updated = await prisma.message.update({
-            where: { id: idNum },
-            data: { status },
-            include: { conversation: { include: { participants: true } } },
-        });
+        return await prisma.$transaction(async (tx) => {
+            const updated = await tx.message.update({
+                where: { id: idNum },
+                data: { status },
+                include: { conversation: { include: { participants: true } } },
+            });
 
-        SocketEmitter.emitToUser(updated.senderId, "message-status-update", { messageId: updated.id, status });
-        const otherParticipant = updated.conversation.participants.find(p => p.userId !== updated.senderId);
-        if (otherParticipant) {
-            SocketEmitter.emitToUser(otherParticipant.userId, "message-status-update", { messageId: updated.id, status });
-        }
+            if (status === 'read' && readerId) {
+                await tx.conversationParticipant.updateMany({
+                    where: { conversationId: updated.conversationId, userId: Number(readerId) },
+                    data: { unreadCount: 0 }
+                });
+            }
 
-        return { id: updated.id, status };
+            return {
+                id: updated.id,
+                status,
+                senderId: updated.senderId,
+                conversationId: updated.conversationId,
+                participants: updated.conversation.participants
+            };
+        }, { timeout: 30000 });
     }
 
     static async searchMessages({ conversationId, userId, q, limit = 30, cursorId }) {

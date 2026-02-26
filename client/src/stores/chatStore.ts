@@ -59,7 +59,7 @@ export const useChatStore = create<ChatState>()(
         })),
       addMessage: (message) => set((state) => {
         // Prevent duplicate messages (especially from optimistic updates vs socket echo)
-        if (state.messages.some((m) => m.id === message.id)) {
+        if (state.messages.some((m) => String(m.id) === String(message.id))) {
           return state;
         }
         return { messages: [...state.messages, message] };
@@ -84,7 +84,7 @@ export const useChatStore = create<ChatState>()(
       updateMessageStatus: (id, status) =>
         set((state) => ({
           messages: state.messages.map((m) =>
-            m.id === id ? { ...m, messageStatus: status, status } : m
+            String(m.id) === String(id) ? { ...m, messageStatus: status, status } : m
           ),
         })),
     }),

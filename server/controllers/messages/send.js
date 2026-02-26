@@ -5,7 +5,7 @@ import { SocketEmitter } from "../../utils/SocketEmitter.js";
 
 export const addMessage = async (req, res, next) => {
   try {
-    const { content, from, to, type = "text", replyToMessageId, isGroup } = req.body;
+    const { content, from, to, type = "text", replyToMessageId, isGroup, tempId } = req.body;
     const recipientOnline = global.onlineUsers?.has?.(to);
 
     if (!content || typeof content !== "string" || !content.trim() || !from || !to) {
@@ -22,7 +22,7 @@ export const addMessage = async (req, res, next) => {
       recipientOnline,
     });
 
-    SocketEmitter.emitMessageSent(convo, message);
+    SocketEmitter.emitMessageSent(convo, { ...message, tempId });
     return res.status(201).json(MessageMapper.toMinimalMessage(message));
   } catch (error) {
     const status = error?.status || 500;
@@ -32,7 +32,7 @@ export const addMessage = async (req, res, next) => {
 
 export const addVideo = async (req, res, next) => {
   try {
-    const { from, to, replyToMessageId, caption, isGroup } = req.body;
+    const { from, to, replyToMessageId, caption, isGroup, tempId } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -53,7 +53,7 @@ export const addVideo = async (req, res, next) => {
       recipientOnline,
     });
 
-    SocketEmitter.emitMessageSent(convo, message);
+    SocketEmitter.emitMessageSent(convo, { ...message, tempId });
     return res.status(201).json(MessageMapper.toMinimalMessage(message));
   } catch (error) {
     const status = error?.status || 500;
@@ -62,7 +62,7 @@ export const addVideo = async (req, res, next) => {
 };
 export const addImage = async (req, res, next) => {
   try {
-    const { from, to, replyToMessageId, caption, isGroup } = req.body;
+    const { from, to, replyToMessageId, caption, isGroup, tempId } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -83,7 +83,7 @@ export const addImage = async (req, res, next) => {
       recipientOnline,
     });
 
-    SocketEmitter.emitMessageSent(convo, message);
+    SocketEmitter.emitMessageSent(convo, { ...message, tempId });
     return res.status(201).json(MessageMapper.toMinimalMessage(message));
   } catch (error) {
     const status = error?.status || 500;
@@ -93,7 +93,7 @@ export const addImage = async (req, res, next) => {
 
 export const addAudio = async (req, res, next) => {
   try {
-    const { from, to, replyToMessageId, caption, isGroup } = req.body;
+    const { from, to, replyToMessageId, caption, isGroup, tempId } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -110,7 +110,7 @@ export const addAudio = async (req, res, next) => {
       recipientOnline,
     });
 
-    SocketEmitter.emitMessageSent(convo, message);
+    SocketEmitter.emitMessageSent(convo, { ...message, tempId });
     return res.status(201).json(MessageMapper.toMinimalMessage(message));
   } catch (error) {
     const status = error?.status || 500;
@@ -120,7 +120,7 @@ export const addAudio = async (req, res, next) => {
 
 export const addFile = async (req, res, next) => {
   try {
-    const { from, to, replyToMessageId, caption, isGroup } = req.body;
+    const { from, to, replyToMessageId, caption, isGroup, tempId } = req.body;
     if (!req.file || !from || !to) {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -144,7 +144,7 @@ export const addFile = async (req, res, next) => {
       recipientOnline,
     });
 
-    SocketEmitter.emitMessageSent(convo, message);
+    SocketEmitter.emitMessageSent(convo, { ...message, tempId });
     return res.status(201).json(MessageMapper.toMinimalMessage(message));
   } catch (error) {
     const status = error?.status || 500;
@@ -154,7 +154,7 @@ export const addFile = async (req, res, next) => {
 
 export const addLocation = async (req, res, next) => {
   try {
-    const { from, to, latitude, longitude, name, address, replyToMessageId, isGroup } = req.body || {};
+    const { from, to, latitude, longitude, name, address, replyToMessageId, isGroup, tempId } = req.body || {};
     if (!from || !to || typeof latitude === 'undefined' || typeof longitude === 'undefined') {
       return res.status(400).json({ message: "Invalid data" });
     }
@@ -185,7 +185,7 @@ export const addLocation = async (req, res, next) => {
       recipientOnline,
     });
 
-    SocketEmitter.emitMessageSent(convo, message);
+    SocketEmitter.emitMessageSent(convo, { ...message, tempId });
     return res.status(201).json(MessageMapper.toMinimalMessage(message));
   } catch (error) {
     const status = error?.status || 500;

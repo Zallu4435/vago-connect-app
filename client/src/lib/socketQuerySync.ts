@@ -1,52 +1,40 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { Message } from '@/types';
-import { updateMessagesCache } from './cacheHelpers';
+import { updateMessagesCache, updateContactFieldsInCache, upsertMessageInCache, updateContactProfileInCache, unshiftContactInCache } from './cacheHelpers';
 
 export const createSocketQuerySync = (queryClient: QueryClient) => {
   return {
-    onMessageReceive: (message: Message, userId?: string | number, chatUserId?: string | number) => {
-      if (!userId || !chatUserId) return;
-      const key = ['messages', String(userId), String(chatUserId)];
-      queryClient.setQueryData<Message[]>(key, (old = []) => {
-        const exists = old.some((m) => m.id === message.id);
-        if (exists) return old;
-        return [...old, message];
-      });
 
-      // Update contacts preview and unread counts for incoming message
-      const contactsKey = ['contacts', String(userId)];
-      queryClient.setQueryData<any[]>(contactsKey, (old = []) => {
-        if (!Array.isArray(old)) return old;
-        const idx = old.findIndex((c: any) => String(c.id) === String(chatUserId));
-        if (idx === -1) return old;
-        const contact = old[idx] || {};
-        const updated = {
-          ...contact,
-          message: (message as any).content || (message as any).message || contact.message,
-          type: (message as any).type || 'text',
-          timestamp: (message as any).timestamp || new Date().toISOString(),
-          senderId: (message as any).senderId,
-          isSystemMessage: Boolean((message as any).isSystemMessage),
-          systemMessageType: (message as any).systemMessageType || null,
-          messageStatus: (message as any).messageStatus || contact.messageStatus,
-          totalUnreadMessages: (Number(contact.totalUnreadMessages) || 0) + 1,
-        };
-        const rest = old.filter((_, i) => i !== idx);
-        return [updated, ...rest];
-      });
-    },
 
-    onMessageStatusUpdate: (messageId: number | string, status: string) => {
+    onMessageStatusUpdate: (messageId: number | string, status: string, conversationId?: number | string) => {
       updateMessagesCache(queryClient, (msg: any) =>
         String(msg?.id) === String(messageId) ? { ...msg, messageStatus: status } : msg
       );
+      if (conversationId) {
+        updateContactFieldsInCache(queryClient, (c: any) => {
+          if (String(c.conversationId) !== String(conversationId)) return c;
+          // Only update the preview status if this messageId matches the preview message
+          // or if no specific preview ID exists but we want to optimistically update
+          return { ...c, messageStatus: status };
+        });
+      }
     },
 
-    onMessagesRead: (messageIds: (number | string)[]) => {
+    onMessagesRead: (messageIds: (number | string)[], conversationId?: number | string, authUserId?: string) => {
       const idsSet = new Set(messageIds.map(String));
       updateMessagesCache(queryClient, (msg: any) =>
         idsSet.has(String(msg?.id)) ? { ...msg, messageStatus: 'read' } : msg
       );
+
+      // Clear unread badge in contacts list when messages in this conversation are read
+      // Also mark the preview message as read (blue ticks)
+      if (conversationId && authUserId) {
+        updateContactFieldsInCache(queryClient, (c: any) =>
+          String(c.conversationId) === String(conversationId)
+            ? { ...c, totalUnreadMessages: 0, messageStatus: 'read' }
+            : c
+        );
+      }
     },
 
     onMessageEdited: (messageId: number | string, newContent: string, editedAt?: string) => {
@@ -95,6 +83,103 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
 
     onUserOffline: (_userId: number | string) => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+
+    onChatPinned: (conversationId: number | string, pinned: boolean, pinOrder: number) => {
+      updateContactFieldsInCache(queryClient, (c: any) =>
+        String(c.conversationId) === String(conversationId)
+          ? { ...c, isPinned: pinned, pinOrder }
+          : c
+      );
+    },
+
+    onChatCleared: (conversationId: number | string, clearedAt: string) => {
+      // 1. Reset contact preview
+      updateContactFieldsInCache(queryClient, (c: any) =>
+        String(c.conversationId) === String(conversationId)
+          ? { ...c, message: '', type: 'text', timestamp: clearedAt, totalUnreadMessages: 0 }
+          : c
+      );
+      // 2. Invalidate messages for this specific chat
+      queryClient.invalidateQueries({ queryKey: ['messages'] });
+    },
+
+    onChatArchived: (conversationId: number | string, archived: boolean) => {
+      // Invalidate contacts to handle removal/addition to the sidebar list (Filter handles visibility)
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+
+    onChatMuted: (conversationId: number | string, muted: boolean, mutedUntil?: string) => {
+      updateContactFieldsInCache(queryClient, (c: any) =>
+        String(c.conversationId) === String(conversationId)
+          ? { ...c, isMuted: muted, mutedUntil }
+          : c
+      );
+    },
+
+    onChatDeleted: (conversationId: number | string) => {
+      // Remove the conversation from the contacts list in cache
+      queryClient.setQueriesData({ queryKey: ['contacts'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        const filter = (c: any) => String(c.conversationId) !== String(conversationId);
+        if (oldData.pages) {
+          return {
+            ...oldData,
+            pages: oldData.pages.map((p: any) => ({ ...p, contacts: p.contacts?.filter(filter) })),
+          };
+        }
+        return Array.isArray(oldData) ? oldData.filter(filter) : oldData;
+      });
+    },
+
+    onContactBlocked: (userId: string | number, type: 'blocked' | 'blockedBy') => {
+      updateContactProfileInCache(queryClient, userId, {
+        [type === 'blocked' ? 'isBlocked' : 'blockedBy']: true
+      });
+    },
+
+    onContactUnblocked: (userId: string | number, type: 'blocked' | 'blockedBy') => {
+      updateContactProfileInCache(queryClient, userId, {
+        [type === 'blocked' ? 'isBlocked' : 'blockedBy']: false
+      });
+    },
+
+    onGroupCreated: (groupData: any) => {
+      // Create a mapped contact-like object
+      const newContact = {
+        id: groupData.id, // For fallback matching if needed
+        conversationId: groupData.id,
+        name: groupData.groupName,
+        email: null,
+        profilePicture: groupData.groupIcon,
+        about: groupData.groupDescription,
+        type: 'text',
+        message: 'Group created',
+        timestamp: groupData.createdAt || new Date().toISOString(),
+        totalUnreadMessages: 0,
+        messageStatus: 'sent',
+        isGroup: true,
+        participants: groupData.participants || []
+      };
+
+      unshiftContactInCache(queryClient, newContact);
+    },
+
+    onGroupMembersUpdated: (conversationId: string | number, participants: any[]) => {
+      updateContactFieldsInCache(queryClient, (c: any) => {
+        if (String(c.conversationId) !== String(conversationId)) return c;
+        return { ...c, participants };
+      });
+    },
+
+    onGroupRoleUpdated: (conversationId: string | number, userId: string | number, role: string) => {
+      updateContactFieldsInCache(queryClient, (c: any) => {
+        if (String(c.conversationId) !== String(conversationId)) return c;
+        const updatedParticipants = (c.participants || []).map((p: any) =>
+          String(p.userId) === String(userId) ? { ...p, role } : p
+        );
+        return { ...c, participants: updatedParticipants };
+      });
     },
   };
 };

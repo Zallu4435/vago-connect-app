@@ -9,6 +9,7 @@
  */
 export const normalizeMessage = (raw, fromId, toId, fallbackType = "text") => ({
     id: Number(raw?.id),
+    conversationId: Number(raw?.conversationId || 0),
     senderId: Number(fromId),
     receiverId: Number(toId),
     type: raw?.type || fallbackType,

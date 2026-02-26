@@ -1,0 +1,24 @@
+
+> dev
+> nodemon index.js
+
+[33m[nodemon] 2.0.22[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,json[39m
+[32m[nodemon] starting `node index.js`[39m
+Server is running on port 3005
+PrismaClientInitializationError: 
+Invalid `prisma.user.findUnique()` invocation:
+
+
+Can't reach database server at `ep-crimson-shadow-ah9xy6sb-pooler.c-3.us-east-1.aws.neon.tech`:`5432`
+
+Please make sure your database server is running at `ep-crimson-shadow-ah9xy6sb-pooler.c-3.us-east-1.aws.neon.tech`:`5432`.
+    at Rn.handleRequestError (/home/zallu/Desktop/whatsapp clone/server/node_modules/@prisma/client/runtime/library.js:174:7601)
+    at Rn.handleAndLogRequestError (/home/zallu/Desktop/whatsapp clone/server/node_modules/@prisma/client/runtime/library.js:174:6754)
+    at /home/zallu/Desktop/whatsapp clone/server/node_modules/@prisma/client/runtime/library.js:177:3010
+    at async /home/zallu/Desktop/whatsapp clone/server/node_modules/@prisma/client/runtime/library.js:177:3225
+    at async t._executeRequest (/home/zallu/Desktop/whatsapp clone/server/node_modules/@prisma/client/runtime/library.js:177:11403)
+    at async UserService.checkUser (file:///home/zallu/Desktop/whatsapp%20clone/server/services/UserService.js:11:22)
+    at async checkUser (file:///home/zallu/Desktop/whatsapp%20clone/server/controllers/AuthController.js:7:20)

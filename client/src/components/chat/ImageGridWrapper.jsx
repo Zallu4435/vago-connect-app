@@ -68,16 +68,37 @@ function ImageGridWrapper({
 }
 
 export default React.memo(ImageGridWrapper, (prev, next) => {
-    // Memoization needs to verify the array length hasn't changed
-    if (prev.messagesArray.length !== next.messagesArray.length) return false;
+    // 1. Verify basic props
+    if (
+        prev.isIncoming !== next.isIncoming ||
+        prev.selectMode !== next.selectMode ||
+        prev.messagesArray.length !== next.messagesArray.length
+    ) {
+        return false;
+    }
 
-    // Checks if the active anchor ID was suddenly selected or deselected
+    // 2. Check anchor ID selection
     const prevAnchorId = prev.messagesArray[0]?.id;
     const nextAnchorId = next.messagesArray[0]?.id;
+    if (prev.selectedIds?.includes(prevAnchorId) !== next.selectedIds?.includes(nextAnchorId)) {
+        return false;
+    }
 
-    return (
-        prev.isIncoming === next.isIncoming &&
-        prev.selectMode === next.selectMode &&
-        prev.selectedIds?.includes(prevAnchorId) === next.selectedIds?.includes(nextAnchorId)
-    );
+    // 3. Check for reaction changes across the entire grid
+    // This is crucial because ImageGridWrapper flattens reactions
+    const prevReactions = prev.messagesArray.flatMap(m => m.reactions || []);
+    const nextReactions = next.messagesArray.flatMap(m => m.reactions || []);
+
+    if (prevReactions.length !== nextReactions.length) return false;
+
+    for (let i = 0; i < prevReactions.length; i++) {
+        if (
+            prevReactions[i].emoji !== nextReactions[i].emoji ||
+            prevReactions[i].userId !== nextReactions[i].userId
+        ) {
+            return false;
+        }
+    }
+
+    return true;
 });

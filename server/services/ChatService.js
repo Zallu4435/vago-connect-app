@@ -61,6 +61,18 @@ export class ChatService {
                 include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
             });
 
+            const sysMsg = await prisma.message.create({
+                data: {
+                    conversationId: conversation.id,
+                    senderId: creatorId,
+                    type: 'text',
+                    content: `Group created`,
+                    isSystemMessage: true,
+                    systemMessageType: 'group_created',
+                    status: 'sent',
+                },
+            });
+
             SocketEmitter.emitToUsers(conversation.participants.map((p) => p.userId), "group-created", {
                 conversation: {
                     id: conversation.id,
@@ -132,7 +144,7 @@ export class ChatService {
         });
 
         const names = users.map((u) => u.name || `User ${u.id}`).join(', ');
-        await prisma.message.create({
+        const sysMsg = await prisma.message.create({
             data: {
                 conversationId: groupId,
                 senderId: adminId,
@@ -151,6 +163,7 @@ export class ChatService {
 
         const minimalParts = ChatMapper.mapActiveParticipantsToMinimal(updated.participants);
         SocketEmitter.emitToUsers(updated.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+        SocketEmitter.emitToUsers(updated.participants.map(p => p.userId), 'message-sent', { message: sysMsg });
         return { conversationId: groupId, participants: minimalParts };
     }
 
@@ -181,7 +194,7 @@ export class ChatService {
 
         const removedUsers = await prisma.user.findMany({ where: { id: { in: toRemove } }, select: { id: true, name: true } });
         const names = removedUsers.map((u) => u.name || `User ${u.id}`).join(', ');
-        await prisma.message.create({
+        const sysMsg = await prisma.message.create({
             data: {
                 conversationId: groupId,
                 senderId: adminId,
@@ -199,6 +212,10 @@ export class ChatService {
         });
         const minimalParts = ChatMapper.mapActiveParticipantsToMinimal(updated.participants);
         SocketEmitter.emitToUsers(updated.participants.filter(p => !p.leftAt).map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+
+        // Notify both active members and the left members about the system message
+        SocketEmitter.emitToUsers(updated.participants.map(p => p.userId), 'message-sent', { message: sysMsg });
+
         return { conversationId: groupId, participants: minimalParts };
     }
 
@@ -249,7 +266,21 @@ export class ChatService {
                 updatedAt: full.updatedAt,
                 participants: ChatMapper.mapParticipantsToMinimal(full.participants),
             };
+
+            const sysMsg = await prisma.message.create({
+                data: {
+                    conversationId: groupId,
+                    senderId: adminId,
+                    type: 'text',
+                    content: `Group settings updated`,
+                    isSystemMessage: true,
+                    systemMessageType: 'group_updated',
+                    status: 'sent',
+                },
+            });
+
             SocketEmitter.emitToUsers(full.participants.map((p) => p.userId), 'group-updated', { conversation: minimal });
+            SocketEmitter.emitToUsers(full.participants.map((p) => p.userId), 'message-sent', { message: sysMsg });
             return minimal;
         } catch (error) {
             if (iconPublicId) {
@@ -341,7 +372,7 @@ export class ChatService {
         const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
         const name = user?.name || "A member";
 
-        await prisma.message.create({
+        const sysMsg = await prisma.message.create({
             data: {
                 conversationId: groupId,
                 senderId: userId,
@@ -360,6 +391,8 @@ export class ChatService {
         const minimalParts = ChatMapper.mapActiveParticipantsToMinimal(updated.participants);
 
         SocketEmitter.emitToUsers(updated.participants.filter(p => !p.leftAt).map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+        SocketEmitter.emitToUsers(updated.participants.map(p => p.userId), 'message-sent', { message: sysMsg });
+
         return { message: "Left group successfully", conversationId: groupId };
     }
 

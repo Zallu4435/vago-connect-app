@@ -10,13 +10,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useSocketStore } from "@/stores/socketStore";
-import { useSendMessage } from '@/hooks/messages/useSendMessage';
 import { useEditMessage } from '@/hooks/messages/useEditMessage';
 import { useSendMedia } from '@/hooks/messages/useSendMedia';
 import { normalizeMessage } from "@/utils/messageHelpers";
 import ErrorMessage from "@/components/common/ErrorMessage";
 import { showToast } from "@/lib/toast";
-import { useSendLocation } from '@/hooks/messages/useSendLocation';
 import ActionSheet from "@/components/common/ActionSheet";
 import MediaPreviewModal from "./MediaPreviewModal";
 import { useClickOutside } from '@/hooks/ui/useClickOutside';
@@ -60,8 +58,6 @@ function MessageBar({ isOnline = true }) {
   const attachButtonRef = useRef(null);
 
   // Mutations
-  const sendMessageMutation = useSendMessage();
-  const sendLocationMutation = useSendLocation();
   const editMessageMutation = useEditMessage();
 
   // Typing state
@@ -167,6 +163,7 @@ function MessageBar({ isOnline = true }) {
     const tempId = Date.now();
     const optimisticMsg = normalizeMessage({
       id: tempId,
+      conversationId: currentChatUser?.conversationId || (currentChatUser?.isGroup ? currentChatUser.id : 0),
       content: text,
       status: "pending",
       createdAt: new Date().toISOString(),
@@ -189,38 +186,21 @@ function MessageBar({ isOnline = true }) {
       setIsTyping(false);
     }
 
-    sendMessageMutation.mutate(
-      {
-        from: userInfo.id,
-        to: currentChatUser.id,
-        content: text,
-        type: "text",
-        replyToMessageId: replyTo?.id,
-        isGroup: currentChatUser?.isGroup || currentChatUser?.type === 'group'
-      },
-      {
-        onSuccess: (data) => {
-          socket.current?.emit("send-msg", {
-            to: currentChatUser.id,
-            from: userInfo.id,
-            message: data.content,
-            type: data.type || "text",
-            messageId: data.id,
-            replyToMessageId: data.replyToMessageId,
-            quotedMessage: data.quotedMessage,
-          });
-          const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "text");
-          setMessages((prev) => prev.map(m => m.id === tempId ? msg : m));
-          addToMessagesCache(msg);
-        },
-        onError: (e) => {
-          useChatStore.getState().updateMessageStatus(tempId, "error");
-          console.error("sendMessage error", e);
-          showToast.error("Failed to send message. Try again.");
-        },
-      }
-    );
-  }, [isOnline, message, currentChatUser, userInfo, replyTo, editMessage, sendMessageMutation, editMessageMutation, socket, setMessages, addToMessagesCache, clearReplyTo, clearEditMessage, isTyping]);
+    // Pure WebSocket sending logic
+    socket.current?.emit("send-text-message", {
+      to: currentChatUser.id,
+      from: userInfo.id,
+      message: text,
+      type: "text",
+      replyToMessageId: replyTo?.id,
+      isGroup: currentChatUser?.isGroup || currentChatUser?.type === 'group',
+      tempId,
+    });
+
+    // We optimistically added to cache, the message-sent listener will swap the tempId
+    addToMessagesCache(optimisticMsg);
+
+  }, [isOnline, isChatBlocked, message, currentChatUser, userInfo, replyTo, editMessage, editMessageMutation, setMessages, addToMessagesCache, clearReplyTo, clearEditMessage, isTyping, socket]);
 
   const handleFileSelect = useCallback((type) => {
     if (!isOnline) return;
@@ -271,43 +251,36 @@ function MessageBar({ isOnline = true }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords || {};
-        if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-          showToast.dismiss(toastId);
-          showToast.error("Failed to get location.");
-          return;
-        }
-        sendLocationMutation.mutate(
-          {
-            from: userInfo.id,
-            to: currentChatUser.id,
-            latitude,
-            longitude,
-            replyToMessageId: replyTo?.id,
-            isGroup: currentChatUser?.isGroup || currentChatUser?.type === 'group'
-          },
-          {
-            onSuccess: (data) => {
-              showToast.dismiss(toastId);
-              showToast.success("Location sent.");
-              socket.current?.emit("send-msg", {
-                to: currentChatUser.id,
-                from: userInfo.id,
-                message: data.content,
-                type: data.type || "location",
-                messageId: data.id,
-                replyToMessageId: data.replyToMessageId,
-                quotedMessage: data.quotedMessage,
-              });
-              const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, "location");
-              setMessages((prev) => ([...(prev || []), msg]));
-              addToMessagesCache(msg);
-            },
-            onError: () => {
-              showToast.dismiss(toastId);
-              showToast.error("Failed to send location.");
-            },
-          }
-        );
+        const lat = latitude;
+        const lng = longitude;
+        showToast.dismiss(toastId);
+
+        const tempId = Date.now();
+        const payload = { lat, lng };
+        const optimisticMsg = normalizeMessage({
+          id: tempId,
+          conversationId: currentChatUser?.conversationId || (currentChatUser?.isGroup ? currentChatUser.id : 0),
+          content: JSON.stringify(payload),
+          status: "pending",
+          createdAt: new Date().toISOString(),
+        }, userInfo.id, currentChatUser.id, "location");
+
+        setMessages((prev) => ([...(prev || []), optimisticMsg]));
+        addToMessagesCache(optimisticMsg);
+
+        if (replyTo) clearReplyTo();
+
+        // Pure WebSocket sending logic
+        socket.current?.emit("send-location-message", {
+          to: currentChatUser.id,
+          from: userInfo.id,
+          latitude: lat,
+          longitude: lng,
+          replyToMessageId: replyTo?.id,
+          isGroup: currentChatUser?.isGroup || currentChatUser?.type === 'group',
+          tempId,
+        });
+
       },
       () => {
         showToast.dismiss(toastId);
@@ -316,7 +289,7 @@ function MessageBar({ isOnline = true }) {
       { enableHighAccuracy: true, timeout: 10000 }
     );
     setShowAttachMenu(false);
-  }, [isOnline, currentChatUser, userInfo, sendLocationMutation, setMessages, addToMessagesCache, socket, replyTo]);
+  }, [isOnline, currentChatUser, userInfo, setMessages, addToMessagesCache, socket, replyTo, clearReplyTo]);
 
   return (
     <>
@@ -481,14 +454,10 @@ function MessageBar({ isOnline = true }) {
               className="p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95 flex-shrink-0 disabled:opacity-70"
               onClick={message.trim().length > 0 ? sendMessage : () => setShowAudioRecorder(true)}
               title={message.trim().length > 0 ? "Send Message" : "Record Voice"}
-              disabled={!isOnline || (message.trim().length > 0 && sendMessageMutation.isPending)}
+              disabled={!isOnline}
             >
               {message.trim().length > 0 ? (
-                sendMessageMutation.isPending ? (
-                  <div className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-ancient-icon-glow border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <MdSend className="text-ancient-icon-glow text-xl sm:text-2xl" />
-                )
+                <MdSend className="text-ancient-icon-glow text-xl sm:text-2xl" />
               ) : (
                 <FaMicrophone className="text-ancient-icon-glow text-lg sm:text-xl" />
               )}
@@ -496,13 +465,6 @@ function MessageBar({ isOnline = true }) {
           </>
         ) : (
           <CaptureAudio onChange={setShowAudioRecorder} />
-        )}
-
-        {/* Error Message */}
-        {sendMessageMutation.isError && (
-          <div className="absolute -top-12 right-4 z-20">
-            <ErrorMessage message="Failed to send. Try again." />
-          </div>
         )}
 
         {/* Media Preview Modal */}

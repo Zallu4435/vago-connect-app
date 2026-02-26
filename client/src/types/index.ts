@@ -1,22 +1,31 @@
 export interface User {
-  id: string;
+  id: string | number;
   name: string;
   email: string;
   profileImage: string;
   about?: string;
+  conversationId?: number;
+  isGroup?: boolean;
 }
 
 export interface Contact {
-  id: string;
+  id: string | number;
+  conversationId?: number;
   name: string;
   profilePicture: string;
   about?: string;
+  timestamp?: string;
+  lastMessage?: string;
+  totalUnreadMessages?: number;
+  isPinned?: boolean;
+  isGroup?: boolean;
 }
 
 export type MessageStatusType = "sent" | "delivered" | "read" | "pending" | "error";
 
 export interface Message {
   id: number;
+  conversationId: number;
   senderId: number;
   receiverId: number;
   type: "text" | "audio" | "image" | "video" | "document" | "location";

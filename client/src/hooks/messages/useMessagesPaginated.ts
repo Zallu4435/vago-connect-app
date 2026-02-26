@@ -1,7 +1,9 @@
-import { useInfiniteQuery, type UseInfiniteQueryResult, type InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery, type UseInfiniteQueryResult, type InfiniteData, useQueryClient } from '@tanstack/react-query';
 import { MessageService } from '@/services/messageService';
 import type { Message } from '@/types';
 import { queryKeys } from '@/lib/queryKeys';
+import { useAuthStore } from '@/stores/authStore';
+import { updateContactFieldsInCache } from '@/lib/cacheHelpers';
 
 interface Page {
   messages: Message[];
@@ -16,11 +18,16 @@ interface Options {
 
 export function useMessagesPaginated(userId?: string, peerId?: string, opts: Options = {}): UseInfiniteQueryResult<InfiniteData<Page>, Error> {
   const { limit = 50, markRead = false } = opts;
+  const qc = useQueryClient();
+  const authUserId = useAuthStore((s) => s.userInfo?.id);
+
   return useInfiniteQuery<Page, Error>({
     queryKey: userId && peerId ? [...queryKeys.messages.byChat(userId, peerId), 'infinite', limit, markRead] : ['messages', '', '', 'infinite', limit, markRead] as const,
     enabled: Boolean(userId && peerId),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage?.nextCursor ?? null,
+    staleTime: 1000 * 60 * 5, // 5 minutes fresh
+    gcTime: 1000 * 60 * 30, // 30 mins garbage collection
     queryFn: async ({ pageParam }) => {
       const data = await MessageService.getMessages(Number(peerId!), {
         limit,
@@ -58,6 +65,21 @@ export function useMessagesPaginated(userId?: string, peerId?: string, opts: Opt
         sender: m.sender || null,
         deletedBy: m.deletedBy,
       } as any));
+      // If we just marked read sequentially, instantly drop local contact unread badge
+      if (markRead && !pageParam && authUserId && peerId) {
+        updateContactFieldsInCache(qc, (c: any) => {
+          // Find this specific interaction context via id (or conversationId when grouping is robust)
+          if (String(c.id) === String(peerId)) {
+            return { ...c, totalUnreadMessages: 0 };
+          }
+          // For group chats where peerId might be conversationId implicitly passed down
+          if (opts.isGroup && String(c.conversationId) === String(peerId)) {
+            return { ...c, totalUnreadMessages: 0 };
+          }
+          return c;
+        });
+      }
+
       return { messages: mapped, nextCursor: (data?.nextCursor as string | null) ?? null };
     },
   });

@@ -5,9 +5,15 @@ import { createPortal } from "react-dom";
 import Avatar from "@/components/common/Avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { useReactToMessage } from '@/hooks/messages/useReactToMessage';
+import { useChatStore } from "@/stores/chatStore";
 
 export default function ReactionModal({ open, onClose, message, anchorRef, reactions }) {
+    // [DEBUG] Performance validation log
+    if (open) {
+        console.log(`[ReactionModal] Render open: ${open}, msgId: ${message?.id || '?'}, reactions: ${reactions?.length || message?.reactions?.length || 0}`);
+    }
     const userInfo = useAuthStore((s) => s.userInfo);
+    const currentChatUser = useChatStore((s) => s.currentChatUser);
     const reactMutation = useReactToMessage();
     const modalRef = useRef(null);
     const coords = usePopoverPosition({
@@ -39,9 +45,12 @@ export default function ReactionModal({ open, onClose, message, anchorRef, react
 
     const handleRemoveReaction = (reaction) => {
         if (String(reaction.userId) === String(userInfo?.id)) {
-            // For aggregated grids, the reaction object contains its unique messageId.
-            // Fallback to the anchor message id for single messages.
-            reactMutation.mutate({ id: reaction.messageId || message.id, emoji: reaction.emoji });
+            const peerId = currentChatUser?.id || currentChatUser?.conversationId;
+            reactMutation.mutate({
+                id: reaction.messageId || message.id,
+                emoji: reaction.emoji,
+                peerId
+            });
         }
     };
 
@@ -53,7 +62,7 @@ export default function ReactionModal({ open, onClose, message, anchorRef, react
     // Use a portal similar to ActionSheet or EmojiPicker
     let portalRoot = null;
     if (typeof document !== 'undefined') {
-        portalRoot = document.getElementById('action-sheet-portal'); // reusing existing portal container if any
+        portalRoot = document.getElementById('action-sheet-portal');
         if (!portalRoot) {
             portalRoot = document.createElement('div');
             portalRoot.id = 'action-sheet-portal';

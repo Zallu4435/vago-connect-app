@@ -63,20 +63,16 @@ export async function isBlockedBetweenUsers(prisma, userAId, userBId) {
 }
 
 export async function unhideConversationParticipants(prisma, conversationId) {
-  try {
-    await prisma.conversationParticipant.updateMany({
-      where: {
-        conversationId: Number(conversationId),
-        isDeleted: true,
-      },
-      data: {
-        isDeleted: false,
-        deletedAt: null,
-      },
-    });
-  } catch (error) {
-    console.error("Failed to unhide conversation:", error);
-  }
+  await prisma.conversationParticipant.updateMany({
+    where: {
+      conversationId: Number(conversationId),
+      isDeleted: true,
+    },
+    data: {
+      isDeleted: false,
+      deletedAt: null,
+    },
+  });
 }
 
 export function buildMediaFileData(messageId, cld, file, extra = {}) {

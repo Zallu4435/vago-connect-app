@@ -26,6 +26,7 @@ function BaseMessageLayout({
     onForward,
     children,
 }) {
+
     const [showReactionsModal, setShowReactionsModal] = useState(false);
     const reactionsRef = useRef(null);
 
@@ -126,4 +127,38 @@ function BaseMessageLayout({
     );
 }
 
-export default React.memo(BaseMessageLayout);
+function arePropsEqual(prev, next) {
+    // Basic shallow checks for primitive props
+    if (
+        prev.isIncoming !== next.isIncoming ||
+        prev.isGroup !== next.isGroup ||
+        prev.senderAvatar !== next.senderAvatar ||
+        prev.hasSender !== next.hasSender ||
+        prev.selectMode !== next.selectMode ||
+        prev.isSelected !== next.isSelected ||
+        prev.showActions !== next.showActions
+    ) {
+        return false;
+    }
+
+    // Reaction comparison: compare lengths first, then content if needed
+    const prevReactions = prev.reactions || [];
+    const nextReactions = next.reactions || [];
+    if (prevReactions.length !== nextReactions.length) return false;
+
+    // Optional: shallow content check for reactions to detect emoji switches
+    for (let i = 0; i < prevReactions.length; i++) {
+        const pr = prevReactions[i];
+        const nr = nextReactions[i];
+        if (pr.emoji !== nr.emoji || pr.userId !== nr.userId) return false;
+    }
+
+    // Note: reactionAnchorMessage and actionAnchorMessage are usually the same object 
+    // but if ids change, we should re-render
+    if (prev.reactionAnchorMessage?.id !== next.reactionAnchorMessage?.id) return false;
+    if (prev.actionAnchorMessage?.id !== next.actionAnchorMessage?.id) return false;
+
+    return true;
+}
+
+export default React.memo(BaseMessageLayout, arePropsEqual);

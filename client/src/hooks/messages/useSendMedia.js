@@ -47,6 +47,7 @@ export const useSendMedia = () => {
         if (replyTo?.id) form.append("replyToMessageId", String(replyTo.id));
         const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
         if (isGroup) form.append("isGroup", "true");
+        form.append("tempId", String(tempId));
 
         // Optimistic message
         const optimisticMsg = normalizeMessage({
@@ -80,22 +81,13 @@ export const useSendMedia = () => {
                 data = await MessageService.sendFile(form, onUploadProgress);
             }
 
-            socket.current?.emit("send-msg", {
-                to: currentChatUser.id,
-                from: userInfo.id,
-                message: data.content,
-                type: data.type || (isImage ? "image" : isVideo ? "video" : "document"),
-                messageId: data.id,
-                replyToMessageId: data.replyToMessageId,
-                quotedMessage: data.quotedMessage,
-                caption: data.caption,
-            });
+            // send-msg removed, relying on message-sent from server
 
             const msg = normalizeMessage(data, userInfo.id, currentChatUser.id, isImage ? "image" : isVideo ? "video" : "document");
             if (!msg.caption && caption?.trim()) msg.caption = caption.trim();
 
             // Remove optimistic and add real
-            setMessages((prev) => prev.map(m => m.id === tempId ? msg : m));
+            setMessages((prev) => prev.map(m => String(m.id) === String(tempId) ? msg : m));
             addToMessagesCache(msg);
         } catch (err) {
             useChatStore.getState().updateMessageStatus(tempId, "error");
@@ -104,7 +96,7 @@ export const useSendMedia = () => {
         } finally {
             setTimeout(() => setUploadProgress({ label: "", percent: 0 }), 400);
         }
-    }, [currentChatUser, userInfo, socket, replyTo, setMessages, addToMessagesCache]);
+    }, [currentChatUser, userInfo, replyTo, setMessages, addToMessagesCache]);
 
     return { uploadFile, uploadProgress };
 };

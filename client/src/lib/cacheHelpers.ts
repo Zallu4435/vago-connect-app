@@ -23,56 +23,87 @@ export const updateMessagesCache = (queryClient: QueryClient, updater: (msg: any
 
 /**
  * Adds or updates a message in all 'messages' queries.
+ * If tempId is provided, it replaces the message with that tempId with the new message.
  * For paginated data, it updates the message if it exists, otherwise appends it to the last page.
  */
-export const upsertMessageInCache = (queryClient: QueryClient, message: any) => {
-    queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
-        if (!old) return old;
+export const upsertMessageInCache = (queryClient: QueryClient, message: any, tempId?: string | number) => {
+    const queries = queryClient.getQueryCache().findAll({ queryKey: ['messages'] });
 
-        // Flat array handling
-        if (Array.isArray(old)) {
-            const exists = old.some((m: any) => String(m.id) === String(message.id));
-            if (exists) {
-                return old.map((m: any) => (String(m.id) === String(message.id) ? { ...m, ...message } : m));
+    queries.forEach(query => {
+        const qKey = query.queryKey;
+        const cachePeerId = qKey && qKey.length >= 3 ? String(qKey[2]) : null;
+
+        const idToSearch = tempId ? String(tempId) : null;
+        const msgIdStr = String(message.id);
+        const isMatchLocal = (m: any) => {
+            const mid = String(m.id);
+            return mid === msgIdStr || (idToSearch && mid === idToSearch);
+        };
+
+        // Determine if this message actually belongs in THIS specific cache
+        const msgConvId = String(message.conversationId || "");
+        const msgSenderId = String(message.senderId || "");
+        const msgReceiverId = String(message.receiverId || "");
+
+        let belongsToThisCache = false;
+        if (cachePeerId) {
+            // 1. Exact conversationId match (if message has one)
+            if (msgConvId !== "0" && msgConvId === cachePeerId) {
+                belongsToThisCache = true;
             }
-            return [...old, message];
+            // 2. Peer matching (Direct chat fallback / Optimistic messages)
+            else if (msgSenderId === cachePeerId || msgReceiverId === cachePeerId) {
+                belongsToThisCache = true;
+            }
         }
 
-        // Infinite data handling
-        if (Array.isArray(old.pages)) {
-            if (old.pages.length === 0) {
-                return { ...old, pages: [{ messages: [message], nextCursor: null }] };
+        if (!belongsToThisCache) return;
+
+        queryClient.setQueryData(qKey, (old: any) => {
+            if (!old) return old;
+
+            // Flat array handling
+            if (Array.isArray(old)) {
+                const exists = old.some(isMatchLocal);
+                if (exists) {
+                    return old.map((m: any) => isMatchLocal(m) ? { ...m, ...message, id: message.id } : m);
+                }
+                return [message, ...old]; // Unshift into top (assuming newest first)
             }
 
-            const existsAnywhere = old.pages.some((pg: any) =>
-                (pg.messages || []).some((m: any) => String(m.id) === String(message.id))
-            );
+            // Infinite data handling
+            if (Array.isArray(old.pages)) {
+                if (old.pages.length === 0) return old;
 
-            const pages = old.pages.map((p: any, idx: number) => {
-                const isLastPage = idx === old.pages.length - 1;
-                const existsInPage = (p.messages || []).some((m: any) => String(m.id) === String(message.id));
+                const existsAnywhere = old.pages.some((pg: any) =>
+                    (pg.messages || []).some(isMatchLocal)
+                );
 
-                if (existsInPage) {
-                    // Update the existing message
-                    return {
-                        ...p,
-                        messages: p.messages.map((m: any) =>
-                            String(m.id) === String(message.id) ? { ...m, ...message } : m
-                        )
-                    };
-                }
+                const pages = old.pages.map((p: any, idx: number) => {
+                    const isFirstPage = idx === 0;
+                    const existsInPage = (p.messages || []).some(isMatchLocal);
 
-                if (isLastPage && !existsAnywhere) {
-                    // Append to the last page if it's completely new
-                    return { ...p, messages: [...(p.messages || []), message] };
-                }
+                    if (existsInPage) {
+                        return {
+                            ...p,
+                            messages: p.messages.map((m: any) =>
+                                isMatchLocal(m) ? { ...m, ...message, id: message.id } : m
+                            )
+                        };
+                    }
 
-                return p;
-            });
+                    // If it's the first page (newest) and doesn't exist anywhere else, unshift it
+                    if (isFirstPage && !existsAnywhere) {
+                        return { ...p, messages: [message, ...(p.messages || [])] };
+                    }
 
-            return { ...old, pages };
-        }
-        return old;
+                    return p;
+                });
+
+                return { ...old, pages };
+            }
+            return old;
+        });
     });
 };
 
@@ -91,6 +122,8 @@ export const updateContactProfileInCache = (queryClient: QueryClient, userId: st
                     name: updatedData.name ?? contact.name,
                     about: updatedData.about ?? contact.about,
                     profilePicture: updatedData.profileImage || updatedData.image || contact.profilePicture,
+                    isBlocked: updatedData.isBlocked ?? contact.isBlocked,
+                    blockedBy: updatedData.blockedBy ?? contact.blockedBy,
                 };
             }
             return contact;
@@ -110,6 +143,34 @@ export const updateContactProfileInCache = (queryClient: QueryClient, userId: st
         // Handle non-paginated array queries
         if (Array.isArray(oldData)) {
             return oldData.map(updateContact);
+        }
+
+        return oldData;
+    });
+};
+
+/**
+ * Updates dynamic fields (unread count, last message, timestamps) in all 'contacts' queries.
+ * Supports both paginated and flat-array cache structures via matching predicate.
+ */
+export const updateContactFieldsInCache = (queryClient: QueryClient, updater: (contact: any) => any) => {
+    queryClient.setQueriesData({ queryKey: ['contacts'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+
+        // Handle paginated queries
+        if (oldData.pages) {
+            return {
+                ...oldData,
+                pages: oldData.pages.map((page: any) => ({
+                    ...page,
+                    contacts: page.contacts?.map(updater),
+                })),
+            };
+        }
+
+        // Handle non-paginated array queries
+        if (Array.isArray(oldData)) {
+            return oldData.map(updater);
         }
 
         return oldData;
@@ -189,5 +250,38 @@ export const updateGroupProfileInCache = (queryClient: QueryClient, conversation
         }
 
         return oldGroupData;
+    });
+};
+
+/**
+ * Inserts a brand new contact/group conversation at the top of the 'contacts' queries.
+ */
+export const unshiftContactInCache = (queryClient: QueryClient, newContact: any) => {
+    queryClient.setQueriesData({ queryKey: ['contacts'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+
+        // Prevent duplicate insertions
+        const exists = (c: any) => String(c.conversationId) === String(newContact.conversationId);
+
+        // Handle paginated queries (insert at top of first page)
+        if (oldData.pages && oldData.pages.length > 0) {
+            const alreadyExists = oldData.pages.some((p: any) => p.contacts?.some(exists));
+            if (alreadyExists) return oldData;
+
+            const newPages = [...oldData.pages];
+            newPages[0] = {
+                ...newPages[0],
+                contacts: [newContact, ...(newPages[0].contacts || [])],
+            };
+            return { ...oldData, pages: newPages };
+        }
+
+        // Handle non-paginated array queries
+        if (Array.isArray(oldData)) {
+            if (oldData.some(exists)) return oldData;
+            return [newContact, ...oldData];
+        }
+
+        return oldData;
     });
 };

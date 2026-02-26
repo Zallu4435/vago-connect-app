@@ -3,10 +3,6 @@ import { api } from '@/lib/api';
 const MESSAGES_PREFIX = '/api/messages';
 
 export class MessageService {
-    static async sendMessage(params: { from: number; to: number; isGroup?: boolean; content?: string; type?: string; replyToMessageId?: number; caption?: string; }) {
-        const { data } = await api.post(`${MESSAGES_PREFIX}`, params);
-        return data;
-    }
 
     static async sendImage(formData: FormData, onUploadProgress?: any) {
         const { data } = await api.post(`${MESSAGES_PREFIX}/image`, formData, {
@@ -43,11 +39,6 @@ export class MessageService {
         return data;
     }
 
-    static async sendLocation(params: { from: number; to: number; isGroup?: boolean; latitude: number; longitude: number; name?: string; address?: string; replyToMessageId?: number; }) {
-        const { data } = await api.post(`${MESSAGES_PREFIX}/location`, params);
-        return data;
-    }
-
     static async getMessages(to: number, params?: { isGroup?: boolean; limit?: number; cursor?: number; direction?: 'before' | 'after'; markRead?: boolean }) {
         // 'from' is now inferred on the backend via verifyAccessToken (req.userId)
         const { data } = await api.get(`${MESSAGES_PREFIX}/${to}`, { params });
@@ -65,28 +56,8 @@ export class MessageService {
         return data;
     }
 
-    static async editMessage(messageId: number | string, content: string) {
-        const { data } = await api.patch(`${MESSAGES_PREFIX}/${messageId}/edit`, { content });
-        return data;
-    }
-
-    static async deleteMessage(messageId: number | string, deleteType: 'forMe' | 'forEveryone' = 'forEveryone') {
-        const { data } = await api.delete(`${MESSAGES_PREFIX}/${messageId}`, { params: { deleteType } });
-        return data;
-    }
-
     static async starMessage(messageId: number | string, starred: boolean) {
         const { data } = await api.post(`${MESSAGES_PREFIX}/${messageId}/star`, { starred });
-        return data;
-    }
-
-    static async reactToMessage(messageId: number | string, emoji: string | null) {
-        const { data } = await api.post(`${MESSAGES_PREFIX}/${messageId}/react`, { emoji });
-        return data;
-    }
-
-    static async forwardMessages(messageIds: number[], toConversationIds: number[]) {
-        const { data } = await api.post(`${MESSAGES_PREFIX}/forward`, { messageIds, toConversationIds });
         return data;
     }
 

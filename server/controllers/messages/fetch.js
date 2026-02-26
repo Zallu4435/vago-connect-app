@@ -1,6 +1,7 @@
 import { MessageService } from "../../services/MessageService.js";
 import getPrismaInstance from "../../utils/PrismaClient.js";
 import { MessageMapper } from "../../utils/mappers/MessageMapper.js";
+import { SocketEmitter } from "../../utils/SocketEmitter.js";
 
 export const getMessages = async (req, res, next) => {
   try {
@@ -24,6 +25,16 @@ export const getMessages = async (req, res, next) => {
       direction,
       markRead
     });
+
+    if (result.emitRead) {
+      // 1. Notify the sender (other user) that their messages were read (so their ticks turn blue)
+      SocketEmitter.emitToUser(result.emitRead.otherUserId, 'messages-read', result.emitRead.payload);
+
+      // 2. Notify the reader's other tabs/sessions to clear the unread badge
+      SocketEmitter.emitToUser(from, 'messages-read', result.emitRead.payload);
+
+      delete result.emitRead;
+    }
 
     return res.status(200).json(result);
   } catch (error) {

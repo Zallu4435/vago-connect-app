@@ -150,6 +150,7 @@ export class UserService {
         });
 
         SocketEmitter.emitToUser(blockerId, "contact-blocked", { userId: blockedId });
+        SocketEmitter.emitToUser(blockedId, "contact-blocked-by", { userId: blockerId });
 
         return created;
     }
@@ -168,6 +169,7 @@ export class UserService {
         });
 
         SocketEmitter.emitToUser(blockerId, "contact-unblocked", { userId: blockedId });
+        SocketEmitter.emitToUser(blockedId, "contact-unblocked-by", { userId: blockerId });
 
         return { success: true };
     }

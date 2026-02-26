@@ -1,0 +1,62 @@
+
+> whatsapp-clone@0.1.0 dev
+> next dev --turbo
+
+   ▲ Next.js 15.1.7 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.7:3000
+
+ ✓ Starting...
+ ✓ Ready in 2s
+ ○ Compiling / ...
+ ✓ Compiled / in 21.3s
+ GET / 200 in 24405ms
+ ○ Compiling /404 ...
+ ✓ Compiled /404 in 676ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 915ms
+ GET / 200 in 203ms
+ GET / 200 in 395ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 326ms
+ ✓ Compiled in 3.4s
+ ✓ Compiled in 1357ms
+ ✓ Compiled in 1598ms
+ ✓ Compiled in 1301ms
+ GET / 200 in 2643ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 251ms
+ GET / 200 in 468ms
+ GET / 200 in 265ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 246ms
+ GET / 200 in 208ms
+Failed to proxy http://localhost:3005/api/auth/all-users [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://localhost:3005/api/messages/contacts?limit=30&q= [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ○ Compiling /_error ...
+Failed to proxy http://localhost:3005/api/auth/all-users [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+Failed to proxy http://localhost:3005/api/messages/contacts?limit=30&q= [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+ ✓ Compiled /_error in 9s
+ GET / 200 in 643ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 114ms
+ GET / 200 in 254ms
+ GET / 200 in 176ms
+ ✓ Compiled in 1034ms
+ ✓ Compiled in 902ms
+ ✓ Compiled in 387ms
+ ✓ Compiled in 802ms
+ ✓ Compiled in 1236ms
+ GET / 200 in 4489ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1161ms
+ GET /login 200 in 260ms
+ ✓ Compiled in 1762ms
+ ✓ Compiled in 1232ms
+ GET / 200 in 8118ms
+ ✓ Compiled in 856ms
+ ✓ Compiled in 1379ms
+ GET / 200 in 3420ms
+ GET / 200 in 1463ms
+ GET / 200 in 355ms
+ ✓ Compiled in 2.6s
+ ✓ Compiled in 1971ms

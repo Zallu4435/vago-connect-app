@@ -38,7 +38,7 @@ function Chat({ isOnline }) {
 
         {/* Scrollable, grows with available space (ChatContainer handles scrolling) */}
         <div className="flex-1 min-h-0 relative overflow-hidden bg-transparent">
-          <ChatContainer key={`chat-${currentChatUser.id}`} />
+          <ChatContainer key={`chat-${String(currentChatUser.id)}`} />
         </div>
 
         {/* Message bar sticks to bottom, never overflows */}

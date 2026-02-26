@@ -7,11 +7,16 @@
  */
 export const clusterMessages = (messagesArr) => {
     if (!messagesArr || messagesArr.length === 0) return [];
+
+    // Defensive check for missing or malformed first message
+    const firstMsg = messagesArr[0];
+    if (!firstMsg) return [];
+
     const clusters = [];
     let currentCluster = [];
-    let currentSender = messagesArr[0]?.senderId;
-    let currentType = messagesArr[0]?.type;
-    let lastMessageTime = new Date(messagesArr[0]?.createdAt).getTime();
+    let currentSender = firstMsg.senderId;
+    let currentType = firstMsg.type;
+    let lastMessageTime = new Date(firstMsg.createdAt || 0).getTime();
 
     const isSystemLike = (msg) => msg?.type === "system" || msg?.type === "group_status";
 

@@ -41,6 +41,7 @@ function ChatContainer() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isLoading, // Destructure the actual loading state
   } = useMessagesPaginated(
     userInfo?.id ? String(userInfo.id) : undefined,
     currentChatUser?.id ? String(currentChatUser.id) : undefined,
@@ -56,26 +57,8 @@ function ChatContainer() {
     return pages.flatMap((p) => p.messages);
   }, [pagesData]);
 
-  // When the user changes, clear out messages and selection state so it doesn't bleed.
-  useEffect(() => {
-    setMessages([]);
-    setSelectMode(false);
-    setSelectedIds([]);
-  }, [currentChatUser?.id, setMessages]);
-
-  useEffect(() => {
-    if (!Array.isArray(mergedMessages)) return;
-    setMessages((prev = []) => {
-      const byId = new Map();
-      mergedMessages.forEach((m) => byId.set(m.id, m));
-      (prev || []).forEach((m) => {
-        if (!byId.has(m.id)) byId.set(m.id, m);
-      });
-      const out = Array.from(byId.values());
-      out.sort((a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0));
-      return out;
-    });
-  }, [mergedMessages, setMessages]);
+  // Removed redundant clear/sync effects to prevent UI flickering.
+  // The store key on ChatContainer handles isolation, and filteredMessages handles the merge.
 
   // Deleted for user filter
   const isDeletedForUser = useCallback((m, uid) => {
@@ -94,50 +77,120 @@ function ChatContainer() {
   }, []);
 
   const filteredMessages = useMemo(() => {
-    const storeAll = Array.isArray(messages) ? messages : [];
-    const pages = pagesData?.pages || [];
-    const fallbackAll = pages.flatMap((p) => p.messages) || [];
-    const all = storeAll.length > 0 ? storeAll : fallbackAll;
-    return all.filter((m) => !isDeletedForUser(m, userInfo?.id));
-  }, [messages, pagesData, isDeletedForUser, userInfo?.id]);
+    const storeMsgs = Array.isArray(messages) ? messages : [];
+    const cachePages = pagesData?.pages || [];
+    const cacheMsgs = cachePages.flatMap((p) => p.messages) || [];
 
-  // Preserve scroll position when loading older messages (pagination)
-  useEffect(() => {
+    const activeConvId = currentChatUser?.conversationId ? String(currentChatUser.conversationId) : "";
+    const activePeerId = currentChatUser?.id ? String(currentChatUser.id) : "";
+    const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
+
+    const byId = new Map();
+    const tempToRealId = new Map();
+
+    // 1. Cache is the source of truth
+    cacheMsgs.forEach(m => {
+      if (!m || !m.id) return;
+      const mid = String(m.id);
+      byId.set(mid, m);
+      if (m.tempId) tempToRealId.set(String(m.tempId), mid);
+    });
+
+    // 2. Store holds pending/optimistic messages
+    storeMsgs.forEach(m => {
+      if (!m || !m.id) return;
+
+      // EXTREMELY IMPORTANT: Filter global store messages to only show for this chat
+      const msgConvId = m.conversationId ? String(m.conversationId) : "0";
+      let isMatch = false;
+      if (isGroup) {
+        isMatch = (msgConvId === activeConvId) || (msgConvId === activePeerId);
+      } else {
+        const isConvMatch = activeConvId && activeConvId !== "0" && msgConvId === activeConvId;
+        const isPeerMatch = (String(m.senderId) === activePeerId && String(m.receiverId) === String(userInfo?.id)) ||
+          (String(m.senderId) === String(userInfo?.id) && String(m.receiverId) === activePeerId);
+        isMatch = isConvMatch || isPeerMatch || (msgConvId === "0" && isPeerMatch);
+      }
+
+      if (!isMatch) return;
+
+      const mid = String(m.id);
+      if (!byId.has(mid) && !tempToRealId.has(mid)) {
+        byId.set(mid, m);
+      }
+    });
+
+    const all = Array.from(byId.values());
+    all.sort((a, b) => {
+      const ta = new Date(a.timestamp || a.createdAt || 0).getTime();
+      const tb = new Date(b.timestamp || b.createdAt || 0).getTime();
+      return ta - tb;
+    });
+
+    return all.filter((m) => !isDeletedForUser(m, userInfo?.id));
+  }, [messages, pagesData, isDeletedForUser, userInfo?.id, currentChatUser?.id, currentChatUser?.conversationId, currentChatUser?.isGroup, currentChatUser?.type]);
+
+
+
+  // Scroll Anchoring: Preserve position when loading history from the top
+  useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el || !loadingOlderRef.current) return;
 
-    // Scroll position is automatically preserved by the browser when new content
-    // is added at the top, so we just reset the flag
+    const currentScrollHeight = el.scrollHeight;
+    const previousHeight = prevScrollHeightRef.current;
+
+    if (previousHeight > 0 && currentScrollHeight > previousHeight) {
+      const heightDiff = currentScrollHeight - previousHeight;
+      el.scrollTop += heightDiff;
+    }
+
     loadingOlderRef.current = false;
-  }, [messages]);
+  }, [filteredMessages]);
+
+  const prevScrollHeightRef = useRef(0);
+  useLayoutEffect(() => {
+    prevScrollHeightRef.current = containerRef.current?.scrollHeight || 0;
+  });
+
+  const prevLastIdRef = useRef(null);
 
   // Auto-scroll to bottom using modern pattern with useLayoutEffect
   // This runs synchronously before browser paint, preventing flicker
   useLayoutEffect(() => {
     if (!containerRef.current) return;
 
-    const currentLen = Array.isArray(messages) ? messages.length : 0;
-    const lastMessage = currentLen > 0 ? messages[currentLen - 1] : null;
-    const isNewMessageAdd = currentLen > prevMessagesLengthRef.current;
+    const currentLen = filteredMessages.length;
+    const lastMessage = currentLen > 0 ? filteredMessages[currentLen - 1] : null;
+    const lastId = lastMessage ? String(lastMessage.id) : null;
 
-    // Update ref for next render
-    prevMessagesLengthRef.current = currentLen;
+    // A message is "newly added at bottom" if the last ID changed
+    // AND we aren't currently loading pagination history from the top.
+    const isActuallyNewAtBottom = lastId !== prevLastIdRef.current && !loadingOlderRef.current;
+    const isInitialLoad = currentLen > 0 && prevMessagesLengthRef.current === 0;
 
     const isMyMessage = lastMessage && String(lastMessage.senderId) === String(userInfo?.id);
 
-    // Force scroll if it's a new message that the current user just sent
-    const forceScroll = isNewMessageAdd && isMyMessage;
+    // Force scroll if:
+    // 1. It's the VERY FIRST batch of messages loaded (0 -> N)
+    // 2. A genuinely new message arrived at the bottom that WE sent
+    const forceScroll = (isActuallyNewAtBottom && isMyMessage) || isInitialLoad;
 
+    // Update refs AFTER calculation for next render
+    prevLastIdRef.current = lastId;
+    prevMessagesLengthRef.current = currentLen;
+
+    if (loadingOlderRef.current) return;
     if (!shouldAutoScrollRef.current && !forceScroll) return;
 
-    // Use requestAnimationFrame to ensure DOM is fully painted + layout calculated
-    // before we measure scrollHeight and force scroll.
+    // Use requestAnimationFrame AND a tiny timeout to ensure DOM layout is truly finished
+    // especially for larger batches or clustered images.
     requestAnimationFrame(() => {
       if (containerRef.current) {
         containerRef.current.scrollTop = containerRef.current.scrollHeight;
       }
     });
-  }, [messages, userInfo?.id]);
+  }, [filteredMessages, userInfo?.id]);
 
   // Reset auto-scroll when chat changes and scroll to bottom immediately
   useEffect(() => {
@@ -155,7 +208,7 @@ function ChatContainer() {
     setReplyTo(message);
   }, [setReplyTo]);
   const handleForward = useCallback((message) => {
-    setSelectedIds([message.id]);
+    setSelectedIds([Number(message.id)]);
     setShowForward(true);
   }, []);
   const toggleSelect = useCallback((id) => {
@@ -171,7 +224,8 @@ function ChatContainer() {
     }
 
     setSelectedIds((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      const mid = Number(id);
+      if (prev.some(x => Number(x) === mid)) return prev.filter((x) => Number(x) !== mid);
       if (prev.length >= 50) { // arbitrary higher limit for deletes/copy, but forward limits might apply elsewhere
         showToast.info("You can select up to 50 messages at once");
         return prev;
@@ -241,12 +295,13 @@ function ChatContainer() {
     containerRef,
     hasNextPage,
     isFetchingNextPage,
-    isLoading: loadingOlderRef.current, // keep the top-loading state
+    // CRITICAL: Suppress pagination until we have initial data and aren't snapping to bottom
+    isLoading: isLoading || loadingOlderRef.current || filteredMessages.length === 0,
     fetchNextPage: () => {
       loadingOlderRef.current = true;
       fetchNextPage();
     },
-    rootMargin: '100px 0px 0px 0px',
+    rootMargin: '50px 0px 0px 0px', // Smaller margin to prevent premature triggers
     onScroll: ({ distanceFromBottom }) => {
       setShowJump(distanceFromBottom > 150);
       shouldAutoScrollRef.current = distanceFromBottom <= 150;
@@ -273,14 +328,13 @@ function ChatContainer() {
 
       <div className="flex w-full">
         <div className="flex flex-col justify-end w-full gap-3 px-2 sm:px-4 py-3">
-          {/* Sticky sentinel for pagination */}
-          <div className="sticky top-0 z-10 flex justify-center pointer-events-none">
-            <div ref={topSentinelRef} className="h-6">
-              {isFetchingNextPage && (
-                <LoadingSpinner className="text-ancient-text-muted" size={16} label="Loading older messages…" />
-              )}
-            </div>
+          {/* Top sentinel for pagination - NOT sticky to prevent premature triggers */}
+          <div ref={topSentinelRef} className="h-6 flex justify-center w-full">
+            {isFetchingNextPage && (
+              <LoadingSpinner className="text-ancient-text-muted" size={16} label="Loading older messages…" />
+            )}
           </div>
+
           {/* Select messages control bar (sticky) */}
           {filteredMessages.some(m => !m.isSystemMessage) && (
             <SelectMessagesBar
@@ -302,9 +356,9 @@ function ChatContainer() {
           )}
           {/* Message stack */}
           {(() => {
-            // It's initial loading if we have no pages Data OR we are fetching the first page and have no messages yet
-            const hasData = pagesData && pagesData.pages && pagesData.pages.length > 0;
-            const isInitialLoading = !hasData || (filteredMessages.length === 0 && isFetchingNextPage);
+            // Comprehensive loading state check
+            const hasAnyMessages = filteredMessages.length > 0;
+            const isInitialLoading = !hasAnyMessages && (isLoading || (isFetchingNextPage && !pagesData));
 
             if (isInitialLoading) {
               return (
@@ -314,7 +368,7 @@ function ChatContainer() {
               );
             }
 
-            if (filteredMessages.length === 0 && !isFetchingNextPage) {
+            if (filteredMessages.length === 0 && !isLoading && !isFetchingNextPage) {
               return (
                 <EmptyState
                   icon={MdChat}
@@ -326,8 +380,6 @@ function ChatContainer() {
             }
 
             // Using the robust generalized clustering logic from chatHelpers
-            // but we need to ensure the ImageGrid logic specifically catches consecutive images
-            // fallback to the custom closure logic.
             const clusteredBlocks = clusterMessages(filteredMessages);
 
             return clusteredBlocks.map((clusterObj, idx) => {
