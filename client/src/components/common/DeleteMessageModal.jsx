@@ -2,7 +2,7 @@
 import React from "react";
 import { FaTrashAlt } from "react-icons/fa";
 import ModalShell from "@/components/common/ModalShell";
-import LoadingSpinner from "@/components/common/LoadingSpinner";
+import Button from "@/components/common/Button";
 
 export default function DeleteMessageModal({
     open,
@@ -30,28 +30,31 @@ export default function DeleteMessageModal({
 
             <div className="flex flex-col gap-2 p-3 sm:p-4 bg-ancient-bg-medium border-t border-ancient-border-stone">
                 {showForEveryoneButton && (
-                    <button
+                    <Button
                         onClick={() => onDelete("forEveryone")}
-                        disabled={isPending}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-500 font-bold text-white rounded-lg flex items-center justify-center transition-colors disabled:opacity-60 disabled:cursor-not-allowed min-h-[40px]"
+                        isLoading={isPending}
+                        variant="danger"
+                        className="bg-red-600 text-white hover:bg-red-500 border-none w-full min-h-[40px]"
                     >
-                        {isPending ? <LoadingSpinner size={20} color="text-white" /> : "Delete for Everyone"}
-                    </button>
+                        Delete for Everyone
+                    </Button>
                 )}
-                <button
+                <Button
                     onClick={() => onDelete("forMe")}
-                    disabled={isPending}
-                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 font-bold text-white rounded-lg flex items-center justify-center transition-colors disabled:opacity-60 disabled:cursor-not-allowed min-h-[40px]"
+                    isLoading={isPending}
+                    variant="warning"
+                    className="w-full min-h-[40px]"
                 >
-                    {isPending ? <LoadingSpinner size={20} color="text-white" /> : "Delete for Me"}
-                </button>
-                <button
+                    Delete for Me
+                </Button>
+                <Button
                     onClick={onClose}
                     disabled={isPending}
-                    className="px-4 py-2 mt-1 border border-ancient-input-border text-ancient-text-light hover:bg-ancient-input-bg rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[40px]"
+                    variant="ghost"
+                    className="w-full border border-ancient-input-border text-ancient-text-light min-h-[40px] mt-1"
                 >
                     Cancel
-                </button>
+                </Button>
             </div>
         </ModalShell>
     );

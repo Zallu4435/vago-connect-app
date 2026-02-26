@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useRef } from "react";
-import { usePopoverPosition } from "@/hooks/usePopoverPosition";
-import { useClickOutside } from "@/hooks/useClickOutside";
+import { usePopoverPosition } from '@/hooks/ui/usePopoverPosition';
+import { useClickOutside } from '@/hooks/ui/useClickOutside';
 import { createPortal } from "react-dom";
 import Avatar from "@/components/common/Avatar";
 import { useAuthStore } from "@/stores/authStore";
-import { useReactToMessage } from "@/hooks/mutations/useReactToMessage";
+import { useReactToMessage } from '@/hooks/messages/useReactToMessage';
 
 export default function ReactionModal({ open, onClose, message, anchorRef, reactions }) {
     const userInfo = useAuthStore((s) => s.userInfo);
@@ -30,7 +30,7 @@ export default function ReactionModal({ open, onClose, message, anchorRef, react
             groups[emoji].push(r);
         });
         return groups;
-    }, [message?.reactions]);
+    }, [message?.reactions, reactions]);
 
     const tabs = Object.keys(groupedReactions);
     const [activeTab, setActiveTab] = useState("All");

@@ -5,7 +5,7 @@ import { MdSend } from "react-icons/md";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useSocketStore } from "@/stores/socketStore";
-import { useUploadAudio } from "@/hooks/mutations/useUploadAudio";
+import { useUploadAudio } from '@/hooks/messages/useUploadAudio';
 import { showToast } from "@/lib/toast";
 import AnimatedWave from "@/components/common/AnimatedWave";
 
@@ -235,6 +235,9 @@ function CaptureAudio({ onChange }) {
               className="flex-1 flex items-center overflow-hidden cursor-pointer"
               role="slider"
               aria-label="Playback position"
+              aria-valuenow={playbackTime}
+              aria-valuemin={0}
+              aria-valuemax={playbackDuration}
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));

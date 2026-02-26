@@ -1,7 +1,7 @@
-import { firebaseAuth } from "@/utils/FirebaseConfig";
-import { api } from "@/lib/api";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { firebaseAuth } from "@/utils/FirebaseConfig";
 import React from "react";
+import { useLoginUser } from "@/hooks/auth/useAuthStatus";
 import { FcGoogle } from "react-icons/fc";
 import { FaMagic, FaScroll } from "react-icons/fa";
 import { useRouter } from "next/router";
@@ -22,6 +22,8 @@ function Login() {
   }, [accessToken, router]);
 
   const [isLoading, setIsLoading] = React.useState(false);
+  const loginMutation = useLoginUser();
+
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
@@ -29,13 +31,12 @@ function Login() {
       const result = await signInWithPopup(firebaseAuth, provider);
       const firebaseToken = await result.user.getIdToken();
       const email = result.user.email;
-      const { data } = await api.post(
-        "/api/auth/login",
-        { firebaseToken, email },
-        { withCredentials: true }
-      );
+
+      const data = await loginMutation.mutateAsync({ email, firebaseToken });
+
       const { accessToken: at, user } = data || {};
       if (!at || !user) throw new Error("Invalid login response from the server.");
+
       setAccessToken(at);
       setUserInfo({
         id: String(user.id),

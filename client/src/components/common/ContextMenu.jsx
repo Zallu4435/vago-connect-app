@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { useClickOutside } from "@/hooks/useClickOutside";
+import { useClickOutside } from '@/hooks/ui/useClickOutside';
 import ReactDOM from "react-dom";
 import { FaMagic } from "react-icons/fa";
 

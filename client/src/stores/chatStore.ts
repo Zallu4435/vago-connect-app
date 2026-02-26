@@ -10,6 +10,7 @@ interface ChatState {
   messages: Message[];
   messageSearch: boolean;
   onlineUsers: number[];
+  typingUsers: number[];
   activePage: "default" | "contacts" | "profile" | "calls";
   replyTo: Message | null;
   editMessage: Message | null;
@@ -22,6 +23,8 @@ interface ChatState {
   addMessage: (message: Message) => void;
   toggleMessageSearch: () => void;
   setOnlineUsers: (users: number[]) => void;
+  addTypingUser: (userId: number) => void;
+  removeTypingUser: (userId: number) => void;
   clearChat: () => void;
   setActivePage: (page: "default" | "contacts" | "profile" | "calls") => void;
   setReplyTo: (message: Message | null) => void;
@@ -41,6 +44,7 @@ export const useChatStore = create<ChatState>()(
       messages: [],
       messageSearch: false,
       onlineUsers: [],
+      typingUsers: [],
       activePage: "default",
       replyTo: null,
       editMessage: null,
@@ -56,6 +60,14 @@ export const useChatStore = create<ChatState>()(
       addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
       toggleMessageSearch: () => set((state) => ({ messageSearch: !state.messageSearch })),
       setOnlineUsers: (users) => set({ onlineUsers: users }),
+      addTypingUser: (userId) =>
+        set((state) => ({
+          typingUsers: state.typingUsers.includes(userId) ? state.typingUsers : [...state.typingUsers, userId]
+        })),
+      removeTypingUser: (userId) =>
+        set((state) => ({
+          typingUsers: state.typingUsers.filter((id) => id !== userId)
+        })),
       clearChat: () =>
         set({ messages: [], currentChatUser: null, messageSearch: false }),
       setActivePage: (page) => set({ activePage: page }),

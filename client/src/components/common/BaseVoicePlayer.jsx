@@ -5,6 +5,8 @@ import { RiShareForwardFill } from "react-icons/ri";
 import AnimatedWave from "@/components/common/AnimatedWave";
 import { formatDuration } from "@/utils/formatDuration";
 import Image from "next/image";
+import ErrorMessage from "@/components/common/ErrorMessage";
+import { useAudioBlob } from "@/hooks/ui/useAudioBlob";
 
 /**
  * BaseVoicePlayer
@@ -34,9 +36,11 @@ export default function BaseVoicePlayer({
   const [current, setCurrent] = useState(0);
   const [hasError, setHasError] = useState(false);
 
+  const { blobUrl, isLoading, error: blobError } = useAudioBlob(src);
+
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !blobUrl) return;
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
@@ -54,31 +58,17 @@ export default function BaseVoicePlayer({
           onPlayChange?.(false);
         });
     }
-  }, [isPlaying, onPlayChange]);
+  }, [isPlaying, onPlayChange, blobUrl]);
 
-  const handleAudioError = useCallback(async () => {
-    setHasError(true);
-    setIsPlaying(false);
-    onPlayChange?.(false);
-    // Fallback: fetch as blob and play
-    try {
-      const resp = await fetch(src, { credentials: "omit" });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const blob = await resp.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = audioRef.current;
-      if (audio) {
-        audio.src = url;
-        audio.load();
-        await audio.play();
-        setIsPlaying(true);
-        setHasError(false);
-        onPlayChange?.(true);
-      }
-    } catch {
+  useEffect(() => {
+    if (blobError) {
       setHasError(true);
+      setIsPlaying(false);
+      onPlayChange?.(false);
+    } else {
+      setHasError(false);
     }
-  }, [src, onPlayChange]);
+  }, [blobError, onPlayChange]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -93,7 +83,7 @@ export default function BaseVoicePlayer({
       onPlayChange?.(false);
       setCurrent(0);
     };
-    const onError = () => handleAudioError();
+    const onError = () => setHasError(true);
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("ended", onEnded);
@@ -104,7 +94,7 @@ export default function BaseVoicePlayer({
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
-  }, [handleAudioError, onPlayChange]);
+  }, [onPlayChange]);
 
   // Reset on src change
   useEffect(() => {
@@ -116,11 +106,11 @@ export default function BaseVoicePlayer({
       setCurrent(0);
       audio.pause();
       audio.currentTime = 0;
-      audio.src = src || "";
+      audio.src = blobUrl || "";
       audio.load();
       setHasError(false);
     } catch { }
-  }, [src, onPlayChange]);
+  }, [blobUrl, onPlayChange]);
 
   const progress = useMemo(() => (duration ? Math.min(100, Math.max(0, (current / duration) * 100)) : 0), [current, duration]);
 
@@ -177,8 +167,8 @@ export default function BaseVoicePlayer({
             <span className="font-medium tabular-nums">{formatDuration(duration)}</span>
           </div>
           {hasError && (
-            <div className="text-red-400 text-[10px] mt-0.5 italic">
-              Failed to play audio
+            <div className="mt-1">
+              <ErrorMessage message="Failed to load audio" className="bg-transparent shadow-none px-0 py-0 text-[10px]" />
             </div>
           )}
         </div>
@@ -190,13 +180,15 @@ export default function BaseVoicePlayer({
           </div>
         )}
       </div>  {/* end player row */}
-      <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" src={src} className="sr-only">
-        <source src={src} type="audio/webm" />
-        <source src={src} type="audio/ogg" />
-        <source src={src} type="audio/mpeg" />
-        <source src={src} type="audio/mp4" />
-        <source src={src} type="audio/wav" />
-      </audio>
+      {blobUrl && (
+        <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" src={blobUrl} className="sr-only">
+          <source src={blobUrl} type="audio/webm" />
+          <source src={blobUrl} type="audio/ogg" />
+          <source src={blobUrl} type="audio/mpeg" />
+          <source src={blobUrl} type="audio/mp4" />
+          <source src={blobUrl} type="audio/wav" />
+        </audio>
+      )}
     </div>
   );
 }

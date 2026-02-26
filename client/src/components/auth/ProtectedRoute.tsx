@@ -37,7 +37,6 @@ export default function ProtectedRoute({ children, redirectTo = '/login' }: Prot
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-conversation-panel-background text-white">
         <div className="mb-4 text-3xl">Whatsapp</div>
         <LoadingSpinner />
-        <div className="mt-2 text-secondary">Loading...</div>
       </div>
     );
   }

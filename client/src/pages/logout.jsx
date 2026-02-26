@@ -1,13 +1,10 @@
-import { firebaseAuth } from "@/utils/FirebaseConfig";
-import { signOut } from "firebase/auth";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useCallStore } from "@/stores/callStore";
 import { useSocketStore } from "@/stores/socketStore";
-import { queryClient } from "@/lib/queryClient";
-import { api } from "@/lib/api";
+import { useLogoutUser } from "@/hooks/auth/useAuthStatus";
 import { showToast } from "@/lib/toast";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import LoadingSpinner from "@/components/common/LoadingSpinner";
@@ -20,63 +17,40 @@ function LogoutPage() { // Renamed component to follow Next.js page conventions
   const resetCallState = useCallStore((s) => s.resetCallState);
   const socket = useSocketStore((s) => s.socket);
   const router = useRouter();
-  
+
+  const logoutMutation = useLogoutUser();
+
   useEffect(() => {
     const performLogout = async () => {
       try {
         // Emit socket signout if connected and then disconnect
         if (socket?.current && userInfo?.id) {
           try {
-            console.log("Signing out socket...");
             socket.current.emit("signout", userInfo.id);
-          } catch (e) {
-            console.warn("Socket signout emission failed:", e);
-          }
-          try {
             socket.current.disconnect();
-            console.log("Socket disconnected.");
           } catch (e) {
-            console.warn("Socket disconnection failed:", e);
+            console.warn("Socket disconnect issue:", e);
           }
         }
 
-        // Backend logout to clear refresh cookie
-        try {
-          await api.post("/api/auth/logout", undefined, { withCredentials: true });
-          console.log("Server session cleared.");
-        } catch (e) {
-          console.warn("Backend logout failed:", e);
-        }
+        // Delegate backend + Firebase logout to mutation hook
+        await logoutMutation.mutateAsync();
 
-        // Clear client stores and caches
+        // Clear client stores
         clearAuth();
-        try { clearChat?.(); } catch (e) { console.warn("Clearing chat history failed:", e); }
-        try { resetCallState?.(); } catch (e) { console.warn("Resetting call state failed:", e); }
-        try { queryClient.clear(); } catch (e) { console.warn("Clearing query cache failed:", e); }
-        console.log("Local session cleared.");
+        try { clearChat?.(); } catch (e) { }
+        try { resetCallState?.(); } catch (e) { }
 
-        // Firebase sign out
-        try {
-          await signOut(firebaseAuth);
-          console.log("Firebase sign out complete.");
-        } catch (e) {
-          console.warn("Firebase sign out failed:", e);
-        }
-
-        // Feedback
         showToast.info("Signed out successfully.");
-
-        // Redirect
         router.push("/login");
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error("Logout error:", error);
         showToast.error("Could not sign out cleanly. Redirecting to login.");
-        router.push("/login"); // Ensure redirect even on error
+        router.push("/login");
       }
     };
     performLogout();
-  }, [socket, userInfo?.id, router, clearAuth, clearChat, resetCallState]); 
+  }, [socket, userInfo?.id, router, clearAuth, clearChat, resetCallState, logoutMutation]);
 
   return (
     <ProtectedRoute>

@@ -8,7 +8,7 @@ import { Toaster } from "react-hot-toast";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
 import React, { useEffect, useState } from "react";
 import { refreshAccessToken } from "@/lib/refreshToken";
-import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+import { useTokenRefresh } from '@/hooks/auth/useTokenRefresh';
 import LoadingSpinner from "@/components/common/LoadingSpinner"; // Assuming this is theme-neutral or will be updated
 import { GiCrystalBall } from "react-icons/gi"; // Mystical icon
 import { FaScroll } from "react-icons/fa"; // Reliable scroll icon

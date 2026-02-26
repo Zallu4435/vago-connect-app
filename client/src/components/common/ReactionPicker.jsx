@@ -1,23 +1,14 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { usePopoverPosition } from "@/hooks/usePopoverPosition";
-import { useClickOutside } from "@/hooks/useClickOutside";
+import { usePopoverPosition } from '@/hooks/ui/usePopoverPosition';
+import { useClickOutside } from '@/hooks/ui/useClickOutside';
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
+import { getPortalRoot } from "@/utils/domHelpers";
 import { MdAdd } from "react-icons/md";
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false, loading: () => null });
 
-const getPortalRoot = () => {
-  if (typeof document === 'undefined') return null;
-  let portalRoot = document.getElementById('emoji-picker-portal');
-  if (!portalRoot) {
-    portalRoot = document.createElement('div');
-    portalRoot.id = 'emoji-picker-portal';
-    document.body.appendChild(portalRoot);
-  }
-  return portalRoot;
-};
 
 export default function ReactionPicker({
   open,
@@ -35,7 +26,7 @@ export default function ReactionPicker({
   const pickerRef = useRef(null);
 
   useEffect(() => {
-    setPortalRoot(getPortalRoot());
+    setPortalRoot(getPortalRoot("emoji-picker-portal"));
   }, []);
   const coords = usePopoverPosition({
     open: showPicker,

@@ -2,28 +2,28 @@
 import React from "react";
 import { IoWarning, IoAlertCircle, IoInformationCircle } from "react-icons/io5";
 import ModalShell from "@/components/common/ModalShell";
-import LoadingSpinner from "@/components/common/LoadingSpinner";
+import Button from "@/components/common/Button";
 
 const VARIANT_MAP = {
   danger: {
     bgHeader: "bg-red-900/30",
     borderHeader: "border-red-800/60",
     iconClass: "text-red-400",
-    confirmClass: "bg-red-600 hover:bg-red-500 text-white",
+    variantKey: "danger",
     icon: IoAlertCircle,
   },
   warning: {
     bgHeader: "bg-yellow-900/30",
     borderHeader: "border-yellow-800/60",
     iconClass: "text-yellow-400",
-    confirmClass: "bg-yellow-500 hover:bg-yellow-400 text-ancient-bg-dark",
+    variantKey: "warning",
     icon: IoWarning,
   },
   info: {
     bgHeader: "bg-blue-900/30",
     borderHeader: "border-blue-800/60",
     iconClass: "text-blue-400",
-    confirmClass: "bg-blue-600 hover:bg-blue-500 text-white",
+    variantKey: "info",
     icon: IoInformationCircle,
   },
 };
@@ -70,32 +70,22 @@ export default function ConfirmModal({
         flex flex-col xs:flex-row justify-end gap-2
         p-3 sm:p-4 bg-ancient-bg-medium border-t border-ancient-border-stone
       ">
-        <button
+        <Button
           onClick={onClose}
           disabled={confirmLoading}
-          className="
-            px-3 sm:px-4 py-2 rounded-lg border border-ancient-input-border 
-            text-ancient-text-light hover:bg-ancient-input-bg transition-colors
-            w-full xs:w-auto
-          "
+          variant="ghost"
+          className="w-full xs:w-auto border border-ancient-input-border"
         >
           {cancelText}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={onConfirm}
-          disabled={confirmLoading}
-          className={`
-            px-3 sm:px-4 py-2 rounded-lg font-bold shadow-md transition-colors
-            ${v.confirmClass} disabled:opacity-60 disabled:cursor-not-allowed
-            w-full xs:w-auto flex items-center justify-center
-          `}
+          isLoading={confirmLoading}
+          variant={v.variantKey}
+          className={`w-full xs:w-auto shadow-md ${v.variantKey === 'danger' ? 'bg-red-600 text-white hover:bg-red-500 border-none' : ''}`}
         >
-          {confirmLoading ? (
-            <LoadingSpinner size={20} label="Processing..." />
-          ) : (
-            confirmText
-          )}
-        </button>
+          {confirmText}
+        </Button>
       </div>
     </ModalShell>
   );

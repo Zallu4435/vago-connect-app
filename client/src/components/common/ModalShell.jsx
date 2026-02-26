@@ -1,19 +1,10 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { useClickOutside } from "@/hooks/useClickOutside";
+import { useClickOutside } from '@/hooks/ui/useClickOutside';
 import { createPortal } from "react-dom";
-import { useModalLock } from "@/hooks/useModalLock";
+import { useModalLock } from '@/hooks/ui/useModalLock';
+import { getPortalRoot } from "@/utils/domHelpers";
 
-const getModalPortalRoot = () => {
-  if (typeof document === 'undefined') return null;
-  let root = document.getElementById('modal-portal');
-  if (!root) {
-    root = document.createElement('div');
-    root.id = 'modal-portal';
-    document.body.appendChild(root);
-  }
-  return root;
-};
 
 export default function ModalShell({
   open,
@@ -28,7 +19,7 @@ export default function ModalShell({
   const [portalRoot, setPortalRoot] = useState(null);
 
   useEffect(() => {
-    setPortalRoot(getModalPortalRoot());
+    setPortalRoot(getPortalRoot("modal-portal"));
   }, []);
 
   useClickOutside(open, onClose, [ref]);

@@ -59,3 +59,31 @@ export const calculateTime = (inputDateStr) => {
     return formattedDate;
   }
 };
+
+export function formatTimestamp(isoString) {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  // To avoid midnight edge cases, calculate based on local start of day:
+  const isToday = now.toDateString() === date.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = yesterday.toDateString() === date.toDateString();
+
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) {
+    return `Today, ${timeStr}`;
+  } else if (isYesterday) {
+    return `Yesterday, ${timeStr}`;
+  } else if (diffDays < 7) {
+    const dayName = date.toLocaleDateString([], { weekday: 'long' });
+    return `${dayName}, ${timeStr}`;
+  } else {
+    // "24 February, 11:00 AM" or "February 24, 11:00 AM" depending on locale
+    const dateStr = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    return `${dateStr}, ${timeStr}`;
+  }
+}

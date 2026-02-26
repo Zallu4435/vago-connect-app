@@ -34,15 +34,15 @@ function CapturePhoto({ onCapture, onClose }) {
         startingRef.current = false;
       }
     };
+    const vRef = videoRef.current;
+    const sRef = streamRef.current;
     start();
     return () => {
-      const stream = streamRef.current;
-      const video = videoRef.current;
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
+      if (sRef) {
+        sRef.getTracks().forEach((t) => t.stop());
       }
-      if (video) {
-        video.srcObject = null;
+      if (vRef) {
+        vRef.srcObject = null;
       }
     };
   }, [onClose]);

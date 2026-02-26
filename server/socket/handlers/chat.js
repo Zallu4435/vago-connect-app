@@ -22,6 +22,20 @@ export function handleChatEvents(io, socket, onlineUsers) {
         }
     });
 
+    socket.on("typing", (data) => {
+        const sendUserSocket = onlineUsers.get(String(data.to));
+        if (sendUserSocket) {
+            io.to(sendUserSocket).emit("typing", { from: data.from, to: data.to });
+        }
+    });
+
+    socket.on("stop-typing", (data) => {
+        const sendUserSocket = onlineUsers.get(String(data.to));
+        if (sendUserSocket) {
+            io.to(sendUserSocket).emit("stop-typing", { from: data.from, to: data.to });
+        }
+    });
+
     // Explicit signout: remove mapping and notify others
     socket.on("signout", (userId) => {
         try {

@@ -1,21 +1,10 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { useClickOutside } from "@/hooks/useClickOutside";
-import { usePopoverPosition } from "@/hooks/usePopoverPosition";
+import { useClickOutside } from '@/hooks/ui/useClickOutside';
+import { usePopoverPosition } from '@/hooks/ui/usePopoverPosition';
 import { createPortal } from "react-dom";
+import { getPortalRoot } from "@/utils/domHelpers";
 
-// Create or get portal root
-const getPortalRoot = () => {
-  if (typeof document === 'undefined') return null;
-
-  let portalRoot = document.getElementById('action-sheet-portal');
-  if (!portalRoot) {
-    portalRoot = document.createElement('div');
-    portalRoot.id = 'action-sheet-portal';
-    document.body.appendChild(portalRoot);
-  }
-  return portalRoot;
-};
 
 export default function ActionSheet({
   open,
@@ -32,7 +21,7 @@ export default function ActionSheet({
 
   // Initialize portal root
   useEffect(() => {
-    setPortalRoot(getPortalRoot());
+    setPortalRoot(getPortalRoot("action-sheet-portal"));
   }, []);
 
   // Click and escape to dismiss, responsive for mobile/touch too

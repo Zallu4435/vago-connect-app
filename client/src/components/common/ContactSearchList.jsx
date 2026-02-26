@@ -3,6 +3,7 @@ import React, { useMemo } from "react";
 import ThemedInput from "@/components/common/ThemedInput";
 import ContactSelectorItem from "@/components/common/ContactSelectorItem";
 import { FaMagic } from "react-icons/fa";
+import EmptyState from "@/components/common/EmptyState";
 
 export default function ContactSearchList({
   contacts = [],
@@ -45,7 +46,9 @@ export default function ContactSearchList({
           </div>
         )}
         {(!loading && filtered.length === 0) && (
-          <div className="text-ancient-text-muted text-center py-8 text-base sm:text-lg">{emptyText || "No contacts found."}</div>
+          <div className="py-8">
+            <EmptyState title={emptyText || "No contacts found."} layout="embedded" />
+          </div>
         )}
         {!loading && filtered.map((contact) => (
           <ContactSelectorItem

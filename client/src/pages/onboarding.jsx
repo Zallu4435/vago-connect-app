@@ -3,12 +3,12 @@ import ThemedInput from "@/components/common/ThemedInput";
 import Avatar from "@/components/common/Avatar";
 import { useRouter } from "next/router";
 import { useAuthStore } from "@/stores/authStore";
-import { useOnboardUser } from "@/hooks/mutations/useOnboardUser";
+import { useOnboardUser } from '@/hooks/auth/useAuthStatus';
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { GiCrystalBall, GiFeather, GiScrollQuill } from "react-icons/gi";
 import { FaMagic } from "react-icons/fa";
 import { showToast } from "@/lib/toast";
-import LoadingSpinner from "@/components/common/LoadingSpinner";
+import Button from "@/components/common/Button";
 
 function Onboarding() {
   const userInfo = useAuthStore((s) => s.userInfo);
@@ -21,37 +21,33 @@ function Onboarding() {
 
   const onBoardUserHandle = async () => {
     const email = userInfo?.email;
-    try {
-      if (!email) { showToast.error("No email found for this account."); return; }
-      if (!name?.trim()) { showToast.error("Please enter your name."); return; }
-      onboardMutation.mutate(
-        { email, name: name.trim(), about: about || "", image },
-        {
-          onSuccess: (data) => {
-            if (data?.status && data?.user) {
-              setUserInfo({
-                id: String(data.user.id),
-                name: data.user.name,
-                email: data.user.email,
-                profileImage: data.user.image,
-                about: data.user.about
-              });
-              showToast.success("Setup complete! Welcome to Vago Connect.");
-              router.push("/");
-            } else {
-              showToast.error("Failed to complete setup. Please try again.");
-            }
-          },
-          onError: (error) => {
-            console.error("Onboarding failed:", error);
-            showToast.error("Something went wrong. Please try again.");
-          },
-        }
-      );
-    } catch (error) {
-      console.error("Onboarding error:", error);
-      showToast.error("An unexpected error occurred. Please try again.");
-    }
+    if (!email) { showToast.error("No email found for this account."); return; }
+    if (!name?.trim()) { showToast.error("Please enter your name."); return; }
+
+    onboardMutation.mutate(
+      { email, name: name.trim(), about: about || "", image },
+      {
+        onSuccess: (data) => {
+          if (data?.status && data?.user) {
+            setUserInfo({
+              id: String(data.user.id),
+              name: data.user.name,
+              email: data.user.email,
+              profileImage: data.user.image,
+              about: data.user.about
+            });
+            showToast.success("Setup complete! Welcome to Vago Connect.");
+            router.push("/");
+          } else {
+            showToast.error("Failed to complete setup. Please try again.");
+          }
+        },
+        onError: (error) => {
+          console.error("Onboarding failed:", error);
+          showToast.error("Something went wrong. Please try again.");
+        },
+      }
+    );
   };
 
   return (
@@ -93,25 +89,16 @@ function Onboarding() {
               placeholder="Tell people about yourself (optional)"
               Icon={GiFeather}
             />
-            <button
+            <Button
               onClick={onBoardUserHandle}
               disabled={onboardMutation.isPending}
-              className="
-                bg-ancient-icon-glow hover:bg-ancient-bubble-user-light text-ancient-bg-dark font-bold
-                text-lg sm:text-xl px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg shadow-lg
-                transform hover:scale-105 transition-all duration-300 flex items-center gap-2 sm:gap-3
-                disabled:opacity-50 disabled:cursor-not-allowed
-              "
+              isLoading={onboardMutation.isPending}
+              loadingText="Saving..."
+              className="px-6 sm:px-8 shadow-lg transform hover:scale-105 text-lg sm:text-xl"
             >
-              {onboardMutation.isPending ? (
-                <LoadingSpinner label="Saving..." size={24} />
-              ) : (
-                <>
-                  Save and continue
-                  <FaMagic className="text-xl sm:text-2xl" />
-                </>
-              )}
-            </button>
+              Save and continue
+              <FaMagic className="text-xl sm:text-2xl ml-2" />
+            </Button>
           </div>
 
           {/* Avatar Section */}

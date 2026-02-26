@@ -6,7 +6,7 @@ import {
 } from "react-icons/bs";
 import { useCallStore } from "@/stores/callStore";
 import { useSocketStore } from "@/stores/socketStore";
-import { callSession } from "@/hooks/useCallSocketHandlers";
+import { callSession } from '@/hooks/calls/useCallSocketHandlers';
 
 /**
  * IncomingCallNotification

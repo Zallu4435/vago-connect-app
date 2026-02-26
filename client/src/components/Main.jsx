@@ -5,12 +5,13 @@ import { onAuthStateChanged } from "firebase/auth";
 import { firebaseAuth } from "@/utils/FirebaseConfig";
 import { useRouter } from "next/navigation";
 
-const ChatList = dynamic(() => import("./Chatlist/ChatList"));
-const Chat = dynamic(() => import("./Chat/Chat"));
-const SearchMessages = dynamic(() => import("./Chat/SearchMessages"));
-const Empty = dynamic(() => import("./Empty"));
-const VideoCall = dynamic(() => import("./Call/VideoCall"), { ssr: false });
-const AudioCall = dynamic(() => import("./Call/AudioCall"), { ssr: false });
+const ChatList = dynamic(() => import("./chatlist/ChatList"));
+const Chat = dynamic(() => import("./chat/Chat"));
+const SearchMessages = dynamic(() => import("./chat/SearchMessages"));
+const EmptyState = dynamic(() => import("./common/EmptyState"));
+import { HiChatBubbleLeftRight } from "react-icons/hi2";
+const VideoCall = dynamic(() => import("./calls/VideoCall"), { ssr: false });
+const AudioCall = dynamic(() => import("./calls/AudioCall"), { ssr: false });
 const IncomingCallNotification = dynamic(
   () => import("./common/IncomingCallNotification"),
   { ssr: false }
@@ -19,13 +20,13 @@ import { useAuthStore } from "@/stores/authStore";
 import { useSocketStore } from "@/stores/socketStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useCallStore } from "@/stores/callStore";
-import { useUser } from "@/hooks/queries/useUser";
+import { useUser } from '@/hooks/auth/useUser';
 import FullPageError from "@/components/common/FullPageError";
-import useNetworkStatus from "@/hooks/useNetworkStatus";
-import { useSocketConnection } from "@/hooks/useSocketConnection";
-import { useCallSocketHandlers } from "@/hooks/useCallSocketHandlers";
-import { useMessageSocketHandlers } from "@/hooks/useMessageSocketHandlers";
-import { usePresenceSocketHandlers } from "@/hooks/usePresenceSocketHandlers";
+import useNetworkStatus from '@/hooks/websockets/useNetworkStatus';
+import { useSocketConnection } from '@/hooks/websockets/useSocketConnection';
+import { useCallSocketHandlers } from '@/hooks/calls/useCallSocketHandlers';
+import { useMessageSocketHandlers } from '@/hooks/websockets/useMessageSocketHandlers';
+import { usePresenceSocketHandlers } from '@/hooks/websockets/usePresenceSocketHandlers';
 import LoadingSpinner from "@/components/common/LoadingSpinner";
 
 function Main() {
@@ -165,9 +166,15 @@ function Main() {
                 )}
               </div>
             ) : (
-              // Empty State
-              <div key="empty-state" className="flex flex-col flex-1">
-                <Empty />
+              <div key="empty-state" className="flex flex-col flex-1 relative">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <EmptyState
+                    icon={HiChatBubbleLeftRight}
+                    title="No chat selected"
+                    subtitle="Choose a conversation from the list to start chatting."
+                    layout="full"
+                  />
+                </div>
               </div>
             )}
           </div>

@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { Message } from '@/types';
+import { updateMessagesCache } from './cacheHelpers';
 
 export const createSocketQuerySync = (queryClient: QueryClient) => {
   return {
@@ -36,105 +37,48 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
     },
 
     onMessageStatusUpdate: (messageId: number | string, status: string) => {
-      // Update all message caches with this message ID
-      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
-        if (!old) return old;
-        // Flat array
-        if (Array.isArray(old)) {
-          return old.map((msg) => (msg?.id === messageId ? { ...msg, messageStatus: status } : msg));
-        }
-        // InfiniteData
-        if (Array.isArray(old.pages)) {
-          const pages = old.pages.map((p: any) => ({
-            ...p,
-            messages: (p.messages || []).map((m: any) => (m?.id === messageId ? { ...m, messageStatus: status } : m)),
-          }));
-          return { ...old, pages };
-        }
-        return old;
-      });
+      updateMessagesCache(queryClient, (msg: any) =>
+        String(msg?.id) === String(messageId) ? { ...msg, messageStatus: status } : msg
+      );
+    },
+
+    onMessagesRead: (messageIds: (number | string)[]) => {
+      const idsSet = new Set(messageIds.map(String));
+      updateMessagesCache(queryClient, (msg: any) =>
+        idsSet.has(String(msg?.id)) ? { ...msg, messageStatus: 'read' } : msg
+      );
     },
 
     onMessageEdited: (messageId: number | string, newContent: string, editedAt?: string) => {
-      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
-        if (!old) return old;
-        if (Array.isArray(old)) {
-          return old.map((m) => (m?.id === messageId ? { ...m, content: newContent, isEdited: true, editedAt: editedAt || new Date().toISOString() } : m));
-        }
-        if (Array.isArray(old.pages)) {
-          const pages = old.pages.map((p: any) => ({
-            ...p,
-            messages: (p.messages || []).map((m: any) => (m?.id === messageId ? { ...m, content: newContent, isEdited: true, editedAt: editedAt || new Date().toISOString() } : m)),
-          }));
-          return { ...old, pages };
-        }
-        return old;
-      });
+      updateMessagesCache(queryClient, (msg: any) =>
+        String(msg?.id) === String(messageId) ? { ...msg, content: newContent, isEdited: true, editedAt: editedAt || new Date().toISOString() } : msg
+      );
     },
 
     onMessageDeleted: (messageId: number | string, deleteType: 'forMe' | 'forEveryone', payload?: any) => {
-      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
-        if (!old) return old;
-        const apply = (m: any) => {
-          if (m?.id !== messageId) return m;
-          if (deleteType === 'forEveryone') return { ...m, content: 'This message was deleted', isDeletedForEveryone: true };
-          return { ...m, deletedBy: payload?.deletedBy || [] };
-        };
-        if (Array.isArray(old)) {
-          return old.map(apply);
-        }
-        if (Array.isArray(old.pages)) {
-          const pages = old.pages.map((p: any) => ({
-            ...p,
-            messages: (p.messages || []).map(apply),
-          }));
-          return { ...old, pages };
-        }
-        return old;
+      updateMessagesCache(queryClient, (msg: any) => {
+        if (String(msg?.id) !== String(messageId)) return msg;
+        if (deleteType === 'forEveryone') return { ...msg, content: 'This message was deleted', isDeletedForEveryone: true };
+        return { ...msg, deletedBy: payload?.deletedBy || [] };
       });
     },
 
     onMessageReacted: (messageId: number | string, reactions: any[]) => {
-      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
-        if (!old) return old;
-        if (Array.isArray(old)) {
-          return old.map((m) => (m?.id === messageId ? { ...m, reactions } : m));
-        }
-        if (Array.isArray(old.pages)) {
-          const pages = old.pages.map((p: any) => ({
-            ...p,
-            messages: (p.messages || []).map((m: any) => (m?.id === messageId ? { ...m, reactions } : m)),
-          }));
-          return { ...old, pages };
-        }
-        return old;
-      });
+      updateMessagesCache(queryClient, (msg: any) =>
+        String(msg?.id) === String(messageId) ? { ...msg, reactions } : msg
+      );
     },
 
     onMessageStarred: (messageId: number | string, starred: boolean, userId?: number | string) => {
-      queryClient.setQueriesData({ queryKey: ['messages'] }, (old: any) => {
-        if (!old) return old;
-        const apply = (m: any) => {
-          if (m?.id !== messageId) return m;
-          const arr = Array.isArray(m.starredBy) ? m.starredBy.slice() : [];
-          const uid = Number(userId);
-          const exists = arr.some((e: any) => (e?.userId ?? e) === uid);
-          let next = arr;
-          if (starred && !exists) next = [...arr, { userId: uid, starredAt: new Date().toISOString() }];
-          if (!starred && exists) next = arr.filter((e: any) => (e?.userId ?? e) !== uid);
-          return { ...m, starredBy: next };
-        };
-        if (Array.isArray(old)) {
-          return old.map(apply);
-        }
-        if (Array.isArray(old.pages)) {
-          const pages = old.pages.map((p: any) => ({
-            ...p,
-            messages: (p.messages || []).map(apply),
-          }));
-          return { ...old, pages };
-        }
-        return old;
+      updateMessagesCache(queryClient, (msg: any) => {
+        if (String(msg?.id) !== String(messageId)) return msg;
+        const arr = Array.isArray(msg.starredBy) ? msg.starredBy.slice() : [];
+        const uid = Number(userId);
+        const exists = arr.some((e: any) => (e?.userId ?? e) === uid);
+        let next = arr;
+        if (starred && !exists) next = [...arr, { userId: uid, starredAt: new Date().toISOString() }];
+        if (!starred && exists) next = arr.filter((e: any) => (e?.userId ?? e) !== uid);
+        return { ...msg, starredBy: next };
       });
     },
 

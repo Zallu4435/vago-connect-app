@@ -19,8 +19,6 @@ export function initializeSocket(httpServer) {
     global.io = io;
 
     io.on("connection", (socket) => {
-        global.chatSocket = socket;
-
         // Register event handlers
         handleChatEvents(io, socket, global.onlineUsers);
         handleCallEvents(io, socket, global.onlineUsers);
