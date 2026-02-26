@@ -36,8 +36,9 @@ export const useSendMedia = () => {
         const mime = file.type || "";
         const isImage = mime.startsWith("image/");
         const isVideo = mime.startsWith("video/");
-        const field = isImage ? "image" : isVideo ? "video" : "file";
-        const tempId = Date.now();
+        const isAudio = mime.startsWith("audio/");
+        const field = isImage ? "image" : isVideo ? "video" : isAudio ? "audio" : "file";
+        const tempId = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
         const form = new FormData();
         form.append(field, file, file.name || 'upload');
@@ -48,13 +49,17 @@ export const useSendMedia = () => {
         const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
         if (isGroup) form.append("isGroup", "true");
         form.append("tempId", String(tempId));
+        // Extract blob URL for local preview (only for media that needs it)
+        const localBlobUrl = (isImage || isVideo || isAudio) ? URL.createObjectURL(file) : "";
 
         // Optimistic message
         const optimisticMsg = normalizeMessage({
             id: tempId,
             status: "pending",
             createdAt: new Date().toISOString(),
-            content: "",
+            content: localBlobUrl,
+            message: localBlobUrl,
+            isLocal: true,
         }, userInfo.id, currentChatUser.id, isImage ? "image" : isVideo ? "video" : "document");
         if (caption?.trim()) optimisticMsg.caption = caption.trim();
 

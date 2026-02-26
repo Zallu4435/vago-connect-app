@@ -386,13 +386,11 @@ function ChatContainer() {
               const clusterArray = clusterObj?.messages;
               if (!Array.isArray(clusterArray) || clusterArray.length === 0) return null;
 
-              const anchorMessage = clusterArray[0];
-              if (!anchorMessage || typeof anchorMessage !== 'object') return null;
-
-              const isIncoming = Number(anchorMessage.senderId) !== Number(userInfo?.id);
-
-              // If it's a cluster of >1 eligible images, mount the Grid Wrapper
               const isAllImages = clusterArray.length > 1 && clusterArray.every(m => m.type === 'image');
+              const anchorMessage = clusterArray[0];
+              const isIncoming = Number(anchorMessage?.senderId) !== Number(userInfo?.id);
+
+
               if (isAllImages) {
                 return (
                   <ImageGridWrapper

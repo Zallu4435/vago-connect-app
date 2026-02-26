@@ -147,17 +147,13 @@ function CaptureAudio({ onChange }) {
     if (currentChatUser?.isGroup || currentChatUser?.type === "group")
       form.append("isGroup", "true");
 
-    const toastId = showToast.loading("Sending voice message...");
     uploadAudioMutation.mutate(form, {
       onSuccess: (data) => {
-        showToast.dismiss(toastId);
-        showToast.success("Voice message sent!");
         // send-msg removed, relying on message-sent from server
         setMessages([...(messages || []), data]);
         cancel();
       },
       onError: () => {
-        showToast.dismiss(toastId);
         showToast.error("Failed to send. Try again.");
       },
     });

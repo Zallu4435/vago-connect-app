@@ -7,26 +7,32 @@
  * @param {string} fallbackType - Type fallback (e.g., "text", "image")
  * @returns {Object} Normalized message object
  */
-export const normalizeMessage = (raw, fromId, toId, fallbackType = "text") => ({
-    id: Number(raw?.id),
-    conversationId: Number(raw?.conversationId || 0),
-    senderId: Number(fromId),
-    receiverId: Number(toId),
-    type: raw?.type || fallbackType,
-    content: String(raw?.content ?? ""),
-    message: String(raw?.content ?? ""),
-    messageStatus: (raw?.status || "sent"),
-    status: (raw?.status || "sent"),
-    createdAt: String(raw?.createdAt || new Date().toISOString()),
-    timestamp: String(raw?.createdAt || new Date().toISOString()),
-    isEdited: Boolean(raw?.isEdited),
-    editedAt: raw?.editedAt || undefined,
-    reactions: Array.isArray(raw?.reactions) ? raw.reactions : [],
-    starredBy: Array.isArray(raw?.starredBy) ? raw.starredBy : [],
-    caption: typeof raw?.caption === 'string' ? raw.caption : undefined,
-    replyToMessageId: raw?.replyToMessageId,
-    quotedMessage: raw?.quotedMessage,
-});
+export const normalizeMessage = (raw, fromId, toId, fallbackType = "text") => {
+    // Preserve string IDs if they are non-numeric temp IDs
+    const id = (raw?.id && isNaN(Number(raw.id))) ? String(raw.id) : Number(raw?.id);
+
+    return {
+        id,
+        conversationId: Number(raw?.conversationId || 0),
+        senderId: Number(fromId),
+        receiverId: Number(toId),
+        type: raw?.type || fallbackType,
+        content: String(raw?.content ?? ""),
+        message: String(raw?.content ?? ""),
+        messageStatus: (raw?.status || "sent"),
+        status: (raw?.status || "sent"),
+        createdAt: String(raw?.createdAt || new Date().toISOString()),
+        timestamp: String(raw?.createdAt || new Date().toISOString()),
+        isEdited: Boolean(raw?.isEdited),
+        editedAt: raw?.editedAt || undefined,
+        reactions: Array.isArray(raw?.reactions) ? raw.reactions : [],
+        starredBy: Array.isArray(raw?.starredBy) ? raw.starredBy : [],
+        caption: typeof raw?.caption === 'string' ? raw.caption : undefined,
+        replyToMessageId: raw?.replyToMessageId,
+        quotedMessage: raw?.quotedMessage,
+        isLocal: Boolean(raw?.isLocal),
+    };
+};
 
 /**
  * Formats bytes into a human-readable size string.

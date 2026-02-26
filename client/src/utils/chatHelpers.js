@@ -32,6 +32,7 @@ export const clusterMessages = (messagesArr) => {
             isSameSender &&
             timeDiff <= 10 &&
             msgIsSystem === currClusterIsSystem &&
+            msg.type === currentType &&
             !(msgIsSystem && msg.type !== currentType)
         ) {
             currentCluster.push(msg);

@@ -10,6 +10,7 @@ import dynamic from "next/dynamic";
 import RepliedMessageQuote from "./RepliedMessageQuote";
 import { RiShareForwardFill } from "react-icons/ri";
 import { getFileName, getFileExtension, getExtensionColor } from "@/utils/fileHelpers";
+import MediaUploadProgressBar from "../common/MediaUploadProgressBar";
 
 const ChatMediaViewer = dynamic(
   () => import("@/components/chat/ChatMediaViewer"),
@@ -32,6 +33,11 @@ function DocumentMessage({ message, isIncoming }) {
 
 
   const fileUrl = message?.content || message?.message;
+  const isLocal = !!message.isLocal;
+
+  React.useEffect(() => {
+    console.log(`[DocumentMessage] Content changed. msgId: ${message.id}, isLocal: ${isLocal}, url: ${fileUrl?.substring(0, 30)}...`);
+  }, [fileUrl, message.id, isLocal]);
 
   return (
     <>
@@ -168,6 +174,15 @@ function DocumentMessage({ message, isIncoming }) {
               <MdDownload className="text-base sm:text-lg" />
             )}
           </button>
+
+          {/* Uploading progress bar overlay at the bottom of the card */}
+          <MediaUploadProgressBar
+            message={message}
+            isLocal={isLocal}
+            className="bottom-0 rounded-b-xl overflow-hidden"
+            barHeight="h-[3px]"
+            barBg="bg-white/10"
+          />
         </div>
 
         {/* Sparkles */}
