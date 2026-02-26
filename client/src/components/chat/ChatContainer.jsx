@@ -2,6 +2,8 @@
 import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useQueryClient } from "@tanstack/react-query";
+import { updateContactFieldsInCache } from "@/lib/cacheHelpers";
 import MessageWrapper from "./MessageWrapper";
 import ImageGridWrapper from "./ImageGridWrapper";
 import SelectMessagesBar from "./SelectMessagesBar";
@@ -57,8 +59,25 @@ function ChatContainer() {
     return pages.flatMap((p) => p.messages);
   }, [pagesData]);
 
-  // Removed redundant clear/sync effects to prevent UI flickering.
-  // The store key on ChatContainer handles isolation, and filteredMessages handles the merge.
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (currentChatUser?.id && userInfo?.id) {
+      updateContactFieldsInCache(qc, (c) => {
+        const cPeerId = String(c.id);
+        const cConvId = String(c.conversationId || "");
+        const isGroup = !!(currentChatUser?.isGroup || currentChatUser?.type === 'group');
+
+        const isMatch = isGroup
+          ? (cConvId !== "0" && cConvId === String(currentChatUser.id))
+          : (cPeerId === String(currentChatUser.id));
+
+        if (isMatch) {
+          return { ...c, totalUnreadMessages: 0 };
+        }
+        return c;
+      });
+    }
+  }, [currentChatUser?.id, userInfo?.id, qc]);
 
   // Deleted for user filter
   const isDeletedForUser = useCallback((m, uid) => {

@@ -68,12 +68,14 @@ export function useMessagesPaginated(userId?: string, peerId?: string, opts: Opt
       // If we just marked read sequentially, instantly drop local contact unread badge
       if (markRead && !pageParam && authUserId && peerId) {
         updateContactFieldsInCache(qc, (c: any) => {
-          // Find this specific interaction context via id (or conversationId when grouping is robust)
-          if (String(c.id) === String(peerId)) {
-            return { ...c, totalUnreadMessages: 0 };
-          }
-          // For group chats where peerId might be conversationId implicitly passed down
-          if (opts.isGroup && String(c.conversationId) === String(peerId)) {
+          const cPeerId = String(c.id);
+          const cConvId = String(c.conversationId || "");
+
+          const isMatch = opts.isGroup
+            ? (cConvId !== "0" && cConvId === String(peerId))
+            : (cPeerId === String(peerId));
+
+          if (isMatch) {
             return { ...c, totalUnreadMessages: 0 };
           }
           return c;

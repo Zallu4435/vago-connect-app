@@ -35,9 +35,6 @@ function DocumentMessage({ message, isIncoming }) {
   const fileUrl = message?.content || message?.message;
   const isLocal = !!message.isLocal;
 
-  React.useEffect(() => {
-    console.log(`[DocumentMessage] Content changed. msgId: ${message.id}, isLocal: ${isLocal}, url: ${fileUrl?.substring(0, 30)}...`);
-  }, [fileUrl, message.id, isLocal]);
 
   return (
     <>

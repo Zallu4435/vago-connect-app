@@ -31,6 +31,7 @@ export const upsertMessageInCache = (queryClient: QueryClient, message: any, tem
 
     queries.forEach(query => {
         const qKey = query.queryKey;
+        const cacheAuthId = qKey && qKey.length >= 2 ? String(qKey[1]) : null;
         const cachePeerId = qKey && qKey.length >= 3 ? String(qKey[2]) : null;
 
         const idToSearch = tempId ? String(tempId) : null;
@@ -46,14 +47,27 @@ export const upsertMessageInCache = (queryClient: QueryClient, message: any, tem
         const msgReceiverId = String(message.receiverId || "");
 
         let belongsToThisCache = false;
-        if (cachePeerId) {
-            // 1. Exact conversationId match (if message has one)
-            if (msgConvId !== "0" && msgConvId === cachePeerId) {
+        if (cachePeerId && cacheAuthId) {
+            // 1. Exact conversationId match (Groups / Professional DMs)
+            if (msgConvId !== "" && msgConvId !== "0" && msgConvId === cachePeerId) {
                 belongsToThisCache = true;
             }
-            // 2. Peer matching (Direct chat fallback / Optimistic messages)
-            else if (msgSenderId === cachePeerId || msgReceiverId === cachePeerId) {
-                belongsToThisCache = true;
+            // 2. Peer matching (Fallback / Optimistic / Simple DMs)
+            else {
+                const isSavedMessagesCache = cachePeerId === cacheAuthId;
+                if (isSavedMessagesCache) {
+                    // Only messages where both sender and receiver are the same user
+                    if (msgSenderId === cacheAuthId && msgReceiverId === cacheAuthId) {
+                        belongsToThisCache = true;
+                    }
+                } else {
+                    // Standard DMs: must match the pair (Me, Peer)
+                    const isIncomingFromPeer = msgSenderId === cachePeerId && msgReceiverId === cacheAuthId;
+                    const isOutgoingToPeer = msgSenderId === cacheAuthId && msgReceiverId === cachePeerId;
+                    if (isIncomingFromPeer || isOutgoingToPeer) {
+                        belongsToThisCache = true;
+                    }
+                }
             }
         }
 

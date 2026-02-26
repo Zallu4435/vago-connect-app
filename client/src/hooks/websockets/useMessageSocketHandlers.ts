@@ -214,7 +214,7 @@ export function useMessageSocketHandlers() {
         const isActiveChat = Boolean(currentChatUser?.id) && (
           isGroup
             ? String(activeConvId) === String(msgConvId)
-            : (String(message.senderId) === String(currentChatUser?.id) ||
+            : ((String(message.senderId) === String(currentChatUser?.id) && String(message.receiverId) === String(myAuthId)) ||
               (String(message.senderId) === String(myAuthId) && String(message.receiverId) === String(currentChatUser?.id)))
         );
 
@@ -224,10 +224,20 @@ export function useMessageSocketHandlers() {
         } else {
           s.emit('mark-delivered', { messageId: message.id, senderId: message.senderId });
         }
+      } else if (Number(message.senderId) === Number(message.receiverId)) {
+        // Saved Messages: sender is receiver
+        s.emit('mark-read', { messageId: message.id, senderId: message.senderId });
+        socketSync.onMessageStatusUpdate(message.id, 'read');
       }
 
       const convId = (message as any)?.conversationId;
       if (!convId) return;
+
+      // For Saved Messages (chat with self), the status should be 'read' immediately
+      if (Number(message.senderId) === Number(message.receiverId)) {
+        message.messageStatus = 'read';
+        (message as any).status = 'read';
+      }
 
       const tempId = (message as any)?.tempId;
 
@@ -241,11 +251,14 @@ export function useMessageSocketHandlers() {
       const isPeerReceiver = Number(message.receiverId) === Number(currentChatUserRef.current?.id);
 
       const currentUser = currentChatUserRef.current;
-      const isDirectMatch =
+      const curIsGroup = (currentUser as any)?.isGroup || (currentUser as any)?.type === 'group';
+
+      const isDirectMatch = !curIsGroup && (
         (message.conversationId && currentUser?.conversationId && String(message.conversationId) === String(currentUser.conversationId)) ||
         ((Number(message.senderId) === Number(currentUser?.id) && Number(message.receiverId) === Number(myAuthId)) ||
-          (Number(message.senderId) === Number(myAuthId) && Number(message.receiverId) === Number(currentUser?.id)));
-      const isGroupMatch = (currentUser as any)?.isGroup && String((currentUser as any).conversationId) === String(convId);
+          (Number(message.senderId) === Number(myAuthId) && Number(message.receiverId) === Number(currentUser?.id)))
+      );
+      const isGroupMatch = curIsGroup && String((currentUser as any).conversationId) === String(convId);
 
       if (isDirectMatch || isGroupMatch) {
         const currentMsgs = useChatStore.getState().messages || [];
@@ -265,19 +278,25 @@ export function useMessageSocketHandlers() {
       // Update the contacts preview row
       if (myAuthId) {
         updateContactFieldsInCache(qc, (c: any) => {
-          if (String(c?.conversationId) !== String(convId)) return c;
+          const isMe = Number(message.senderId) === Number(myAuthId);
+          const peerIdMatch = isMe ? String(message.receiverId) : String(message.senderId);
 
-          const activeChatId = useChatStore.getState().currentChatUser?.id;
-          const isGroupContact = (useChatStore.getState().currentChatUser as any)?.isGroup;
-          const activeConvId = (useChatStore.getState().currentChatUser as any)?.conversationId;
+          const isMatch = (convId && convId !== "0" && String(c?.conversationId) === String(convId)) ||
+            (String(c?.id) === peerIdMatch);
+
+          if (!isMatch) return c;
+
+          const activeUser = useChatStore.getState().currentChatUser;
+          const activeChatId = activeUser?.id;
+          const activeConvId = (activeUser as any)?.conversationId;
+          const isGroupContact = (activeUser as any)?.isGroup;
 
           const isActiveChat = Boolean(activeChatId) && (
             isGroupContact
-              ? String(activeConvId) === String(convId)
-              : (String(message.senderId) === String(activeChatId) || String(message.receiverId) === String(activeChatId))
+              ? (convId && convId !== "0" && String(activeConvId) === String(convId))
+              : ((String(message.senderId) === String(activeChatId) && String(message.receiverId) === String(myAuthId)) ||
+                (String(message.senderId) === String(myAuthId) && String(message.receiverId) === String(activeChatId)))
           );
-
-          const isIncoming = Number(message.senderId) !== Number(myAuthId);
 
           return {
             ...c,
@@ -288,7 +307,7 @@ export function useMessageSocketHandlers() {
             isSystemMessage: Boolean((message as any).isSystemMessage),
             systemMessageType: (message as any).systemMessageType || null,
             messageStatus: message.messageStatus || 'sent',
-            totalUnreadMessages: isIncoming && !isActiveChat
+            totalUnreadMessages: !isMe && !isActiveChat
               ? (Number(c.totalUnreadMessages) || 0) + 1
               : (isActiveChat ? 0 : c.totalUnreadMessages),
           };
