@@ -44,6 +44,8 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   const conversationType = contactEntry?.type;
   const isSelfChat = String(currentChatUser?.id) === String(userInfo?.id) || Boolean(contactEntry?.isSelf);
   const isPinned = Boolean(contactEntry?.isPinned);
+  const isBlocked = Boolean(contactEntry?.isBlocked);
+  const blockedBy = Boolean(contactEntry?.blockedBy);
   const isOnline = onlineUsers?.some((u) => String(u) === String(currentChatUser?.id));
   const isTyping = typingUsers?.some((u) => String(u) === String(currentChatUser?.id));
   const isGroupChat = conversationType === "group" || currentChatUser?.isGroup;
@@ -66,34 +68,68 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
 
   const handleVoiceCall = () => {
     if (!currentChatUser || !userInfo) return;
-    const call = {
-      callType: "audio",
-      from: { id: userInfo.id, name: userInfo.name, image: userInfo.profileImage },
-      to: {
-        id: currentChatUser.id,
-        name: currentChatUser.name,
-        image: currentChatUser.profilePicture || currentChatUser.image || currentChatUser.profileImage
-      },
-    };
-    initiateCall(call, "audio");
-    socket?.current?.emit?.("call-user", call);
-    setCallToast(() => showToast.info("Calling..."));
+    if (isBlocked || blockedBy) {
+      showToast.error("Cannot call a blocked contact");
+      return;
+    }
+
+    // Simulate connecting state
+    setCallToast(() => showToast.loading("Initiating call..."));
+
+    setTimeout(() => {
+      // Check if user is offline before dialing
+      if (!isOnline) {
+        setCallToast(() => showToast.error("User is unavailable for a call right now."));
+        return;
+      }
+
+      // User is online, proceed with dialing
+      const call = {
+        callType: "audio",
+        from: { id: userInfo.id, name: userInfo.name, image: userInfo.profileImage },
+        to: {
+          id: currentChatUser.id,
+          name: currentChatUser.name,
+          image: currentChatUser.profilePicture || currentChatUser.image || currentChatUser.profileImage
+        },
+      };
+      initiateCall(call, "audio");
+      socket?.current?.emit?.("call-user", call);
+      setCallToast(() => showToast.success("Ringing..."));
+    }, 1500);
   };
 
   const handleVideoCall = () => {
     if (!currentChatUser || !userInfo) return;
-    const call = {
-      callType: "video",
-      from: { id: userInfo.id, name: userInfo.name, image: userInfo.profileImage },
-      to: {
-        id: currentChatUser.id,
-        name: currentChatUser.name,
-        image: currentChatUser.profilePicture || currentChatUser.image || currentChatUser.profileImage
-      },
-    };
-    initiateCall(call, "video");
-    socket?.current?.emit?.("call-user", call);
-    setCallToast(() => showToast.info("Starting video call..."));
+    if (isBlocked || blockedBy) {
+      showToast.error("Cannot call a blocked contact");
+      return;
+    }
+
+    // Simulate connecting state
+    setCallToast(() => showToast.loading("Initiating video call..."));
+
+    setTimeout(() => {
+      // Check if user is offline before dialing
+      if (!isOnline) {
+        setCallToast(() => showToast.error("User is unavailable for a video call right now."));
+        return;
+      }
+
+      // User is online, proceed with dialing
+      const call = {
+        callType: "video",
+        from: { id: userInfo.id, name: userInfo.name, image: userInfo.profileImage },
+        to: {
+          id: currentChatUser.id,
+          name: currentChatUser.name,
+          image: currentChatUser.profilePicture || currentChatUser.image || currentChatUser.profileImage
+        },
+      };
+      initiateCall(call, "video");
+      socket?.current?.emit?.("call-user", call);
+      setCallToast(() => showToast.success("Ringing..."));
+    }, 1500);
   };
 
   return (
@@ -131,6 +167,8 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
                 .join(", ") || "Tap here for group info"
             ) : isSelfChat ? (
               "Keep notes and links handy"
+            ) : isBlocked || blockedBy ? (
+              ""
             ) : isTyping ? (
               <span className="text-ancient-icon-glow italic">typing...</span>
             ) : isOnline ? (
@@ -182,12 +220,13 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
               {
                 label: "Media",
                 icon: MdPermMedia,
-                disabled: !hasMessages,
+                disabled: !hasMessages || (isBlocked || blockedBy),
                 onClick: () => onOpenMedia?.(),
               },
               ...(isGroupChat ? [] : [{
                 label: "Voice Call",
                 icon: MdCall,
+                disabled: isBlocked || blockedBy,
                 onClick: handleVoiceCall,
               }]),
               ...(isGroupChat
@@ -222,10 +261,10 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
                 },
               }]),
               ...(isGroupChat || isSelfChat ? [] : [{
-                label: "Block User",
-                disabled: !currentChatUser?.id || blockUser.isPending,
+                label: isBlocked ? "Unblock User" : "Block User",
+                disabled: !currentChatUser?.id || blockUser.isPending || (!isBlocked && blockedBy),
                 onClick: () => setShowBlockConfirm(true),
-                danger: true,
+                danger: !isBlocked,
               }]),
               ...(isGroupChat ? [{
                 label: "Exit Group",
@@ -282,15 +321,15 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
           const targetId = currentChatUser?.id;
           if (!targetId) return;
           blockUser.mutate(
-            { userId: targetId, block: true },
+            { userId: targetId, block: !isBlocked },
             { onSuccess: () => setShowBlockConfirm(false) }
           );
         }}
-        title={`Block ${currentChatUser?.name || currentChatUser?.username}?`}
-        description="Blocked contacts will no longer be able to call you or send you messages."
-        confirmText={blockUser.isPending ? "Blocking..." : "Block"}
+        title={`${isBlocked ? 'Unblock' : 'Block'} ${currentChatUser?.name || currentChatUser?.username}?`}
+        description={isBlocked ? "This contact will be able to call you or send you messages again." : "Blocked contacts will no longer be able to call you or send you messages."}
+        confirmText={blockUser.isPending ? (isBlocked ? "Unblocking..." : "Blocking...") : (isBlocked ? "Unblock" : "Block")}
         confirmLoading={blockUser.isPending}
-        variant="danger"
+        variant={isBlocked ? "primary" : "danger"}
       />
 
       {/* Confirm: Exit Group */}

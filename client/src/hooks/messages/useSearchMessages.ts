@@ -1,20 +1,21 @@
-import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { useInfiniteQuery, UseInfiniteQueryResult, InfiniteData } from '@tanstack/react-query';
 import { MessageService } from '@/services/messageService';
 import { queryKeys } from '@/lib/queryKeys';
 import type { Message } from '@/types';
 
 export interface SearchMessagesResult {
     messages: Message[];
+    nextCursor?: string | null;
 }
 
-export function useSearchMessages(chatId?: number | string, q: string = ''): UseQueryResult<SearchMessagesResult, Error> {
-    return useQuery<SearchMessagesResult, Error>({
+export function useSearchMessages(chatId?: number | string, q: string = ''): UseInfiniteQueryResult<InfiniteData<SearchMessagesResult>, Error> {
+    return useInfiniteQuery({
         queryKey: chatId ? [...queryKeys.messageSearch.byChat(chatId), q] : ['messageSearch', '', q],
         enabled: Boolean(chatId) && q.trim().length > 0,
-        queryFn: async () => {
-            const data = await MessageService.searchMessages(chatId!, q.trim());
+        initialPageParam: undefined as string | undefined,
+        queryFn: async ({ pageParam = undefined }) => {
+            const data = await MessageService.searchMessages(chatId!, q.trim(), Number(pageParam) || undefined);
 
-            // Ensure we map it properly if needed, but the backend returns message objects
             const mapped = (data?.messages || []).map((m: any) => ({
                 ...m,
                 id: Number(m.id),
@@ -23,8 +24,9 @@ export function useSearchMessages(chatId?: number | string, q: string = ''): Use
                 content: String(m.content ?? ''),
             }));
 
-            return { messages: mapped };
+            return { messages: mapped, nextCursor: data?.nextCursor || null };
         },
+        getNextPageParam: (lastPage: any) => lastPage?.nextCursor || undefined,
         staleTime: 30_000,
     });
 }

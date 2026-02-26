@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 const PhotoLibrary = dynamic(() => import("./PhotoLibrary"), { ssr: false });
 const CapturePhoto = dynamic(() => import("./CapturePhoto"), { ssr: false });
 
-function Avatar({ type, image, setImage, defaultImage = "", isGroup = false }) {
+function Avatar({ type, image, setImage, defaultImage = "", isGroup = false, isLoading = false }) {
   const [hover, setHover] = useState(false);
   const [isContextMenuVisible, setIsContextMenuVisible] = useState(false);
   const [contextMenuCoordinates, setContextMenuCoordinates] = useState({ x: 0, y: 0 });
@@ -17,7 +17,13 @@ function Avatar({ type, image, setImage, defaultImage = "", isGroup = false }) {
   const [src, setSrc] = useState(image || "");
 
   useEffect(() => {
-    setSrc(image || "");
+    // Append a cache-buster if we have a valid source so Next.js Image reflects updates immediately
+    if (image) {
+      const hasQuery = image.includes('?');
+      setSrc(`${image}${hasQuery ? '&' : '?'}t=${Date.now()}`);
+    } else {
+      setSrc("");
+    }
   }, [image]);
 
   const showContextMenu = (e) => {
@@ -114,17 +120,16 @@ function Avatar({ type, image, setImage, defaultImage = "", isGroup = false }) {
             onFocus={() => setHover(true)}
             onBlur={() => setHover(false)}
           >
-            {/* Overlay: always clickable for accessibility if setImage defined */}
-            {setImage && (
+            {setImage && !isLoading && (
               <button
                 type="button"
                 tabIndex={-1}
                 className={`
-                  absolute inset-0 z-10 flex items-center justify-center flex-col text-center gap-1
-                  rounded-full bg-ancient-bg-medium/80 backdrop-blur-sm border-2 border-ancient-icon-glow shadow-lg
-                  transition-opacity duration-300
-                  ${hover ? "opacity-100 visible" : "opacity-0 invisible"}
-                `}
+                    absolute inset-0 z-10 flex items-center justify-center flex-col text-center gap-1
+                    rounded-full bg-ancient-bg-medium/80 backdrop-blur-sm border-2 border-ancient-icon-glow shadow-lg
+                    transition-opacity duration-300
+                    ${hover ? "opacity-100 visible" : "opacity-0 invisible"}
+                  `}
                 onClick={showContextMenu}
                 aria-label="Change photo"
               >
@@ -132,6 +137,11 @@ function Avatar({ type, image, setImage, defaultImage = "", isGroup = false }) {
                 <span className="text-ancient-text-light text-base sm:text-lg font-bold z-20 leading-tight">Change photo</span>
                 <FaMagic className="hidden sm:block absolute bottom-3 right-4 text-2xl sm:text-4xl text-ancient-icon-glow opacity-80 animate-spin-slow-reverse" />
               </button>
+            )}
+            {isLoading && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center rounded-full bg-ancient-bg-dark/70 backdrop-blur-sm">
+                <div className="w-10 h-10 border-4 border-ancient-icon-glow border-t-transparent rounded-full animate-spin"></div>
+              </div>
             )}
             {/* Main Avatar Image */}
             <div className={`relative z-0 ${sizeClasses.xl} flex items-center justify-center overflow-hidden rounded-full border-4 border-ancient-icon-glow shadow-xl`}>

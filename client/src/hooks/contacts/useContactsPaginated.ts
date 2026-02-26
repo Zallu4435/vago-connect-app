@@ -23,7 +23,7 @@ export function useContactsPaginated(userId?: string, opts: Options = {}): UseIn
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage?.nextCursor ?? null,
     queryFn: async ({ pageParam }) => {
-      const data = await MessageService.getInitialContacts(Number(userId!), {
+      const data = await MessageService.getInitialContacts({
         limit,
         q,
         cursor: pageParam ? Number(pageParam) : undefined
@@ -62,6 +62,8 @@ export function useContactsPaginated(userId?: string, opts: Options = {}): UseIn
             participants: u.participants,
             conversationId: row?.conversationId,
             isGroup,
+            isBlocked: Boolean(u?.isBlocked),
+            blockedBy: Boolean(u?.blockedBy),
             isPinned: Boolean(ps?.isPinned),
             pinOrder: typeof ps?.pinOrder === 'number' ? ps.pinOrder : 0,
             isSelf: !isGroup && String(u.id) === String(userId),

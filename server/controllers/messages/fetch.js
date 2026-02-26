@@ -4,7 +4,8 @@ import { MessageMapper } from "../../utils/mappers/MessageMapper.js";
 
 export const getMessages = async (req, res, next) => {
   try {
-    const { from, to } = req.params;
+    const { to } = req.params;
+    const from = req.user.userId;
     const isGroup = req.query.isGroup === 'true';
 
     // Query params
@@ -33,8 +34,7 @@ export const getMessages = async (req, res, next) => {
 
 export const getInitialContactswithMessages = async (req, res, next) => {
   try {
-    const { from } = req.params;
-    const userId = Number(from);
+    const userId = Number(req.user.userId);
     const prisma = getPrismaInstance();
 
     // Pagination: limit, cursor (participant id). Order by participant id desc for stability.
@@ -88,7 +88,31 @@ export const getInitialContactswithMessages = async (req, res, next) => {
       page = participants;
     }
 
-    let result = page.map((p) => MessageMapper.toConversationListItem(p, userId));
+    const blockedRecords = await prisma.blockedUser.findMany({
+      where: {
+        OR: [{ blockerId: userId }, { blockedId: userId }]
+      },
+      select: { blockerId: true, blockedId: true }
+    });
+
+    const blockedThem = new Set();
+    const blockedByThem = new Set();
+
+    blockedRecords.forEach(r => {
+      // I blocked them
+      if (r.blockerId === userId) blockedThem.add(r.blockedId);
+      // They blocked me
+      if (r.blockedId === userId) blockedByThem.add(r.blockerId);
+    });
+
+    let result = page.map((p) => {
+      const mapped = MessageMapper.toConversationListItem(p, userId);
+      if (mapped.type === 'direct' && mapped.user) {
+        mapped.user.isBlocked = blockedThem.has(mapped.user.id);
+        mapped.user.blockedBy = blockedByThem.has(mapped.user.id);
+      }
+      return mapped;
+    });
 
     if (q) {
       const term = q.toLowerCase();
@@ -128,6 +152,10 @@ export const getCallHistory = async (req, res, next) => {
 
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
     const dateQuery = typeof req.query.date === 'string' ? req.query.date.trim() : '';
+
+    const rawLimit = Number(req.query.limit);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 30;
+    const cursorId = req.query.cursor ? Number(req.query.cursor) : undefined;
 
     const whereClause = {
       type: "call",
@@ -186,12 +214,21 @@ export const getCallHistory = async (req, res, next) => {
           }
         }
       },
-      take: 100 // Limit history slightly for performance
+      take: limit + 1,
+      ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {})
     });
 
-    const calls = rawCalls.map(msg => MessageMapper.toCallHistoryItem(msg));
+    let nextCursor = null;
+    let page = rawCalls;
+    if (rawCalls.length > limit) {
+      const nextItem = rawCalls.pop();
+      nextCursor = nextItem?.id ? String(nextItem.id) : null;
+      page = rawCalls;
+    }
 
-    return res.status(200).json({ message: "Call history fetched", status: true, calls });
+    const calls = page.map(msg => MessageMapper.toCallHistoryItem(msg));
+
+    return res.status(200).json({ message: "Call history fetched", status: true, calls, nextCursor });
   } catch (error) {
     next(error);
   }

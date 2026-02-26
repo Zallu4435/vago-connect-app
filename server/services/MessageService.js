@@ -14,7 +14,10 @@ import { SocketEmitter } from "../utils/SocketEmitter.js";
 export class MessageService {
     static async addMessage({ content, from, to, type = "text", replyToMessageId, isGroup, recipientOnline }) {
         const prisma = getPrismaInstance();
-        const blocked = await isBlockedBetweenUsers(prisma, from, to);
+        let blocked = false;
+        if (!isGroup) {
+            blocked = await isBlockedBetweenUsers(prisma, from, to);
+        }
         if (blocked) throw Object.assign(new Error("Cannot send message. User is blocked."), { status: 403 });
 
         const convo = await resolveConversation(prisma, from, to, isGroup);
@@ -30,6 +33,11 @@ export class MessageService {
                 replyToMessageId: replyData.replyToMessageId,
                 quotedMessage: replyData.quotedMessage,
             },
+        });
+
+        await prisma.conversationParticipant.updateMany({
+            where: { conversationId: convo.id, userId: { not: Number(from) } },
+            data: { unreadCount: { increment: 1 } }
         });
 
         await unhideConversationParticipants(prisma, convo.id);
@@ -57,7 +65,10 @@ export class MessageService {
         const contentUrl = cld.secure_url;
 
         try {
-            const blocked = await isBlockedBetweenUsers(prisma, from, to);
+            let blocked = false;
+            if (!isGroup) {
+                blocked = await isBlockedBetweenUsers(prisma, from, to);
+            }
             if (blocked) throw Object.assign(new Error("Cannot send message. User is blocked."), { status: 403 });
 
             const convo = await resolveConversation(prisma, from, to, isGroup);
@@ -78,6 +89,12 @@ export class MessageService {
             });
 
             try { await prisma.mediaFile.create({ data: buildMediaFileData(newMessage.id, cld, file) }); } catch (_) { }
+
+            await prisma.conversationParticipant.updateMany({
+                where: { conversationId: convo.id, userId: { not: Number(from) } },
+                data: { unreadCount: { increment: 1 } }
+            });
+
             await unhideConversationParticipants(prisma, convo.id);
 
             return { convo, message: newMessage };
@@ -147,6 +164,11 @@ export class MessageService {
             if (pending.length) {
                 await prisma.message.updateMany({ where: { id: { in: pending } }, data: { status: 'read' } });
                 unreadMessages = pending;
+
+                await prisma.conversationParticipant.updateMany({
+                    where: { conversationId: convo.id, userId: Number(from) },
+                    data: { unreadCount: 0 }
+                });
 
                 SocketEmitter.emitToUser(otherUserId, 'messages-read', {
                     conversationId: convo.id,
@@ -478,7 +500,7 @@ export class MessageService {
         return { id: updated.id, status };
     }
 
-    static async searchMessages({ conversationId, userId, q }) {
+    static async searchMessages({ conversationId, userId, q, limit = 30, cursorId }) {
         const prisma = getPrismaInstance();
 
         if (!conversationId) throw Object.assign(new Error("Invalid conversation id"), { status: 400 });
@@ -497,15 +519,13 @@ export class MessageService {
             return [];
         }
 
-        const messages = await prisma.message.findMany({
+        const rows = await prisma.message.findMany({
             where: {
                 conversationId,
                 isSystemMessage: false,
                 ...(clearedAt ? { createdAt: { gt: clearedAt } } : {}),
                 NOT: {
-                    deletedBy: {
-                        array_contains: userId,
-                    },
+                    deletedBy: { array_contains: userId },
                 },
                 OR: [
                     { content: { contains: q, mode: 'insensitive' } },
@@ -514,12 +534,21 @@ export class MessageService {
                 ]
             },
             orderBy: { createdAt: 'desc' },
-            take: 100,
+            take: limit + 1,
+            ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
             include: {
                 sender: { select: { id: true, name: true, profileImage: true } },
             }
         });
 
-        return messages;
+        let nextCursor = null;
+        let messages = rows;
+        if (rows.length > limit) {
+            const nextItem = rows.pop();
+            nextCursor = nextItem?.id ? String(nextItem.id) : null;
+            messages = rows;
+        }
+
+        return { messages, nextCursor };
     }
 }

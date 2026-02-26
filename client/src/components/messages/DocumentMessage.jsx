@@ -27,6 +27,7 @@ function DocumentMessage({ message, isIncoming }) {
   const ext = getFileExtension(fileName);
   const colorClass = getExtensionColor(ext);
   const [showPreview, setShowPreview] = React.useState(false);
+  const [isDownloading, setIsDownloading] = React.useState(false);
 
 
 
@@ -95,11 +96,11 @@ function DocumentMessage({ message, isIncoming }) {
             >
               <MdInsertDriveFile className="text-2xl sm:text-3xl text-ancient-icon-glow" />
             </div>
-            {fileExt && (
+            {ext && (
               <span
-                className={`absolute -bottom-1 -right-1 text-[7px] sm:text-[8px] font-bold px-1 py-[2px] rounded leading-none shadow ${extColor(fileExt)}`}
+                className={`absolute -bottom-1 -right-1 text-[7px] sm:text-[8px] font-bold px-1 py-[2px] rounded leading-none shadow ${colorClass}`}
               >
-                {fileExt}
+                {ext}
               </span>
             )}
           </div>
@@ -136,13 +137,21 @@ function DocumentMessage({ message, isIncoming }) {
 
           {/* Download button — visible on hover */}
           <button
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              downloadMedia(fileUrl, fileName);
+              if (isDownloading) return;
+              setIsDownloading(true);
+              try {
+                await downloadMedia(fileUrl, fileName);
+              } finally {
+                setIsDownloading(false);
+              }
             }}
+            disabled={isDownloading}
             className={`
               flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-              opacity-0 group-hover:opacity-100 transition-all duration-200
+              transition-all duration-200
+              ${isDownloading ? "opacity-100 cursor-wait" : "opacity-0 group-hover:opacity-100 cursor-pointer"}
               ${isIncoming
                 ? "bg-ancient-icon-glow/15 hover:bg-ancient-icon-glow/30 text-ancient-icon-glow"
                 : "bg-ancient-bg-dark/30 hover:bg-ancient-bg-dark/50 text-ancient-icon-glow"
@@ -150,7 +159,14 @@ function DocumentMessage({ message, isIncoming }) {
             `}
             aria-label="Download document"
           >
-            <MdDownload className="text-base sm:text-lg" />
+            {isDownloading ? (
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+            ) : (
+              <MdDownload className="text-base sm:text-lg" />
+            )}
           </button>
         </div>
 

@@ -43,7 +43,7 @@ export class MessageMapper {
             lastMessage: lastMsg ? {
                 id: lastMsg.id,
                 type: lastMsg.type,
-                message: lastMsg.type === 'text' ? lastMsg.content : '',
+                message: (lastMsg.type === 'text' || lastMsg.type === 'call') ? lastMsg.content : '',
                 status: lastMsg.status,
                 timestamp: lastMsg.createdAt,
                 senderId: lastMsg.senderId,

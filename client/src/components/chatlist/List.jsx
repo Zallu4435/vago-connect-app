@@ -7,6 +7,7 @@ import LoadingSpinner from "@/components/common/LoadingSpinner";
 import ErrorMessage from "@/components/common/ErrorMessage";
 import EmptyState from "@/components/common/EmptyState";
 import Button from "@/components/common/Button";
+import { useInfiniteScroll } from "@/hooks/ui/useInfiniteScroll";
 
 function List() {
   const userInfo = useAuthStore((s) => s.userInfo);
@@ -22,7 +23,12 @@ function List() {
     fetchNextPage,
   } = useContactsPaginated(userInfo?.id, { limit: 30, q: (contactsSearch || '').trim() });
 
-  const sentinelRef = useRef(null);
+  const sentinelRef = useInfiniteScroll({
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    fetchNextPage,
+  });
 
   const contacts = useMemo(() => {
     const pages = data?.pages || [];
@@ -50,22 +56,6 @@ function List() {
       return name.includes(term) || msg.includes(term);
     });
   }, [contacts, contactsSearch]);
-
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage) return;
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver((entries) => {
-      const e = entries[0];
-      if (e.isIntersecting) {
-        fetchNextPage();
-      }
-    }, { rootMargin: '200px' });
-    obs.observe(el);
-    return () => {
-      obs.disconnect();
-    };
-  }, [hasNextPage, fetchNextPage, isFetchingNextPage]);
 
   let content = null;
 

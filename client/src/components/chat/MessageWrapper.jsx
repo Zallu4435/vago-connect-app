@@ -29,9 +29,11 @@ function MessageWrapper({
     const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
     const senderAvatar = message?.sender?.profileImage || "/default_avatar.png";
     const isSelected = selectedIds?.includes(message.id);
-    const isCall = message.type === "call";
 
-    if (message.isSystemMessage) {
+    // Determine if it's a call by explicitly checking JSON content if type is missing, or type === 'call'
+    const isCall = message.type === "call" || (message.content && message.content.includes('"callType"'));
+
+    if (message.isSystemMessage && !isCall) {
         return <SystemMessage message={message} />;
     }
 
@@ -55,10 +57,10 @@ function MessageWrapper({
                 <DeletedMessage message={message} isIncoming={isIncoming} />
             ) : (
                 <>
-                    {message.type === "call" && (
+                    {isCall && (
                         <CallMessage message={message} isIncoming={isIncoming} />
                     )}
-                    {message.type === "text" && (
+                    {!isCall && message.type === "text" && (
                         <TextMessage message={message} isIncoming={isIncoming} />
                     )}
                     {message.type === "image" && (
@@ -70,7 +72,7 @@ function MessageWrapper({
                     {message.type === "video" && (
                         <VideoMessage message={message} isIncoming={isIncoming} />
                     )}
-                    {(message.type === "document" || (!['text', 'image', 'audio', 'video', 'location', 'voice', 'call'].includes(String(message.type || '')))) && (
+                    {!isCall && (message.type === "document" || (!['text', 'image', 'audio', 'video', 'location', 'voice', 'call'].includes(String(message.type || '')))) && (
                         <DocumentMessage message={message} isIncoming={isIncoming} />
                     )}
                 </>

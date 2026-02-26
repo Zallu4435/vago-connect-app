@@ -2,6 +2,7 @@
 import React from "react";
 import { FaCheck, FaTimes } from "react-icons/fa";
 import LoadingSpinner from "./LoadingSpinner";
+import { useKeyPress } from '@/hooks/ui/useKeyPress';
 
 export default function InlineEditor({
   value,
@@ -14,6 +15,10 @@ export default function InlineEditor({
   containerClassName = "",
   isSaving = false,
 }) {
+  useKeyPress("Escape", () => {
+    if (!isSaving) onCancel?.();
+  });
+
   return (
     <div className={`bg-ancient-bg-medium border border-ancient-border-stone rounded-lg p-2 flex items-center gap-2 shadow-xl animate-fade-in-up origin-bottom ${containerClassName}`}>
       <input
@@ -22,7 +27,6 @@ export default function InlineEditor({
         onChange={(e) => onChange?.(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !isSaving) onSave?.();
-          if (e.key === "Escape" && !isSaving) onCancel?.();
         }}
         placeholder={placeholder}
         autoFocus={autoFocus}

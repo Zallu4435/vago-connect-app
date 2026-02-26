@@ -57,7 +57,13 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           messages: typeof messages === "function" ? messages(state.messages) : messages,
         })),
-      addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+      addMessage: (message) => set((state) => {
+        // Prevent duplicate messages (especially from optimistic updates vs socket echo)
+        if (state.messages.some((m) => m.id === message.id)) {
+          return state;
+        }
+        return { messages: [...state.messages, message] };
+      }),
       toggleMessageSearch: () => set((state) => ({ messageSearch: !state.messageSearch })),
       setOnlineUsers: (users) => set({ onlineUsers: users }),
       addTypingUser: (userId) =>

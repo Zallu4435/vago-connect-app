@@ -3,7 +3,7 @@ import { useSocketStore } from '@/stores/socketStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { createSocketQuerySync } from '@/lib/socketQuerySync';
-import { upsertMessageInCache } from '@/lib/cacheHelpers';
+import { updateMessagesCache, upsertMessageInCache, updateContactProfileInCache, updateGroupProfileInCache } from '@/lib/cacheHelpers';
 import type { Message } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
 import { useRef } from 'react';
@@ -86,6 +86,54 @@ export function useMessageSocketHandlers() {
     s.on('message-reacted', onReacted);
     s.on('message-starred', onStarred);
     s.on('message-forwarded', onForwarded);
+
+    const onGroupUpdated = ({ conversation }: any) => {
+      if (!conversation?.id) return;
+      const current = useChatStore.getState().currentChatUser;
+      if (current && (current.id === conversation.id || (current as any).conversationId === conversation.id)) {
+        useChatStore.getState().setCurrentChatUser({
+          ...current,
+          name: conversation.groupName,
+          description: conversation.groupDescription,
+          profilePicture: conversation.groupIcon,
+          image: conversation.groupIcon,
+          groupName: conversation.groupName,
+          groupDescription: conversation.groupDescription,
+          groupIcon: conversation.groupIcon,
+        } as any);
+      }
+      updateGroupProfileInCache(qc, conversation.id, conversation);
+    };
+    s.off('group-updated', onGroupUpdated);
+    s.on('group-updated', onGroupUpdated);
+
+    const onProfileUpdated = ({ user }: any) => {
+      if (!user?.id) return;
+
+      // 1. If we are currently chatting with this user, update active chat header
+      const current = useChatStore.getState().currentChatUser;
+      if (current && current.id === user.id && !(current as any).conversationId) { // Not a group
+        useChatStore.getState().setCurrentChatUser({
+          ...current,
+          name: user.name,
+          about: user.about,
+          profilePicture: user.profileImage || user.image,
+          image: user.profileImage || user.image,
+        } as any);
+      }
+
+      // 2. If it's our OWN profile that someone updated from another session
+      const authStore = useAuthStore.getState();
+      if (authStore.userInfo?.id === user.id) {
+        authStore.setUserInfo({ ...authStore.userInfo, ...user } as any);
+      }
+
+      // 3. Force contact list and sidebar to re-render instantly instead of refetching
+      updateContactProfileInCache(qc, user.id, user);
+    };
+    s.off('profile-updated', onProfileUpdated);
+    s.on('profile-updated', onProfileUpdated);
+
     attachedRef.current = true;
 
     // ── message-sent: full DB-persisted message (call records, own sent messages) ──
@@ -132,6 +180,8 @@ export function useMessageSocketHandlers() {
       s.off('message-reacted', onReacted);
       s.off('message-starred', onStarred);
       s.off('message-forwarded', onForwarded);
+      s.off('group-updated', onGroupUpdated);
+      s.off('profile-updated', onProfileUpdated);
       attachedRef.current = false;
     };
   }, [socket, currentChatUser?.id, addMessage, socketSync, authUserId, qc]);

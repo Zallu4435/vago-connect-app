@@ -1,56 +1,11 @@
-/* ===== Utility animations and helpers ===== */
-/* Fade in up animation */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.6s ease-out;
-}
-
-/* Pulse light animation */
-@keyframes pulse-light {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.7;
-  }
-}
-
-.animate-pulse-light {
-  animation: pulse-light 3s ease-in-out infinite;
-}
-
-/* Slow spin animation */
-@keyframes spin-slow {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.animate-spin-slow {
-  animation: spin-slow 2s linear infinite;
-}
-
-/* Delay utility */
+/* ===== Utility helpers ===== */
+/* Animation delay utilities */
 .delay-500 {
   animation-delay: 500ms;
+}
+
+.delay-700 {
+  animation-delay: 700ms;
 }
 
 /* Safe area bottom padding */
@@ -69,20 +24,16 @@
 @tailwind components;
 @tailwind utilities;
 
-
-
 /* Custom scrollbar (vertical and horizontal) */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-
 .custom-scrollbar::-webkit-scrollbar-track {
   background: var(--ancient-bg-medium);
   border-radius: 10px;
 }
-
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: var(--ancient-border-stone);
@@ -90,42 +41,28 @@
   border: 2px solid var(--ancient-bg-medium);
 }
 
-
 /* Emoji Picker Ancient Theme Overrides */
 .EmojiPickerReact,
 .EmojiPickerReact.epr-dark-theme {
   --epr-bg-color: #292b30;
-  /* ancient-bg-medium */
   --epr-text-color: #e0e0e0;
-  /* ancient-text-light */
   --epr-category-label-bg-color: #1e2024;
-  /* ancient-bg-dark */
   --epr-picker-border-color: #4b4f57;
-  /* ancient-border-stone */
   --epr-hover-bg-color: #33363d;
-  /* ancient-input-bg */
   --epr-search-bg-color: #33363d;
-  /* ancient-input-bg */
   --epr-search-border-color: #444850;
-  /* ancient-input-border */
   --epr-search-placeholder-color: #a0a0a0;
-  /* ancient-text-muted */
   --epr-highlight-color: #4ade80;
-  /* ancient-icon-glow */
   --epr-scrollbar-color: #4b4f57;
-  /* ancient-border-stone */
-
 
   background-color: var(--epr-bg-color) !important;
   border: 1px solid var(--epr-picker-border-color) !important;
   color: var(--epr-text-color) !important;
 }
 
-
 .EmojiPickerReact .epr-body {
   background-color: var(--epr-bg-color) !important;
 }
-
 
 .EmojiPickerReact .epr-emoji-category-label {
   background-color: var(--epr-category-label-bg-color) !important;
@@ -133,61 +70,21 @@
   border-bottom: 1px solid var(--epr-picker-border-color) !important;
 }
 
-
 .EmojiPickerReact .epr-search-container input {
   background-color: var(--epr-search-bg-color) !important;
   color: var(--epr-text-color) !important;
   border: 1px solid var(--epr-search-border-color) !important;
 }
 
-
 .EmojiPickerReact .epr-emoji:hover,
 .EmojiPickerReact .epr-emoji[aria-selected="true"] {
   background-color: var(--epr-hover-bg-color) !important;
 }
 
-
 .EmojiPickerReact .epr-preview {
   background-color: var(--epr-bg-color) !important;
   border-top: 1px solid var(--epr-picker-border-color) !important;
 }
-
-
-/* Animations for simulated waves */
-@keyframes pulse-waves {
-  0% {
-    transform: scaleY(1);
-    opacity: 1;
-  }
-
-  50% {
-    transform: scaleY(1.2);
-    opacity: 0.8;
-  }
-
-  100% {
-    transform: scaleY(1);
-    opacity: 1;
-  }
-}
-
-
-.animate-pulse-waves div {
-  animation: pulse-waves 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes audio-wave {
-
-  0%,
-  100% {
-    transform: scaleY(0.2);
-  }
-
-  50% {
-    transform: scaleY(1);
-  }
-}
-
 
 /* Theme variables for plain CSS usage */
 :root {
@@ -205,64 +102,10 @@
   --ancient-warning-text: #ef4444;
 }
 
-
-/* Slide in up animation for bottom trays (e.g., CaptureAudio) */
-@keyframes slide-in-up {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-
-.animate-slide-in-up {
-  animation: slide-in-up 0.3s ease-out forwards;
-}
-
-
-/* Sidebar slide-in (from left) */
-@keyframes slide-in {
-  from {
-    transform: translateX(-100%);
-  }
-
-  to {
-    transform: translateX(0);
-  }
-}
-
-
-.animate-slide-in {
-  animation: slide-in 0.3s ease-out forwards;
-}
-
-
-/* Backdrop fade-in */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out forwards;
-}
-
-
 /* ── Modal body lock — page blur ── */
 /* When a modal is open, blur and dim the underlying page content.
    Only targets direct body children that are NOT our modal portal. */
-html[data-modal-open] body>*:not(#modal-portal) {
+html[data-modal-open] body > *:not(#modal-portal) {
   filter: blur(4px) brightness(0.7);
   transition: filter 0.2s ease;
   pointer-events: none;
@@ -271,26 +114,9 @@ html[data-modal-open] body>*:not(#modal-portal) {
 }
 
 /* Restore instantly when closed */
-html:not([data-modal-open]) body>*:not(#modal-portal) {
+html:not([data-modal-open]) body > *:not(#modal-portal) {
   filter: none;
   pointer-events: auto;
   user-select: auto;
   transition: filter 0.15s ease;
-}
-
-/* Zoom in animation for modal panels */
-@keyframes zoom-in {
-  from {
-    opacity: 0;
-    transform: scale(0.94);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.animate-zoom-in {
-  animation: zoom-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }

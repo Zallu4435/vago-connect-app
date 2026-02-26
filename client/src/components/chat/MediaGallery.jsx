@@ -9,6 +9,7 @@ import { MdClose } from "react-icons/md";
 import MediaPreviewGridItem from "./MediaPreviewGridItem";
 import MediaCarouselView from "./MediaCarouselView";
 import LoadingSpinner from "../common/LoadingSpinner";
+import { useInfiniteScroll } from "@/hooks/ui/useInfiniteScroll";
 
 // MAIN MediaGallery Component
 export default function MediaGallery({ open, onClose }) {
@@ -51,13 +52,16 @@ export default function MediaGallery({ open, onClose }) {
   }, [allMediaData]);
 
   const scrollRef = useRef(null);
-  const handleScroll = useCallback(() => {
-    if (!scrollRef.current || !hasNextPage || isFetchingNextPage) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    if (scrollHeight - scrollTop <= clientHeight * 1.5) {
-      fetchNextPage();
-    }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Use our new generic IntersectionObserver + onScroll custom hook!
+  useInfiniteScroll({
+    containerRef: scrollRef,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: allMediaLoading,
+    fetchNextPage,
+    rootMargin: '200px',
+  });
 
 
   const { downloadMedia, downloadProgress } = useDownloadMedia();
@@ -111,11 +115,9 @@ export default function MediaGallery({ open, onClose }) {
           </div>
         </div>
 
-        {/* Media Grid */}
         <div
           className="flex-grow p-4 overflow-y-auto custom-scrollbar min-h-[50vh]"
           ref={scrollRef}
-          onScroll={handleScroll}
         >
           {!convoId && (
             <div className="text-ancient-text-muted text-center text-sm p-4">

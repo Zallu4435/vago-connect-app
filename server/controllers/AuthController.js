@@ -37,8 +37,9 @@ export const getAllUser = async (req, res, next) => {
     const rawLimit = Number(req.query.limit);
     const cursorId = req.query.cursor ? Number(req.query.cursor) : undefined;
     const sort = req.query.sort === 'name_desc' ? 'desc' : 'asc';
+    const userId = req.query.userId ? Number(req.query.userId) : undefined;
 
-    const result = await UserService.getAllUser({ q, rawLimit, cursorId, sort });
+    const result = await UserService.getAllUser({ q, rawLimit, cursorId, sort, userId });
     return res.status(result.statusCode).json(result);
   } catch (error) {
     next(error);

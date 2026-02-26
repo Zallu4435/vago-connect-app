@@ -10,19 +10,14 @@ export class UserService {
         return data;
     }
 
-    static async getAllContactsPaginated(params: { q?: string; limit?: number; cursor?: number; sort?: string }) {
+    static async getAllContactsPaginated(params: { q?: string; limit?: number; cursor?: number; sort?: string; userId?: string }) {
         const { data } = await api.get(`${AUTH_PREFIX}/all-users`, { params });
         return data;
     }
 
-    static async blockUser(userId: string | number) {
-        const { data } = await api.post(`${USER_PREFIX}/block/${userId}`);
-        return data; // returns { message, isBlocked: true }
-    }
-
-    static async unblockUser(userId: string | number) {
-        const { data } = await api.delete(`${USER_PREFIX}/block/${userId}`);
-        return data; // returns { message, isBlocked: false }
+    static async toggleBlockUser(userId: string | number, isBlocked: boolean) {
+        const { data } = await api.put(`${USER_PREFIX}/${userId}/block`, { isBlocked });
+        return data;
     }
 
     static async reportUser(userId: string | number, params: { reason: string; description?: string; conversationId?: number; softDelete?: boolean }) {

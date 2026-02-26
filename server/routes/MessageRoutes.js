@@ -14,6 +14,7 @@ import {
   forwardMessages,
   starMessage,
   reactToMessage,
+  proxyDownload
 } from "../controllers/MessageController.js";
 import { verifyAccessToken } from "../middlewares/AuthMiddleware.js";
 import { memory, audioUpload, imageUpload, videoUpload } from "../middlewares/FileUploadMiddleware.js";
@@ -30,19 +31,20 @@ messageRouter.use("/chats", ChatRoutes);
 messageRouter.use("/calls", CallRoutes);
 
 // Core Message Interactions
-messageRouter.post("/add-message", verifyAccessToken, addMessage);
-messageRouter.get("/get-messages/:from/:to", verifyAccessToken, getMessages);
-messageRouter.post("/add-image", verifyAccessToken, imageUpload.single("image"), addImage);
+messageRouter.post("/", verifyAccessToken, addMessage);
+messageRouter.get("/contacts", verifyAccessToken, getInitialContactswithMessages);
+messageRouter.get("/:to", verifyAccessToken, getMessages);
+messageRouter.post("/image", verifyAccessToken, imageUpload.single("image"), addImage);
 messageRouter.post("/audio", verifyAccessToken, audioUpload.single("audio"), addAudio);
 messageRouter.post("/video", verifyAccessToken, videoUpload.single("video"), addVideo);
-messageRouter.post("/add-file", verifyAccessToken, memory.single("file"), addFile);
+messageRouter.post("/file", verifyAccessToken, memory.single("file"), addFile);
 messageRouter.post("/location", verifyAccessToken, addLocation);
-messageRouter.get("/get-initial-contacts/:from", verifyAccessToken, getInitialContactswithMessages);
-messageRouter.put("/update-status", verifyAccessToken, updateMessageStatus);
-messageRouter.patch("/:id/edit", verifyAccessToken, editMessage);
+messageRouter.patch("/status", verifyAccessToken, updateMessageStatus);
+messageRouter.patch("/:id", verifyAccessToken, editMessage);
 messageRouter.delete("/:id", verifyAccessToken, deleteMessage);
 messageRouter.post("/forward", verifyAccessToken, forwardMessages);
 messageRouter.post("/:id/star", verifyAccessToken, starMessage);
 messageRouter.post("/:id/react", verifyAccessToken, reactToMessage);
+messageRouter.get("/media/download", proxyDownload);
 
 export default messageRouter;

@@ -13,12 +13,11 @@ import { useDeleteChat, useClearChat } from '@/hooks/chat/useChatActions';
 import { useLeaveGroup } from '@/hooks/groups/useGroupActions';
 import { useBlockUser } from '@/hooks/contacts/useBlockUser';
 import ConfirmModal from "@/components/common/ConfirmModal";
-import { showToast } from "@/lib/toast";
 
 function ChatListItem({ data, isContactsPage = false }) {
   const userInfo = useAuthStore((s) => s.userInfo);
   const setCurrentChatUser = useChatStore((s) => s.setCurrentChatUser);
-  const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
+  const setActivePage = useChatStore((s) => s.setActivePage);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -29,7 +28,7 @@ function ChatListItem({ data, isContactsPage = false }) {
   const handleContactClick = () => {
     if (showDeleteConfirm || showClearConfirm || showBlockConfirm || showExitConfirm) return;
     setCurrentChatUser(data);
-    if (isContactsPage) setAllContactsPage(false);
+    if (isContactsPage) setActivePage("default");
   };
 
   const isSenderLast = Number(data?.senderId) === Number(userInfo?.id);
@@ -40,6 +39,16 @@ function ChatListItem({ data, isContactsPage = false }) {
 
   if (isContactsPage) {
     preview = data?.about || "Available";
+  } else if (data?.type === "call") {
+    try {
+      const p = JSON.parse(data?.message || "{}");
+      const icon = p.callType === "video" ? "📹" : "📞";
+      const dur = p.duration > 0 ? ` · ${Math.floor(p.duration / 60)}:${String(p.duration % 60).padStart(2, "0")}` : "";
+      if (p.status === "missed") preview = `${icon} Missed call`;
+      else if (p.status === "rejected") preview = `${icon} Declined`;
+      else if (p.status === "ended") preview = `${icon} ${p.callType === "video" ? "Video" : "Voice"} call${dur}`;
+      else preview = `${icon} ${p.callType === "video" ? "Video" : "Voice"} call`;
+    } catch { preview = "📞 Call"; }
   } else if (isSystemMsg) {
     // System messages (joined/left group) shown as italic text, no sender prefix
     preview = data?.message || "";
@@ -48,17 +57,6 @@ function ChatListItem({ data, isContactsPage = false }) {
     else if (data?.type === "video") preview = "🎬 Video";
     else if (data?.type === "audio" || data?.type === "voice") preview = "🎵 Voice message";
     else if (data?.type === "document") preview = "📄 Document";
-    else if (data?.type === "call") {
-      try {
-        const p = JSON.parse(data?.message || "{}");
-        const icon = p.callType === "video" ? "📹" : "📞";
-        const dur = p.duration > 0 ? ` · ${Math.floor(p.duration / 60)}:${String(p.duration % 60).padStart(2, "0")}` : "";
-        if (p.status === "missed") preview = `${icon} Missed call`;
-        else if (p.status === "rejected") preview = `${icon} Declined`;
-        else if (p.status === "ended") preview = `${icon} ${p.callType === "video" ? "Video" : "Voice"} call${dur}`;
-        else preview = `${icon} ${p.callType === "video" ? "Video" : "Voice"} call`;
-      } catch { preview = "📞 Call"; }
-    }
     else preview = data?.message || "No messages yet";
   }
 
@@ -140,7 +138,12 @@ function ChatListItem({ data, isContactsPage = false }) {
                 { label: "Clear Chat", onClick: onClear },
                 { label: "Delete", onClick: onDelete, danger: true },
                 // Hide Block for Groups and Self Chat
-                ...(data?.isGroup || data?.type === "group" || data?.isSelf ? [] : [{ label: "Block", onClick: onBlock, danger: true }]),
+                ...(data?.isGroup || data?.type === "group" || data?.isSelf ? [] : [{
+                  label: data?.isBlocked ? "Unblock" : "Block",
+                  onClick: onBlock,
+                  disabled: !data?.isBlocked && data?.blockedBy,
+                  danger: !data?.isBlocked
+                }]),
                 // Show Exit ONLY for Groups
                 ...(data?.isGroup || data?.type === "group" ? [{ label: "Exit Group", onClick: onExit, danger: true }] : []),
               ]}
@@ -220,15 +223,15 @@ function ChatListItem({ data, isContactsPage = false }) {
           const targetId = data?.id || data?.user?.id;
           if (!targetId) return;
           blockUser.mutate(
-            { userId: targetId, block: true },
+            { userId: targetId, block: !data?.isBlocked },
             { onSuccess: () => setShowBlockConfirm(false) }
           );
         }}
-        title={`Block ${displayName}?`}
-        description="Blocked contacts will no longer be able to call you or send you messages."
-        confirmText={blockUser.isPending ? "Blocking..." : "Block"}
+        title={`${data?.isBlocked ? 'Unblock' : 'Block'} ${displayName}?`}
+        description={data?.isBlocked ? "This contact will be able to call you or send you messages again." : "Blocked contacts will no longer be able to call you or send you messages."}
+        confirmText={blockUser.isPending ? (data?.isBlocked ? "Unblocking..." : "Blocking...") : (data?.isBlocked ? "Unblock" : "Block")}
         confirmLoading={blockUser.isPending}
-        variant="danger"
+        variant={data?.isBlocked ? "primary" : "danger"}
       />
 
       {/* Confirm: Exit Group */}

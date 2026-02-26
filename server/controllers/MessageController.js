@@ -13,5 +13,5 @@ export { deleteChatForMe } from "./chats/delete.js";
 export { archiveChat } from "./chats/archive.js";
 export { pinChat } from "./chats/pin.js";
 export { muteChat } from "./chats/mute.js";
-export { getChatMedia, downloadMedia, searchChatMedia } from "./chats/media.js";
+export { getChatMedia, downloadMedia, proxyDownload, searchChatMedia } from "./chats/media.js";
 export { createGroup, addGroupMembers, removeGroupMembers, updateGroupRole, updateGroupSettings, leaveGroup, deleteGroup } from "./chats/group.js";

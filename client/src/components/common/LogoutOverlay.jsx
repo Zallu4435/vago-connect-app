@@ -1,17 +1,22 @@
 "use client";
 import React from "react";
 import { IoLogOutOutline } from "react-icons/io5";
+import { useDelayUnmount } from '@/hooks/ui/useDelayUnmount';
 
 /**
  * Full-screen overlay shown during the logout transition.
  * Fades in over the app so users see feedback instead of a blank flash.
  */
 export default function LogoutOverlay({ visible }) {
-    if (!visible) return null;
+    const portalVisible = useDelayUnmount(visible, 200);
+
+    if (!portalVisible) return null;
+
+    const animClass = visible ? "animate-fade-in" : "animate-fade-out";
 
     return (
         <div
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-ancient-bg-dark/95 backdrop-blur-sm animate-fade-in"
+            className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-ancient-bg-dark/95 backdrop-blur-sm ${animClass}`}
             role="status"
             aria-live="polite"
             aria-label="Logging out"

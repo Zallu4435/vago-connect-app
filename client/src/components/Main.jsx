@@ -156,25 +156,17 @@ function Main() {
                 {/* Message Loading Error Placeholder */}
                 {/* ... */}
                 <Chat isOnline={isOnline} />
-                {/* Search panel overlays chat, if active */}
-                {messageSearch && (
-                  <div key="search-overlay" className="fixed inset-0 z-40 bg-black/40 backdrop-blur-lg animate-fade-in">
-                    <div className="max-w-2xl w-full mx-auto my-12 md:my-20">
-                      <SearchMessages />
-                    </div>
-                  </div>
-                )}
+                {/* Search panel overlays chat — AnimatedPanel handles mount/unmount */}
+                <SearchMessages open={messageSearch} />
               </div>
             ) : (
-              <div key="empty-state" className="flex flex-col flex-1 relative">
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <EmptyState
-                    icon={HiChatBubbleLeftRight}
-                    title="No chat selected"
-                    subtitle="Choose a conversation from the list to start chatting."
-                    layout="full"
-                  />
-                </div>
+              <div key="empty-state" className="flex flex-col flex-1 h-full items-center justify-center bg-ancient-bg-dark">
+                <EmptyState
+                  icon={HiChatBubbleLeftRight}
+                  title="No chat selected"
+                  subtitle="Choose a conversation from the list to start chatting."
+                  layout="full"
+                />
               </div>
             )}
           </div>

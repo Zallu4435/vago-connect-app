@@ -6,11 +6,13 @@ import { useAuthStore } from "@/stores/authStore";
 import { useUpdateProfile } from '@/hooks/auth/useUpdateProfile';
 import Avatar from "../common/Avatar";
 import { getAbsoluteUrl } from "@/lib/url";
+import AnimatedPanel from "@/components/common/AnimatedPanel";
 
-export default function ProfileView() {
+export default function ProfileView({ open = true }) {
     const setActivePage = useChatStore((s) => s.setActivePage);
     const userInfo = useAuthStore((s) => s.userInfo);
-    const { mutateAsync: updateProfile } = useUpdateProfile();
+    const updateProfileMutation = useUpdateProfile();
+    const updateProfile = updateProfileMutation.mutateAsync;
 
     const [image, setImage] = useState("");
 
@@ -46,11 +48,18 @@ export default function ProfileView() {
 
     const handleAvatarChange = async (base64Image) => {
         setImage(base64Image); // Update UI optimistic
-        await updateProfile({ userId: userInfo?.id, profileImage: base64Image });
+        try {
+            const data = await updateProfile({ userId: userInfo?.id, profileImage: base64Image });
+            if (data?.status && data?.user) {
+                setImage(getAbsoluteUrl(data.user.profileImage || data.user.image) || "");
+            }
+        } catch (e) {
+            if (userInfo) setImage(getAbsoluteUrl(userInfo.profileImage || userInfo.image) || "");
+        }
     };
 
     return (
-        <div className="h-full flex flex-col bg-ancient-bg-dark animate-slide-in">
+        <AnimatedPanel open={open} direction="left">
             {/* Header - Matched exactly to ChatListHeader */}
             <div className="
                 h-14 sm:h-16 px-4 sm:px-5 py-2 sm:py-3
@@ -69,9 +78,8 @@ export default function ProfileView() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center">
 
-                {/* Avatar Section */}
                 <div className="pt-8 pb-10 flex justify-center w-full">
-                    <Avatar type="xl" image={image} setImage={handleAvatarChange} />
+                    <Avatar type="xl" image={image} setImage={handleAvatarChange} isLoading={updateProfileMutation.isPending} />
                 </div>
 
                 {/* Info Fields Container */}
@@ -144,6 +152,6 @@ export default function ProfileView() {
 
                 </div>
             </div>
-        </div>
+        </AnimatedPanel>
     );
 }

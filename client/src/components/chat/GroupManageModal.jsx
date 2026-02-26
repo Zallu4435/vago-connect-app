@@ -18,6 +18,7 @@ import ThemedMemberListItem from './ThemedMemberListItem';
 import AddParticipantModal from './AddParticipantModal';
 import ConfirmModal from "@/components/common/ConfirmModal";
 import ModalHeader from "@/components/common/ModalHeader";
+import AnimatedPanel from "@/components/common/AnimatedPanel";
 
 
 
@@ -106,8 +107,8 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         showToast.success("Members added.");
         setShowAddParticipantsModal(false);
       },
-      onError: (err) => {
-        const errorMsg = err?.response?.data?.message || "Failed to add members.";
+      onError: () => {
+        const errorMsg = "Failed to add members.";
         showToast.error(errorMsg);
       },
     });
@@ -155,7 +156,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     // Promoting a member — no confirm needed
     updateRole.mutate({ groupId, userId, role }, {
       onSuccess: () => showToast.success("Member promoted to admin."),
-      onError: (err) => showToast.error(err?.response?.data?.message || "Failed to update role."),
+      onError: () => showToast.error("Failed to update role."),
     });
   };
 
@@ -166,8 +167,8 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         showToast.success("Admin demoted to member.");
         setConfirmDemote({ open: false, userId: null, memberName: "" });
       },
-      onError: (err) => {
-        showToast.error(err?.response?.data?.message || "Failed to demote admin.");
+      onError: () => {
+        showToast.error("Failed to demote admin.");
         setConfirmDemote({ open: false, userId: null, memberName: "" });
       },
     });
@@ -214,7 +215,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
   if (!open || !groupData) return null; // Ensure groupData is available
 
   return (
-    <div className="h-full w-full z-50 flex flex-col bg-ancient-bg-dark text-ancient-text-light animate-fade-in">
+    <AnimatedPanel open={open} direction="right">
       {/* Header */}
       <ModalHeader
         title="Group settings"
@@ -413,6 +414,6 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         confirmLoading={updateRole.isPending}
         variant="warning"
       />
-    </div>
+    </AnimatedPanel>
   );
 }

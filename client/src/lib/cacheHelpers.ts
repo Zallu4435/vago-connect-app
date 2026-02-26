@@ -75,3 +75,119 @@ export const upsertMessageInCache = (queryClient: QueryClient, message: any) => 
         return old;
     });
 };
+
+/**
+ * Updates a specific contact's profile information in all 'contacts' queries.
+ * Supports both paginated and flat-array cache structures.
+ */
+export const updateContactProfileInCache = (queryClient: QueryClient, userId: string | number, updatedData: any) => {
+    queryClient.setQueriesData({ queryKey: ['contacts'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+
+        const updateContact = (contact: any) => {
+            if (contact.id === String(userId)) {
+                return {
+                    ...contact,
+                    name: updatedData.name ?? contact.name,
+                    about: updatedData.about ?? contact.about,
+                    profilePicture: updatedData.profileImage || updatedData.image || contact.profilePicture,
+                };
+            }
+            return contact;
+        };
+
+        // Handle paginated queries
+        if (oldData.pages) {
+            return {
+                ...oldData,
+                pages: oldData.pages.map((page: any) => ({
+                    ...page,
+                    contacts: page.contacts?.map(updateContact),
+                })),
+            };
+        }
+
+        // Handle non-paginated array queries
+        if (Array.isArray(oldData)) {
+            return oldData.map(updateContact);
+        }
+
+        return oldData;
+    });
+};
+
+/**
+ * Updates a specific group's profile information in all 'contacts' queries and 'group' queries.
+ * Supports both paginated and flat-array cache structures.
+ */
+export const updateGroupProfileInCache = (queryClient: QueryClient, conversationId: string | number, updatedData: any) => {
+    // 1. Update contacts query instances
+    queryClient.setQueriesData({ queryKey: ['contacts'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+
+        const updateContact = (contact: any) => {
+            if (contact.conversationId && String(contact.conversationId) === String(conversationId)) {
+                return {
+                    ...contact,
+                    name: updatedData.groupName ?? contact.name,
+                    description: updatedData.groupDescription ?? contact.description,
+                    profilePicture: updatedData.groupIcon ?? contact.profilePicture,
+                    groupName: updatedData.groupName ?? contact.groupName,
+                    groupDescription: updatedData.groupDescription ?? contact.groupDescription,
+                    groupIcon: updatedData.groupIcon ?? contact.groupIcon,
+                };
+            }
+            return contact;
+        };
+
+        // Handle paginated queries
+        if (oldData.pages) {
+            return {
+                ...oldData,
+                pages: oldData.pages.map((page: any) => ({
+                    ...page,
+                    contacts: page.contacts?.map(updateContact),
+                })),
+            };
+        }
+
+        // Handle non-paginated array queries
+        if (Array.isArray(oldData)) {
+            return oldData.map(updateContact);
+        }
+
+        return oldData;
+    });
+
+    // 2. Update group specific query instances if they exist
+    queryClient.setQueriesData({ queryKey: ['group'] }, (oldGroupData: any) => {
+        if (!oldGroupData) return oldGroupData;
+
+        // Single group detail object
+        if (oldGroupData.id && String(oldGroupData.id) === String(conversationId)) {
+            return {
+                ...oldGroupData,
+                groupName: updatedData.groupName ?? oldGroupData.groupName,
+                groupDescription: updatedData.groupDescription ?? oldGroupData.groupDescription,
+                groupIcon: updatedData.groupIcon ?? oldGroupData.groupIcon,
+            };
+        }
+
+        // Arrays of groups (if any)
+        if (Array.isArray(oldGroupData)) {
+            return oldGroupData.map((g: any) => {
+                if (String(g.id) === String(conversationId)) {
+                    return {
+                        ...g,
+                        groupName: updatedData.groupName ?? g.groupName,
+                        groupDescription: updatedData.groupDescription ?? g.groupDescription,
+                        groupIcon: updatedData.groupIcon ?? g.groupIcon,
+                    };
+                }
+                return g;
+            });
+        }
+
+        return oldGroupData;
+    });
+};

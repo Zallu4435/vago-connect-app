@@ -209,3 +209,48 @@ export const downloadMedia = async (req, res, next) => {
     next(error);
   }
 };
+
+// GET /api/messages/media/proxy?url=<cloudinary_url>&filename=<name>
+export const proxyDownload = async (req, res, next) => {
+  try {
+    const targetUrl = req.query.url;
+    const fileName = req.query.filename || "download";
+
+    if (!targetUrl || !targetUrl.startsWith("http")) {
+      return res.status(400).send("Invalid URL provided for proxy download.");
+    }
+
+    // Server-side fetch bypasses CORS preflights
+    const response = await fetch(targetUrl);
+
+    if (!response.ok) {
+      return res.status(response.status).send("Failed to proxy media from upstream server.");
+    }
+
+    // Manually pass Cloudinary headers, but force it as an attachment
+    const contentType = response.headers.get("content-type") || "application/octet-stream";
+    res.setHeader("Content-Type", contentType);
+
+    // Force browser to native-download instead of opening in a new tab
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+    // Stream the readable response payload directly to the Express response to save RAM
+    if (response.body) {
+      // Node.js 18+ web stream compatibility with Express
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+      res.end();
+    } else {
+      // Fallback
+      const arrayBuffer = await response.arrayBuffer();
+      res.end(Buffer.from(arrayBuffer));
+    }
+  } catch (error) {
+    console.error("Proxy Download Error:", error);
+    res.status(500).send("Internal Server Error during file proxying.");
+  }
+};

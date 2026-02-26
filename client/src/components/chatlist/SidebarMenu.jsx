@@ -5,6 +5,9 @@ import Avatar from "../common/Avatar";
 import { getAbsoluteUrl } from "@/lib/url";
 import { IoLogOutOutline } from "react-icons/io5";
 import { GiCrystalBall, GiMagicLamp, GiMoon } from "react-icons/gi";
+import AnimatedPanel from "@/components/common/AnimatedPanel";
+import { useDelayUnmount } from '@/hooks/ui/useDelayUnmount';
+import { useKeyPress } from '@/hooks/ui/useKeyPress';
 
 export default function SidebarMenu({
   open, onClose, user,
@@ -12,39 +15,31 @@ export default function SidebarMenu({
   isLoggingOut = false,
 }) {
   const [mounted, setMounted] = useState(false);
+  // Track whether portal itself should stay in DOM (for exit animation)
+  const portalVisible = useDelayUnmount(open, 300);
 
   useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
-    if (open) document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  useKeyPress('Escape', () => onClose?.(), open);
 
-  if (!mounted || !open) return null;
+  if (!mounted || !portalVisible) return null;
 
   const panel = (
     <div className="fixed inset-0 z-[9999]">
-      {/* Backdrop — covers full viewport, blocks interaction with chat */}
+      {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+        className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${open ? 'animate-fade-in' : 'animate-fade-out'}`}
         onClick={onClose}
         aria-label="Close menu"
         tabIndex={-1}
       />
 
-      {/* Slide-in panel */}
-      <aside
-        className="
-          absolute left-0 top-0 h-full w-[82vw] max-w-[320px] sm:max-w-[340px]
-          bg-ancient-bg-dark border-r border-ancient-border-stone shadow-2xl
-          flex flex-col animate-slide-in
-        "
-        style={{ maxHeight: "100svh", paddingBottom: "env(safe-area-inset-bottom,0px)" }}
-        tabIndex={0}
-        aria-modal="true"
-        role="dialog"
-        aria-label="Navigation menu"
+      {/* Animated slide panel */}
+      <AnimatedPanel
+        open={open}
+        direction="left"
+        duration={300}
+        className="absolute left-0 top-0 h-full w-[82vw] max-w-[320px] sm:max-w-[340px] bg-ancient-bg-dark border-r border-ancient-border-stone shadow-2xl"
       >
         {/* Header */}
         <div className="p-5 sm:p-6 bg-ancient-bg-medium border-b border-ancient-border-stone flex flex-col items-center">
@@ -87,8 +82,9 @@ export default function SidebarMenu({
                 border transition-all duration-200
                 ${isLoggingOut
                   ? "opacity-60 cursor-not-allowed border-red-800/40 bg-red-900/15"
-                  : "border-red-700/50 bg-red-900/10 hover:bg-red-800/25 hover:border-red-600/70 cursor-pointer active:scale-[0.98]"}
-              `}
+                  : "border-red-700/50 bg-red-900/10 hover:bg-red-800/25 hover:border-red-600/70 cursor-pointer active:scale-[0.98]"
+                }
+`}
               onClick={isLoggingOut ? undefined : onLogout}
               disabled={isLoggingOut}
               aria-label={isLoggingOut ? "Logging out…" : "Logout"}
@@ -109,10 +105,9 @@ export default function SidebarMenu({
               )}
             </button>
           </div>
-
         </nav>
-      </aside >
-    </div >
+      </AnimatedPanel>
+    </div>
   );
 
   return createPortal(panel, document.body);

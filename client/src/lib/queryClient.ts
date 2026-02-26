@@ -18,8 +18,16 @@ function handleQueryError(error: unknown) {
       // handled by auth interceptor elsewhere
       return;
     }
-    const message = err?.response?.data?.message || err?.message || 'Something went wrong';
-    showToast.error(String(message));
+    if (status === 403) {
+      showToast.error('You do not have permission to perform this action');
+      return;
+    }
+    if (status === 404) {
+      showToast.error('The requested resource was not found');
+      return;
+    }
+
+    showToast.error('An unexpected error occurred. Please try again');
   } catch {
     // Fallback to generic toast
     showToast.error('Something went wrong');

@@ -15,11 +15,11 @@ const router = Router();
 
 // /api/messages/groups
 router.post("/", verifyAccessToken, imageUpload.single("groupIcon"), createGroup);
-router.post("/:groupId/members/add", verifyAccessToken, addGroupMembers);
-router.post("/:groupId/members/remove", verifyAccessToken, removeGroupMembers);
-router.post("/:groupId/roles", verifyAccessToken, updateGroupRole);
-router.patch("/:groupId/settings", verifyAccessToken, imageUpload.single("groupIcon"), updateGroupSettings);
-router.post("/:groupId/leave", verifyAccessToken, leaveGroup);
+router.post("/:groupId/members", verifyAccessToken, addGroupMembers);
+router.delete("/:groupId/members", verifyAccessToken, removeGroupMembers);
+router.patch("/:groupId/roles", verifyAccessToken, updateGroupRole);
+router.patch("/:groupId", verifyAccessToken, imageUpload.single("groupIcon"), updateGroupSettings);
+router.delete("/:groupId/members/me", verifyAccessToken, leaveGroup);
 router.delete("/:groupId", verifyAccessToken, deleteGroup);
 
 export default router;

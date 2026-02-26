@@ -6,11 +6,7 @@ export function useBlockUser(): UseMutationResult<unknown, Error, { userId: numb
     const qc = useQueryClient();
     return useMutation<unknown, Error, { userId: number | string; block: boolean }>({
         mutationFn: async ({ userId, block }) => {
-            if (block) {
-                return await UserService.blockUser(userId);
-            } else {
-                return await UserService.unblockUser(userId);
-            }
+            return await UserService.toggleBlockUser(userId, block);
         },
         onSuccess: (data, variables) => {
             qc.invalidateQueries({ queryKey: ['contacts'] });

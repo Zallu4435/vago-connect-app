@@ -15,9 +15,11 @@ import { BsCalendarDate } from "react-icons/bs";
 import LoadingSpinner from "../common/LoadingSpinner";
 import EmptyState from "../common/EmptyState";
 import { formatTimestamp } from "@/utils/CalculateTime";
+import AnimatedPanel from "@/components/common/AnimatedPanel";
+import { useInfiniteScroll } from "@/hooks/ui/useInfiniteScroll";
 
 
-export default function CallsList() {
+export default function CallsList({ open = true }) {
   const setActivePage = useChatStore((s) => s.setActivePage);
   const userInfo = useAuthStore((s) => s.userInfo);
   const { setAudioCall, setVideoCall } = useCallStore();
@@ -33,16 +35,33 @@ export default function CallsList() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  const { data: calls = [], isLoading } = useCallHistory(debouncedSearchTerm, filterDate);
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useCallHistory(debouncedSearchTerm, filterDate);
+
+  const calls = React.useMemo(() => {
+    if (!data?.pages) return [];
+    return data.pages.flatMap((page) => page.calls || []);
+  }, [data]);
+
+  const sentinelRef = useInfiniteScroll({
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    fetchNextPage,
+  });
 
   const handleStartCall = (contact, type) => {
-    setActivePage("default");
     if (type === "video") setVideoCall(contact);
     else setAudioCall(contact);
   };
 
   return (
-    <div className="h-full flex flex-col bg-ancient-bg-dark animate-slide-in">
+    <AnimatedPanel open={open} direction="left">
       {/* 1. Header Row - Matched exactly to ChatListHeader */}
       <div className="
         h-14 sm:h-16 px-4 sm:px-5 py-2 sm:py-3
@@ -129,7 +148,7 @@ export default function CallsList() {
               return (
                 <div
                   key={callMsg.id}
-                  className="flex items-center gap-4 px-4 py-3 hover:bg-ancient-input-bg transition cursor-pointer border-b border-ancient-border-stone/20"
+                  className="flex items-center gap-4 px-4 py-3 border-b border-ancient-border-stone/20"
                 >
                   {/* Avatar */}
                   <Avatar type="md" image={avatarSrc} />
@@ -148,29 +167,21 @@ export default function CallsList() {
                   {/* Actions (Call back) */}
                   <div className="flex gap-4">
                     {/* Voice Call Button */}
-                    <button
-                      className="text-ancient-icon-inactive hover:text-ancient-icon-glow p-2 rounded-full hover:bg-ancient-bg-medium transition"
-                      onClick={(e) => { e.stopPropagation(); handleStartCall(contact, "audio"); }}
-                      title="Voice call"
-                    >
-                      <MdPhone className="text-[20px]" />
-                    </button>
+                    <MdPhone className="text-[20px] text-ancient-icon-inactive/50 cursor-not-allowed" />
                     {/* Video Call Button */}
-                    {/* Need to ensure contact obj has necessary fields for WebRTC */}
-                    <button
-                      className="text-ancient-icon-inactive hover:text-ancient-icon-glow p-2 rounded-full hover:bg-ancient-bg-medium transition"
-                      onClick={(e) => { e.stopPropagation(); handleStartCall(contact, "video"); }}
-                      title="Video call"
-                    >
-                      <MdVideocam className="text-[22px]" />
-                    </button>
+                    <MdVideocam className="text-[22px] text-ancient-icon-inactive/50 cursor-not-allowed" />
                   </div>
                 </div>
               );
             })}
+            {hasNextPage && (
+              <div ref={sentinelRef} className="w-full py-4 flex justify-center items-center">
+                {isFetchingNextPage ? <LoadingSpinner key="loading-more" label="Loading older calls..." /> : <div className="py-2" />}
+              </div>
+            )}
           </div>
         )}
       </div>
-    </div>
+    </AnimatedPanel>
   );
 }

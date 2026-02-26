@@ -13,7 +13,7 @@ function EmptyState({
     return (
         <div className={`
       flex flex-col items-center justify-center text-center
-      ${isFull ? 'min-h-[80vh] sm:min-h-[100vh] w-full bg-ancient-bg-dark border-ancient-border-stone border-b-4 border-b-ancient-icon-glow shadow-inner p-4 sm:p-8' : 'w-full h-full p-8'}
+      ${isFull ? 'h-full w-full bg-ancient-bg-dark border-ancient-border-stone shadow-inner p-4 sm:p-8' : 'w-full h-full p-8'}
       ${!isFull && className ? className : ''}
     `}>
             {Icon && (
@@ -23,7 +23,7 @@ function EmptyState({
         `}>
                     <Icon className={`
             select-none
-            ${isFull ? 'text-[150px] sm:text-[300px]' : 'text-2xl'}
+            ${isFull ? 'text-[80px] sm:text-[120px]' : 'text-2xl'}
           `} />
                 </div>
             )}
@@ -31,7 +31,7 @@ function EmptyState({
             {title && (
                 <h3 className={`
           select-none tracking-wider max-w-md
-          ${isFull ? 'text-ancient-text-light mt-6 sm:mt-8 text-xl sm:text-2xl font-semibold' : 'text-ancient-text-light text-lg font-medium mb-1'}
+          ${isFull ? 'text-ancient-text-light mt-4 sm:mt-6 text-xl sm:text-2xl font-semibold' : 'text-ancient-text-light text-lg font-medium mb-1'}
         `}>
                     {title}
                 </h3>

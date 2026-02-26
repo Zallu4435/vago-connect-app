@@ -13,14 +13,16 @@ import { getAbsoluteUrl } from "@/lib/url";
 import dynamic from "next/dynamic";
 import EmptyState from "@/components/common/EmptyState";
 import Button from "@/components/common/Button";
+import AnimatedPanel from "@/components/common/AnimatedPanel";
+import { useInfiniteScroll } from "@/hooks/ui/useInfiniteScroll";
 
 const GroupCreateModal = dynamic(() => import("./GroupCreateModal"), { ssr: false });
 
-function ContactsList() {
+function ContactsList({ open = true }) {
   const [search, setSearch] = useState("");
   const [localValue, setLocalValue] = useState("");
   const [showGroupCreate, setShowGroupCreate] = useState(false);
-  const setAllContactsPage = useChatStore((s) => s.setAllContactsPage);
+  const setActivePage = useChatStore((s) => s.setActivePage);
   const userInfo = useAuthStore((s) => s.userInfo);
 
   const {
@@ -31,8 +33,7 @@ function ContactsList() {
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useAllContactsPaginated({ q: search, limit: 50, sort: "name_asc" });
-  const sentinelRef = useRef(null);
+  } = useAllContactsPaginated({ q: search, limit: 50, sort: "name_asc", userId: userInfo?.id ? String(userInfo.id) : undefined });
 
   useEffect(() => {
     const id = setTimeout(() => setSearch(localValue.trim()), 300);
@@ -68,29 +69,24 @@ function ContactsList() {
     return out;
   }, [sections, search]);
 
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage || isLoading) return;
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver((entries) => {
-      const e = entries[0];
-      if (e.isIntersecting) fetchNextPage();
-    }, { rootMargin: "200px" });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [hasNextPage, fetchNextPage, isFetchingNextPage, isLoading]);
+  const sentinelRef = useInfiniteScroll({
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    fetchNextPage,
+  });
 
   const handleCloseGroupCreate = useCallback(() => setShowGroupCreate(false), []);
 
   return (
-    <div className="h-full flex flex-col bg-ancient-bg-dark text-ancient-text-light w-full">
+    <AnimatedPanel open={open} direction="left">
       {/* Header */}
       <div className="flex flex-col justify-end pb-3 px-3 sm:px-6 border-b border-ancient-border-stone shadow-md bg-ancient-bg-medium relative h-16 sm:h-20">
         <div className="flex items-center gap-4 sm:gap-6">
           <button
             className="text-ancient-text-light hover:text-ancient-icon-glow transition-colors duration-200"
             type="button"
-            onClick={() => setAllContactsPage(false)}
+            onClick={() => setActivePage("default")}
             aria-label="Back to Chats"
           >
             <BiArrowBack className="text-lg sm:text-2xl" />
@@ -193,7 +189,7 @@ function ContactsList() {
       {showGroupCreate && (
         <GroupCreateModal open={showGroupCreate} onClose={handleCloseGroupCreate} />
       )}
-    </div>
+    </AnimatedPanel>
   );
 }
 

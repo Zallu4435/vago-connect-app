@@ -22,7 +22,7 @@ export function useMessagesPaginated(userId?: string, peerId?: string, opts: Opt
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage?.nextCursor ?? null,
     queryFn: async ({ pageParam }) => {
-      const data = await MessageService.getMessages(Number(userId!), Number(peerId!), {
+      const data = await MessageService.getMessages(Number(peerId!), {
         limit,
         cursor: pageParam ? Number(pageParam) : undefined,
         direction: 'before',

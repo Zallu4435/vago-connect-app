@@ -14,32 +14,32 @@ module.exports = {
         "ancient-bg-dark": "#1e2024",
         "ancient-bg-medium": "#292b30",
         "ancient-border-stone": "#4b4f57",
-        
+
         "ancient-text-light": "#e0e0e0",
         "ancient-text-muted": "#a0a0a0",
-        
+
         // User message bubble (teal/greenish)
         "ancient-bubble-user": "#2A5C5A",         // Deep teal-green for sender bubbles
         "ancient-bubble-user-light": "#386a6a",   // Lighter shade for inner glow/effects if needed
-        
+
         // Other user message bubble (earthy gold/brown)
         "ancient-bubble-other": "#7A5C2A",        // Earthy gold-brown for recipient bubbles
         "ancient-bubble-other-light": "#9A7D3A",  // Lighter shade for inner glow/effects if needed
-        
+
         // Icon and interactive element green
         "ancient-icon-glow": "#4ade80",
         "ancient-icon-inactive": "#4D8F4D",       // Muted green for inactive icons
-        
+
         // Warning/Error elements (red and gold)
         "ancient-warning-bg": "#8A3D3D",          // Deep muted red for warning background
         "ancient-warning-text": "#F9C4C4",        // Pale red/pink for warning text
         "ancient-error-bg": "#5F3C2A",            // Dark earthy orange/brown for error background (if distinct from warning)
         "ancient-error-text": "#F9E4C4",          // Pale orange/gold for error text
-        
+
         // Input field
         "ancient-input-bg": "#33363d",
         "ancient-input-border": "#444850",
-        
+
         // --- Legacy colors (retained for backward compatibility, adjust if new theme overrides) ---
         secondary: "#8696a0",
         "teal-light": "#7ae3c3",
@@ -75,6 +75,9 @@ module.exports = {
         "fade-in": "fade-in 0.3s ease-out forwards",
         "zoom-in": "zoom-in 0.3s ease-out forwards",
         "zoom-in-fade-in": "zoom-in-fade-in 0.2s ease-out forwards",
+        "fade-out": "fade-out 0.2s ease-in forwards",
+        "zoom-out": "zoom-out 0.2s ease-in forwards",
+        "zoom-out-fade-out": "zoom-out-fade-out 0.2s ease-in forwards",
         // New light pulse/spin/title animations
         "pulse-light": "pulse-light 4s ease-in-out infinite",
         "fade-in-up": "fade-in-up 0.8s ease-out forwards",
@@ -86,6 +89,17 @@ module.exports = {
         "bounce-subtle": "bounce-subtle 2s ease-in-out infinite",
         // New slow floating animation
         "float-slow": "float-slow 6s ease-in-out infinite",
+        "slide-in-up": "slide-in-up 0.3s ease-out forwards",
+        "slide-in": "slide-in 0.3s ease-out forwards",
+        // AnimatedPanel — directional panel anims
+        "panel-in-left": "panel-in-left   0.3s cubic-bezier(0.22,1,0.36,1) forwards",
+        "panel-out-left": "panel-out-left  0.3s cubic-bezier(0.55,0,1,0.45) forwards",
+        "panel-in-right": "panel-in-right  0.3s cubic-bezier(0.22,1,0.36,1) forwards",
+        "panel-out-right": "panel-out-right 0.3s cubic-bezier(0.55,0,1,0.45) forwards",
+        "panel-in-up": "panel-in-up     0.3s cubic-bezier(0.22,1,0.36,1) forwards",
+        "panel-out-up": "panel-out-up    0.3s cubic-bezier(0.55,0,1,0.45) forwards",
+        "panel-in-down": "panel-in-down   0.3s cubic-bezier(0.22,1,0.36,1) forwards",
+        "panel-out-down": "panel-out-down  0.3s cubic-bezier(0.55,0,1,0.45) forwards",
       },
       keyframes: {
         blob: {
@@ -135,6 +149,18 @@ module.exports = {
           "0%": { transform: "scale(0.8)", opacity: "0" },
           "100%": { transform: "scale(1)", opacity: "1" },
         },
+        "fade-out": {
+          "0%": { opacity: "1" },
+          "100%": { opacity: "0" },
+        },
+        "zoom-out": {
+          "0%": { transform: "scale(1)", opacity: "1" },
+          "100%": { transform: "scale(0.9)", opacity: "0" },
+        },
+        "zoom-out-fade-out": {
+          "0%": { transform: "scale(1)", opacity: "1" },
+          "100%": { transform: "scale(0.8)", opacity: "0" },
+        },
         // New keyframes
         "pulse-light": {
           "0%, 100%": { opacity: "1", filter: "brightness(1)" },
@@ -172,11 +198,28 @@ module.exports = {
           "50%": { transform: "translateY(0)" },
           "75%": { transform: "translateY(-2px)" },
         },
+        "slide-in-up": {
+          "0%": { transform: "translateY(100%)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        "slide-in": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(0)" },
+        },
+        // AnimatedPanel directional keyframes
+        "panel-in-left": { "0%": { transform: "translateX(-100%)", opacity: "0" }, "100%": { transform: "translateX(0)", opacity: "1" } },
+        "panel-out-left": { "0%": { transform: "translateX(0)", opacity: "1" }, "100%": { transform: "translateX(-100%)", opacity: "0" } },
+        "panel-in-right": { "0%": { transform: "translateX(100%)", opacity: "0" }, "100%": { transform: "translateX(0)", opacity: "1" } },
+        "panel-out-right": { "0%": { transform: "translateX(0)", opacity: "1" }, "100%": { transform: "translateX(100%)", opacity: "0" } },
+        "panel-in-up": { "0%": { transform: "translateY(100%)", opacity: "0" }, "100%": { transform: "translateY(0)", opacity: "1" } },
+        "panel-out-up": { "0%": { transform: "translateY(0)", opacity: "1" }, "100%": { transform: "translateY(100%)", opacity: "0" } },
+        "panel-in-down": { "0%": { transform: "translateY(-100%)", opacity: "0" }, "100%": { transform: "translateY(0)", opacity: "1" } },
+        "panel-out-down": { "0%": { transform: "translateY(0)", opacity: "1" }, "100%": { transform: "translateY(-100%)", opacity: "0" } },
       },
     },
   },
   plugins: [
-    function({ addVariant }) {
+    function ({ addVariant }) {
       addVariant('has-checked', '&:has(input:checked)');
     },
   ],

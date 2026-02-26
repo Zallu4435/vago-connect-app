@@ -4,12 +4,12 @@ const MESSAGES_PREFIX = '/api/messages';
 
 export class MessageService {
     static async sendMessage(params: { from: number; to: number; isGroup?: boolean; content?: string; type?: string; replyToMessageId?: number; caption?: string; }) {
-        const { data } = await api.post(`${MESSAGES_PREFIX}/add-message`, params);
+        const { data } = await api.post(`${MESSAGES_PREFIX}`, params);
         return data;
     }
 
     static async sendImage(formData: FormData, onUploadProgress?: any) {
-        const { data } = await api.post(`${MESSAGES_PREFIX}/add-image`, formData, {
+        const { data } = await api.post(`${MESSAGES_PREFIX}/image`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress
         });
@@ -35,7 +35,7 @@ export class MessageService {
     }
 
     static async sendFile(formData: FormData, onUploadProgress?: any) {
-        const { data } = await api.post(`${MESSAGES_PREFIX}/add-file`, formData, {
+        const { data } = await api.post(`${MESSAGES_PREFIX}/file`, formData, {
             timeout: 60000,
             headers: { 'Content-Type': 'multipart/form-data' },
             onUploadProgress
@@ -48,13 +48,15 @@ export class MessageService {
         return data;
     }
 
-    static async getMessages(from: number, to: number, params?: { isGroup?: boolean; limit?: number; cursor?: number; direction?: 'before' | 'after'; markRead?: boolean }) {
-        const { data } = await api.get(`${MESSAGES_PREFIX}/get-messages/${from}/${to}`, { params });
+    static async getMessages(to: number, params?: { isGroup?: boolean; limit?: number; cursor?: number; direction?: 'before' | 'after'; markRead?: boolean }) {
+        // 'from' is now inferred on the backend via verifyAccessToken (req.userId)
+        const { data } = await api.get(`${MESSAGES_PREFIX}/${to}`, { params });
         return data;
     }
 
-    static async getInitialContacts(from: number, params?: { limit?: number; cursor?: number; isGroup?: boolean; q?: string; date?: string }) {
-        const { data } = await api.get(`${MESSAGES_PREFIX}/get-initial-contacts/${from}`, { params });
+    static async getInitialContacts(params?: { limit?: number; cursor?: number; isGroup?: boolean; q?: string; date?: string }) {
+        // 'from' is now inferred on the backend via verifyAccessToken (req.userId)
+        const { data } = await api.get(`${MESSAGES_PREFIX}/contacts`, { params });
         return data;
     }
 
@@ -88,10 +90,12 @@ export class MessageService {
         return data;
     }
 
-    static async searchMessages(chatId: number | string, q: string) {
+    static async searchMessages(chatId: number | string, q: string, limit?: number, cursor?: string | number) {
         const search = new URLSearchParams();
         if (q.trim()) search.set('q', q.trim());
-        const { data } = await api.get(`${MESSAGES_PREFIX}/${chatId}/search-messages?${search.toString()}`);
+        if (limit) search.set('limit', String(limit));
+        if (cursor) search.set('cursor', String(cursor));
+        const { data } = await api.get(`${MESSAGES_PREFIX}/chats/${chatId}/messages/search?${search.toString()}`);
         return data;
     }
 

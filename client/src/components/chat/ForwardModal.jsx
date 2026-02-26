@@ -38,7 +38,7 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
 
   // Flatten paginated pages into a single contacts array
   const contacts = useMemo(
-    () => data?.pages?.flatMap((p) => p.contacts ?? []) ?? [],
+    () => data?.pages?.flatMap((p) => p.contacts ?? [])?.filter(c => !c.isBlocked) ?? [],
     [data]
   );
 
@@ -78,8 +78,8 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
           showToast.success("Messages forwarded successfully");
           onClose?.();
         },
-        onError: (err) =>
-          showToast.error(err?.message || "Failed to forward messages"),
+        onError: () =>
+          showToast.error("Failed to forward messages"),
       }
     );
   };
@@ -283,7 +283,7 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
 
         {/* Footer — forward action */}
         {selectedConvoIds.length > 0 && (
-          <div className="flex-shrink-0 px-4 py-3 bg-ancient-bg-medium border-t border-ancient-border-stone/50 flex items-center justify-between animate-slide-in-up">
+          <div className="flex-shrink-0 px-4 py-3 bg-ancient-bg-medium border-t border-ancient-border-stone/50 flex items-center justify-between animate-panel-in-up">
             <div className="text-[13px] text-ancient-text-muted">
               <span className="text-ancient-text-light font-semibold">
                 {selectedConvoIds.length}

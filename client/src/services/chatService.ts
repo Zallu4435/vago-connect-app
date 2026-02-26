@@ -4,7 +4,7 @@ const CHATS_PREFIX = '/api/messages/chats';
 
 export class ChatService {
     static async clearChat(chatId: string | number) {
-        const { data } = await api.delete(`${CHATS_PREFIX}/${chatId}/clear`);
+        const { data } = await api.delete(`${CHATS_PREFIX}/${chatId}/messages`);
         return data;
     }
 
@@ -14,17 +14,17 @@ export class ChatService {
     }
 
     static async archiveChat(chatId: string | number, archived: boolean, keepArchived?: boolean) {
-        const { data } = await api.post(`${CHATS_PREFIX}/${chatId}/archive`, { archived, keepArchived });
+        const { data } = await api.patch(`${CHATS_PREFIX}/${chatId}/archive`, { archived, keepArchived });
         return data;
     }
 
     static async pinChat(chatId: string | number, pinned: boolean) {
-        const { data } = await api.post(`${CHATS_PREFIX}/${chatId}/pin`, { pinned });
+        const { data } = await api.patch(`${CHATS_PREFIX}/${chatId}/pin`, { pinned });
         return data;
     }
 
     static async muteChat(chatId: string | number, muted: boolean, until?: Date | null) {
-        const { data } = await api.post(`${CHATS_PREFIX}/${chatId}/mute`, { muted, until });
+        const { data } = await api.patch(`${CHATS_PREFIX}/${chatId}/mute`, { muted, until });
         return data;
     }
 

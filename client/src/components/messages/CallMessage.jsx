@@ -71,9 +71,18 @@ export default function CallMessage({ message, isIncoming }) {
         ? new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
         : null;
 
+    const bubbleClass = isIncoming
+        ? "bg-ancient-bubble-user text-ancient-text-light"
+        : "bg-ancient-bubble-other text-ancient-text-light";
+
     return (
         <div
-            className="flex items-center gap-3 px-0.5 py-0.5 min-w-[180px]"
+            className={`
+                message-bubble
+                ${isIncoming ? "message-bubble-incoming" : "message-bubble-outgoing"}
+                ${bubbleClass}
+                flex items-center gap-3 min-w-[180px] px-3 py-2
+            `}
             role="group"
             aria-label={title}
         >

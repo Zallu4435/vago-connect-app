@@ -45,14 +45,14 @@ export function useSocketConnection() {
     const s = socket.current;
     if (s && !lifecycleAttachedRef.current) {
       const onDisconnect = () => {
-        connectionToastId.current = showToast.loading('Severed connection to the ethereal plane...');
+        connectionToastId.current = showToast.loading('Severed connection to the Vago Connect...');
       };
       const onConnect = () => {
         if (connectionToastId.current) {
           showToast.dismiss(connectionToastId.current);
           connectionToastId.current = null;
         }
-        showToast.success('Reconnected to the ethereal plane!');
+        showToast.success('Reconnected to the Vago Connect!');
         try { if (userInfo?.id) s.emit('add-user', userInfo.id); } catch { }
       };
       const onConnectError = () => {
@@ -60,7 +60,7 @@ export function useSocketConnection() {
           showToast.dismiss(connectionToastId.current);
           connectionToastId.current = null;
         }
-        showToast.error('Failed to connect to the ethereal plane.');
+        showToast.error('Failed to connect to the Vago Connect.');
       };
 
       // Connection lifecycle

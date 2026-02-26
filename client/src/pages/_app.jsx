@@ -48,7 +48,6 @@ export default function App({ Component, pageProps }) {
         </div>
         <div className="mb-4 text-4xl font-bold font-serif drop-shadow-lg text-center tracking-wide">Chat App</div>
         <LoadingSpinner /> {/* Use your existing spinner, assuming it's okay */}
-        <div className="mt-4 text-ancient-text-muted text-lg animate-fade-in delay-700">Loading...</div>
       </div>
     );
   }

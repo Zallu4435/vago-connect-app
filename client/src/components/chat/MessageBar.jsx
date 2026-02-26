@@ -21,6 +21,7 @@ import ActionSheet from "@/components/common/ActionSheet";
 import MediaPreviewModal from "./MediaPreviewModal";
 import { useClickOutside } from '@/hooks/ui/useClickOutside';
 import { upsertMessageInCache } from '@/lib/cacheHelpers';
+import { useContacts } from '@/hooks/contacts/useContacts';
 
 const CaptureAudio = dynamic(() => import("../common/CaptureAudio"), { ssr: false });
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false, loading: () => null });
@@ -29,6 +30,12 @@ const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false, lo
 function MessageBar({ isOnline = true }) {
   const userInfo = useAuthStore((s) => s.userInfo);
   const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const { data: contacts = [] } = useContacts(userInfo?.id);
+  const contactEntry = contacts.find((c) => String(c?.id) === String(currentChatUser?.id));
+  const isBlocked = Boolean(contactEntry?.isBlocked);
+  const blockedBy = Boolean(contactEntry?.blockedBy);
+  const isChatBlocked = isBlocked || blockedBy;
+
   const messages = useChatStore((s) => s.messages);
   const setMessages = useChatStore((s) => s.setMessages);
   const replyTo = useChatStore((s) => s.replyTo);
@@ -125,6 +132,10 @@ function MessageBar({ isOnline = true }) {
 
   const sendMessage = useCallback(() => {
     if (!isOnline) return;
+    if (isChatBlocked) {
+      showToast.error("Cannot message a blocked contact");
+      return;
+    }
     const text = message.trim();
     if (!text || !currentChatUser?.id || !userInfo?.id) return;
 
@@ -358,11 +369,16 @@ function MessageBar({ isOnline = true }) {
 
       <div
         className="bg-ancient-bg-medium h-18 sm:h-20 px-3 sm:px-4 flex items-center gap-2 sm:gap-3 relative border-t border-ancient-border-stone/50"
-        onDrop={onDrop}
-        onDragOver={onDragOver}
+        onDrop={isChatBlocked ? undefined : onDrop}
+        onDragOver={isChatBlocked ? undefined : onDragOver}
       >
-        {/* Main Controls or Audio Recorder */}
-        {!showAudioRecorder ? (
+        {isChatBlocked ? (
+          <div className="flex-1 flex justify-center items-center text-ancient-text-muted text-sm sm:text-base font-medium">
+            {isBlocked
+              ? "You blocked this contact."
+              : "You cannot send messages to this contact."}
+          </div>
+        ) : !showAudioRecorder ? (
           <>
             <div className="flex items-center gap-0.5 sm:gap-1">
               {/* Emoji Button */}
@@ -378,10 +394,14 @@ function MessageBar({ isOnline = true }) {
               <div className="relative">
                 <button
                   ref={attachButtonRef}
-                  className="p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95 text-ancient-icon-inactive hover:text-white"
+                  type="button"
+                  disabled={isChatBlocked}
                   onClick={() => { setShowAttachMenu((v) => !v); setShowEmojiPicker(false); }}
+                  className={`
+                    p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95
+                    ${isChatBlocked ? "opacity-30 cursor-not-allowed text-ancient-icon-inactive" : "text-ancient-icon-inactive hover:text-white"}
+                  `}
                   title="Attach"
-                  disabled={!isOnline}
                 >
                   <MdAttachFile className="text-xl sm:text-2xl transform rotate-45" />
                 </button>
@@ -413,8 +433,13 @@ function MessageBar({ isOnline = true }) {
             <div className="flex-1 relative">
               <input
                 type="text"
-                placeholder="Type a message..."
-                className="w-full h-11 sm:h-12 bg-ancient-input-bg border border-ancient-input-border rounded-full px-4 sm:px-5 text-sm sm:text-base text-ancient-text-light placeholder:text-ancient-text-muted focus:outline-none focus:border-ancient-icon-glow transition-all shadow-inner"
+                placeholder={isChatBlocked ? "Cannot send messages to a blocked contact" : "Type a message..."}
+                className={`
+                  w-full h-11 sm:h-12 bg-ancient-input-bg border border-ancient-input-border rounded-full px-4 sm:px-5
+                  text-sm sm:text-base text-ancient-text-light placeholder:text-ancient-text-muted
+                  focus:outline-none focus:border-ancient-icon-glow transition-all shadow-inner
+                  ${isChatBlocked ? "opacity-50 cursor-not-allowed" : ""}
+                `}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onPaste={onPaste}

@@ -10,7 +10,7 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
     queryKey: userId ? queryKeys.contacts.byUser(userId) : ['contacts', ''] as const,
     enabled: Boolean(userId),
     queryFn: async () => {
-      const data = await MessageService.getInitialContacts(Number(userId!));
+      const data = await MessageService.getInitialContacts();
       const rows = (data?.data as any[]) || (data?.users as any[]) || [];
       // Map server response { user, lastMessage, participantState } to UI-friendly flat item
       const mapped = rows
@@ -50,6 +50,8 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
             isPinned: Boolean(ps?.isPinned),
             pinOrder: typeof ps?.pinOrder === 'number' ? ps.pinOrder : 0,
             isSelf: !isGroup && String(u.id) === String(userId),
+            isBlocked: Boolean(u?.isBlocked),
+            blockedBy: Boolean(u?.blockedBy),
             // fields used by ChatListItem for preview/time/unread
             type: m?.type,
             message: m?.message,

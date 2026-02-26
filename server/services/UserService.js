@@ -70,7 +70,7 @@ export class UserService {
         return { message: "Profile updated", status: true, user: updated, statusCode: 200 };
     }
 
-    static async getAllUser({ q, rawLimit, cursorId, sort }) {
+    static async getAllUser({ q, rawLimit, cursorId, sort, userId }) {
         const prisma = getPrismaInstance();
 
         const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 200) : 50;
@@ -106,9 +106,22 @@ export class UserService {
             list = rows;
         }
 
+        let blockedSet = new Set();
+        if (userId) {
+            const blockedRecords = await prisma.blockedUser.findMany({
+                where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+                select: { blockerId: true, blockedId: true }
+            });
+            blockedRecords.forEach(r => {
+                if (r.blockerId === userId) blockedSet.add(r.blockedId);
+                if (r.blockedId === userId) blockedSet.add(r.blockerId);
+            });
+        }
+
         const usersGroupByInitialLetters = list.reduce((acc, user) => {
             const initial = (user?.name || '').charAt(0).toUpperCase() || '#';
             if (!acc[initial]) acc[initial] = [];
+            user.isBlocked = blockedSet.has(user.id);
             acc[initial].push(user);
             return acc;
         }, {});

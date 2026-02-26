@@ -8,7 +8,7 @@ export function useMessages(userId?: string, peerId?: string): UseQueryResult<Me
     queryKey: userId && peerId ? queryKeys.messages.byChat(userId, peerId) : ['messages', '', ''] as const,
     enabled: Boolean(userId && peerId),
     queryFn: async () => {
-      const data = await MessageService.getMessages(Number(userId!), Number(peerId!));
+      const data = await MessageService.getMessages(Number(peerId!));
       const backend = (data?.messages as any[]) || [];
       const mapped: Message[] = backend.map((m) => ({
         id: Number(m.id),

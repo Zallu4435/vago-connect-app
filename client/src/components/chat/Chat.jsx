@@ -51,16 +51,18 @@ function Chat({ isOnline }) {
 
       </div>
 
-      {/* Right Sidebar: Group Management */}
-      {showGroupManage && (
-        <div className="w-full lg:w-[400px] xl:w-[450px] flex-shrink-0 h-full border-l border-ancient-border-stone bg-ancient-bg-dark z-40 animate-slide-in-right relative">
-          <GroupManageModal
-            open={showGroupManage}
-            onClose={() => setShowGroupManage(false)}
-            groupId={currentChatUser.id}
-          />
-        </div>
-      )}
+      {/* Right Sidebar: Group Management — always mounted so AnimatedPanel can play exit animation */}
+      <div className={`
+        ${showGroupManage ? 'w-full lg:w-[400px] xl:w-[450px]' : 'w-0'}
+        flex-shrink-0 h-full border-l border-ancient-border-stone bg-ancient-bg-dark z-40 relative
+        overflow-hidden transition-all duration-300
+      `}>
+        <GroupManageModal
+          open={showGroupManage}
+          onClose={() => setShowGroupManage(false)}
+          groupId={currentChatUser.id}
+        />
+      </div>
 
     </div>
   );

@@ -95,7 +95,7 @@ export default function GroupCreateModal({ open, onClose }) {
     <ModalShell open={open} onClose={onClose} maxWidth="max-w-lg">
       {/* Step 1: Add Participants */}
       {step === 1 && (
-        <div className="flex flex-col h-[60vh] sm:h-[70vh] animate-slide-in-right">
+        <div className="flex flex-col h-[60vh] sm:h-[70vh] animate-panel-in-right">
           {/* Header */}
           <div className="flex items-center justify-between p-3 sm:p-4 bg-ancient-bg-medium border-b border-ancient-border-stone">
             <button
@@ -192,7 +192,7 @@ export default function GroupCreateModal({ open, onClose }) {
 
       {/* Step 2: Group Details */}
       {step === 2 && (
-        <div className="flex flex-col h-[60vh] sm:h-[70vh] animate-slide-in-right">
+        <div className="flex flex-col h-[60vh] sm:h-[70vh] animate-panel-in-right">
           <div className="flex items-center p-3 sm:p-4 bg-ancient-bg-medium border-b border-ancient-border-stone">
             <button
               onClick={() => setStep(1)}

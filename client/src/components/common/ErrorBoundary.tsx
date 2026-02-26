@@ -44,7 +44,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
     if (!hasError) return children;
     if (fallbackUI) return fallbackUI;
-    const isDev = process.env.NODE_ENV === "development";
 
     return (
       <div className="
@@ -67,25 +66,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           </h1>
           <p className="text-base sm:text-lg text-ancient-text-muted mb-4">
             We&apos;re sorry for the inconvenience. The app ran into an unexpected error.
-          </p>
-
-          {isDev && error && (
-            <div className="
-              text-left bg-ancient-bg-dark/80 border border-ancient-border-stone
-              rounded-lg p-4 mb-4 overflow-auto max-h-60 sm:max-h-72
-              font-mono text-xs sm:text-sm text-ancient-danger-dark
-              whitespace-pre-wrap
-            ">
-              <p className="mb-2">{String(error?.message || error)}</p>
-              {errorInfo?.componentStack && (
-                <pre className="text-[10px] sm:text-xs text-ancient-text-muted whitespace-pre-wrap">
-                  {errorInfo.componentStack}
-                </pre>
-              )}
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
+          </p>          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6">
             <button
               onClick={this.handleReload}
               className="
@@ -115,8 +96,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
           <p className="text-xs sm:text-sm text-ancient-text-muted">
             If the problem persists, please contact support
           </p>
-        </div>
-      </div>
+        </div >
+      </div >
     );
   }
 }

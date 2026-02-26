@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useClickOutside } from '@/hooks/ui/useClickOutside';
 import { usePopoverPosition } from '@/hooks/ui/usePopoverPosition';
 import { createPortal } from "react-dom";
+import { useDelayUnmount } from '@/hooks/ui/useDelayUnmount';
 import { getPortalRoot } from "@/utils/domHelpers";
 
 
@@ -18,6 +19,7 @@ export default function ActionSheet({
 }) {
   const ref = useRef(null);
   const [portalRoot, setPortalRoot] = useState(null);
+  const portalVisible = useDelayUnmount(open, 200);
 
   // Initialize portal root
   useEffect(() => {
@@ -27,9 +29,10 @@ export default function ActionSheet({
   // Click and escape to dismiss, responsive for mobile/touch too
   useClickOutside(open, onClose, [ref, anchorRef]);
 
-  // Use Custom Positioning Hook
+  // Use Custom Positioning Hook 
+  // We compute position as long as it's visible in the portal, even while closing
   const coords = usePopoverPosition({
-    open,
+    open: portalVisible,
     anchorRef,
     popoverRef: ref,
     placement,
@@ -37,7 +40,9 @@ export default function ActionSheet({
     gap: 8
   });
 
-  if (!open || !portalRoot) return null;
+  if (!portalVisible || !portalRoot) return null;
+
+  const animClass = open ? "animate-zoom-in-fade-in" : "animate-zoom-out-fade-out";
 
   const menu = (
     <div
@@ -47,7 +52,7 @@ export default function ActionSheet({
         rounded-xl shadow-xl
         p-1 sm:p-2
         min-w-[12rem] max-w-[94vw] sm:min-w-[14rem] sm:max-w-[20rem]
-        animate-fade-in-down
+        ${animClass}
         ${className}
       `}
       style={{ top: coords.top, left: coords.left, visibility: coords.visibility, ...style }}

@@ -9,6 +9,7 @@ import {
 import { BsFillPlayFill, BsPauseFill } from "react-icons/bs";
 import Image from "next/image";
 import { useModalLock } from '@/hooks/ui/useModalLock';
+import { useKeyPress } from '@/hooks/ui/useKeyPress';
 import { getPortalRoot } from "@/utils/domHelpers";
 
 
@@ -68,21 +69,23 @@ export default function MediaCarouselView({
     }
   }, [currentMedia?.type]);
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape") { onClose(); return; }
-      if (mediaItems.length > 1) {
-        if (e.key === "ArrowRight") goToNext();
-        if (e.key === "ArrowLeft") goToPrev();
-      }
-      if (e.key === " " && (currentMedia?.type?.startsWith("video") || currentMedia?.type?.startsWith("audio"))) {
-        e.preventDefault();
-        handleTogglePlay();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [goToNext, goToPrev, onClose, currentMedia, mediaItems.length, handleTogglePlay]);
+  // Keyboard Navigation & Actions
+  useKeyPress("Escape", onClose);
+
+  useKeyPress("ArrowRight", () => {
+    if (mediaItems.length > 1) goToNext();
+  });
+
+  useKeyPress("ArrowLeft", () => {
+    if (mediaItems.length > 1) goToPrev();
+  });
+
+  useKeyPress(" ", (e) => {
+    if (currentMedia?.type?.startsWith("video") || currentMedia?.type?.startsWith("audio")) {
+      e.preventDefault();
+      handleTogglePlay();
+    }
+  });
 
   const DisplayIcon = useMemo(() => {
     switch (currentMedia?.type) {

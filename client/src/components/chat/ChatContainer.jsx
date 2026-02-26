@@ -4,8 +4,8 @@ import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
 import MessageWrapper from "./MessageWrapper";
 import ImageGridWrapper from "./ImageGridWrapper";
-import dynamic from "next/dynamic";
 import SelectMessagesBar from "./SelectMessagesBar";
+import { useInfiniteScroll } from "@/hooks/ui/useInfiniteScroll";
 import { showToast } from "@/lib/toast";
 
 const ForwardModal = dynamic(() => import("./ForwardModal"), { ssr: false });
@@ -16,6 +16,7 @@ import EmptyState from "@/components/common/EmptyState";
 import { MdArrowDownward, MdChat } from "react-icons/md";
 import DeleteMessageModal from "@/components/common/DeleteMessageModal";
 import { clusterMessages } from "@/utils/chatHelpers";
+import dynamic from "next/dynamic";
 
 function ChatContainer() {
   const currentChatUser = useChatStore((s) => s.currentChatUser);
@@ -27,8 +28,6 @@ function ChatContainer() {
   const setMessages = useChatStore((s) => s.setMessages);
   const messages = useChatStore((s) => s.messages);
   const containerRef = useRef(null);
-  const topSentinelRef = useRef(null);
-  const messagesEndRef = useRef(null);
 
   const delMutation = useDeleteMessage(); // Sentinel for auto-scroll
   const loadingOlderRef = useRef(false);
@@ -115,7 +114,7 @@ function ChatContainer() {
   // Auto-scroll to bottom using modern pattern with useLayoutEffect
   // This runs synchronously before browser paint, preventing flicker
   useLayoutEffect(() => {
-    if (!messagesEndRef.current) return;
+    if (!containerRef.current) return;
 
     const currentLen = Array.isArray(messages) ? messages.length : 0;
     const lastMessage = currentLen > 0 ? messages[currentLen - 1] : null;
@@ -131,10 +130,12 @@ function ChatContainer() {
 
     if (!shouldAutoScrollRef.current && !forceScroll) return;
 
-    // Smooth scroll to the sentinel element at the end of messages
-    messagesEndRef.current.scrollIntoView({
-      behavior: 'smooth',
-      block: 'end'
+    // Use requestAnimationFrame to ensure DOM is fully painted + layout calculated
+    // before we measure scrollHeight and force scroll.
+    requestAnimationFrame(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      }
     });
   }, [messages, userInfo?.id]);
 
@@ -142,13 +143,11 @@ function ChatContainer() {
   useEffect(() => {
     shouldAutoScrollRef.current = true;
 
-    if (messagesEndRef.current) {
-      // Instant scroll on chat change (no smooth behavior)
-      messagesEndRef.current.scrollIntoView({
-        behavior: 'instant',
-        block: 'end'
-      });
-    }
+    requestAnimationFrame(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollTop = containerRef.current.scrollHeight;
+      }
+    });
   }, [currentChatUser?.id]);
 
   const setReplyTo = useChatStore((s) => s.setReplyTo);
@@ -238,51 +237,36 @@ function ChatContainer() {
     return selectedMsgs.every(m => String(m.senderId) === String(userInfo?.id));
   }, [selectedIds, filteredMessages, userInfo?.id]);
 
-  const onScroll = useCallback((e) => {
-    const el = e.currentTarget;
-    if (!el) return;
-
-    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
-
-    // Show "Go to Bottom" button if user scrolled up more than 150px
-    const shouldShowButton = distanceFromBottom > 150;
-    setShowJump(shouldShowButton);
-
-    // Update auto-scroll behavior: only auto-scroll if user is near bottom
-    shouldAutoScrollRef.current = distanceFromBottom <= 150;
-  }, []);
-  useEffect(() => {
-    const el = topSentinelRef.current;
-    const scroller = containerRef.current;
-    if (!el || !scroller) return;
-
-    const obs = new IntersectionObserver((entries) => {
-      const e = entries[0];
-      if (e.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        loadingOlderRef.current = true;
-        fetchNextPage();
-      }
-    }, { root: scroller, threshold: 0.01, rootMargin: '100px 0px 0px 0px' });
-
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const topSentinelRef = useInfiniteScroll({
+    containerRef,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: loadingOlderRef.current, // keep the top-loading state
+    fetchNextPage: () => {
+      loadingOlderRef.current = true;
+      fetchNextPage();
+    },
+    rootMargin: '100px 0px 0px 0px',
+    onScroll: ({ distanceFromBottom }) => {
+      setShowJump(distanceFromBottom > 150);
+      shouldAutoScrollRef.current = distanceFromBottom <= 150;
+    }
+  });
   const jumpToLatest = useCallback(() => {
-    if (!messagesEndRef.current) return;
+    if (!containerRef.current) return;
 
     // Re-enable auto-scroll and scroll to bottom
     shouldAutoScrollRef.current = true;
-    messagesEndRef.current.scrollIntoView({
-      behavior: 'smooth',
-      block: 'end'
+    containerRef.current.scrollTo({
+      top: containerRef.current.scrollHeight,
+      behavior: 'smooth'
     });
   }, []);
 
   return (
     <div
       ref={containerRef}
-      onScroll={onScroll}
-      className="h-full w-full flex-1 relative overflow-auto pb-3 custom-scrollbar bg-transparent text-ancient-text-light"
+      className="h-full overflow-y-auto custom-scrollbar flex flex-col relative"
     >
       {/* Optional: floating background visuals */}
       <div className="bg-chat-background bg-fixed h-full w-full opacity-[0.04] fixed left-0 top-0 z-0 pointer-events-none"></div>
@@ -346,15 +330,21 @@ function ChatContainer() {
             // fallback to the custom closure logic.
             const clusteredBlocks = clusterMessages(filteredMessages);
 
-            return clusteredBlocks.map((clusterArray, idx) => {
+            return clusteredBlocks.map((clusterObj, idx) => {
+              const clusterArray = clusterObj?.messages;
+              if (!Array.isArray(clusterArray) || clusterArray.length === 0) return null;
+
               const anchorMessage = clusterArray[0];
+              if (!anchorMessage || typeof anchorMessage !== 'object') return null;
+
               const isIncoming = Number(anchorMessage.senderId) !== Number(userInfo?.id);
 
               // If it's a cluster of >1 eligible images, mount the Grid Wrapper
-              if (clusterArray.length > 1) {
+              const isAllImages = clusterArray.length > 1 && clusterArray.every(m => m.type === 'image');
+              if (isAllImages) {
                 return (
                   <ImageGridWrapper
-                    key={`cluster-${anchorMessage.id}`}
+                    key={`cluster-${anchorMessage.id || idx}`}
                     messagesArray={clusterArray}
                     isIncoming={isIncoming}
                     selectMode={selectMode}
@@ -367,11 +357,11 @@ function ChatContainer() {
                 );
               }
 
-              // Otherwise it maps exactly to the classic MessageWrapper for single elements
-              return (
+              // Otherwise it maps exactly to the classic MessageWrapper for individual elements
+              return clusterArray.map((msg, msgIdx) => (
                 <MessageWrapper
-                  key={anchorMessage.id}
-                  message={anchorMessage}
+                  key={msg.id || `msg-${idx}-${msgIdx}`}
+                  message={msg}
                   isIncoming={isIncoming}
                   selectMode={selectMode}
                   selectedIds={selectedIds}
@@ -379,13 +369,9 @@ function ChatContainer() {
                   onReply={handleReply}
                   onForward={handleForward}
                 />
-              );
+              ));
             });
           })()}
-
-          {/* Scroll sentinel - target for auto-scroll */}
-          <div ref={messagesEndRef} className="h-1" aria-hidden="true" />
-
 
         </div>
       </div>

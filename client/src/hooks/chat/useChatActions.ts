@@ -1,6 +1,7 @@
 import { useMutation, UseMutationResult, useQueryClient } from '@tanstack/react-query';
 import { ChatService } from '@/services/chatService';
 import { showToast } from '@/lib/toast';
+import { useChatStore } from '@/stores/chatStore';
 
 export function useClearChat(): UseMutationResult<unknown, Error, { chatId: number | string }> {
   const qc = useQueryClient();
@@ -11,6 +12,8 @@ export function useClearChat(): UseMutationResult<unknown, Error, { chatId: numb
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['messages'] });
       qc.invalidateQueries({ queryKey: ['contacts'] });
+      // The currently active chat UI reads from the Zustand store
+      useChatStore.getState().setMessages([]);
       showToast.success("Chat cleared successfully");
     },
   });
@@ -25,6 +28,8 @@ export function useDeleteChat(): UseMutationResult<unknown, Error, { chatId: num
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['messages'] });
       qc.invalidateQueries({ queryKey: ['contacts'] });
+      // The currently active chat UI reads from the Zustand store
+      useChatStore.getState().setMessages([]);
       showToast.success("Chat deleted successfully");
     },
   });

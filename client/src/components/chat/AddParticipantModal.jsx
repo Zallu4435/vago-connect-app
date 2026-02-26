@@ -5,7 +5,7 @@ import { useAllContactsPaginated } from '@/hooks/contacts/useAllContactsPaginate
 import ModalShell from "@/components/common/ModalShell";
 import ModalHeader from "@/components/common/ModalHeader";
 import ContactSearchList from "@/components/common/ContactSearchList";
-
+import { useInfiniteScroll } from "@/hooks/ui/useInfiniteScroll";
 import { useDebounce } from "@/hooks/ui/useDebounce";
 
 export default function AddParticipantModal({
@@ -17,7 +17,6 @@ export default function AddParticipantModal({
 }) {
   const [selectedAdd, setSelectedAdd] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const loadMoreRef = useRef(null); // sentinel for infinite scroll
 
   // 300ms debounced search sent to the backend
   const debouncedSearch = useDebounce(searchTerm, 300);
@@ -53,19 +52,13 @@ export default function AddParticipantModal({
   }, [data, existingMembers]);
 
   // Infinite scroll: observe sentinel element
-  useEffect(() => {
-    if (!loadMoreRef.current || !hasNextPage) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const loadMoreRef = useInfiniteScroll({
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    fetchNextPage,
+    rootMargin: "100px", // equivalent to threshold: 0.1 approximately
+  });
 
   const toggleSelection = useCallback(
     (uid) => {
