@@ -207,7 +207,7 @@ function MessageBar({ isOnline = true }) {
     // We optimistically added to cache, the message-sent listener will swap the tempId
     addToMessagesCache(optimisticMsg);
 
-  }, [isOnline, isChatBlocked, message, currentChatUser, userInfo, replyTo, editMessage, editMessageMutation, setMessages, addToMessagesCache, clearReplyTo, clearEditMessage, isTyping, socket]);
+  }, [isOnline, isChatBlocked, isLeft, message, currentChatUser, userInfo, replyTo, editMessage, editMessageMutation, setMessages, addToMessagesCache, clearReplyTo, clearEditMessage, isTyping, socket]);
 
   const handleFileSelect = useCallback((type) => {
     if (!isOnline) return;
