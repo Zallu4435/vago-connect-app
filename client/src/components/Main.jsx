@@ -61,6 +61,7 @@ function Main() {
   const [authPhotoURL, setAuthPhotoURL] = useState("");
 
   useEffect(() => {
+    if (!firebaseAuth) return;
     const unsub = onAuthStateChanged(firebaseAuth, (currentUser) => {
       if (!currentUser) {
         router.push("/login");
