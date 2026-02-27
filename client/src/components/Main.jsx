@@ -28,6 +28,7 @@ import { useCallSocketHandlers } from '@/hooks/calls/useCallSocketHandlers';
 import { useMessageSocketHandlers } from '@/hooks/websockets/useMessageSocketHandlers';
 import { usePresenceSocketHandlers } from '@/hooks/websockets/usePresenceSocketHandlers';
 import LoadingSpinner from "@/components/common/LoadingSpinner";
+import { useRenderLog } from "@/hooks/ui/useRenderLog";
 
 function Main() {
   const isOnline = useNetworkStatus();
@@ -35,12 +36,13 @@ function Main() {
   const setUserInfo = useAuthStore((s) => s.setUserInfo);
   const currentChatUser = useChatStore((s) => s.currentChatUser);
   const messageSearch = useChatStore((s) => s.messageSearch);
-
   const audioCall = useCallStore((s) => s.audioCall);
   const videoCall = useCallStore((s) => s.videoCall);
   // `calling` is true on the callee side when an incoming call is ringing
   const calling = useCallStore((s) => s.calling);
   const callAccepted = useCallStore((s) => s.callAccepted);
+
+  useRenderLog("Main", { isOnline, currentChatUser, messageSearch, audioCall, videoCall, calling, callAccepted });
 
   const router = useRouter();
   useSocketConnection();

@@ -9,14 +9,17 @@ export default function DeleteMessageModal({
     onClose,
     title = "Delete Message",
     description,
-    isPending = false,
+    isDeletingForMe = false,
+    isDeletingForEveryone = false,
     onDelete,
     showForEveryoneButton = false,
 }) {
     if (!open) return null;
 
+    const isAnyPending = isDeletingForMe || isDeletingForEveryone;
+
     return (
-        <ModalShell open={open} onClose={isPending ? () => { } : onClose} maxWidth="max-w-xs sm:max-w-sm">
+        <ModalShell open={open} onClose={isAnyPending ? () => { } : onClose} maxWidth="max-w-xs sm:max-w-sm">
             <div className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 border-b bg-red-900/30 border-red-800/60">
                 <FaTrashAlt className="text-red-400 text-xl sm:text-2xl" />
                 <h3 className="text-ancient-text-light text-base sm:text-lg font-bold">{title}</h3>
@@ -32,7 +35,8 @@ export default function DeleteMessageModal({
                 {showForEveryoneButton && (
                     <Button
                         onClick={() => onDelete("forEveryone")}
-                        isLoading={isPending}
+                        isLoading={isDeletingForEveryone}
+                        disabled={isDeletingForMe}
                         variant="danger"
                         className="bg-red-600 text-white hover:bg-red-500 border-none w-full min-h-[40px]"
                     >
@@ -41,7 +45,8 @@ export default function DeleteMessageModal({
                 )}
                 <Button
                     onClick={() => onDelete("forMe")}
-                    isLoading={isPending}
+                    isLoading={isDeletingForMe}
+                    disabled={isDeletingForEveryone}
                     variant="warning"
                     className="w-full min-h-[40px]"
                 >
@@ -49,7 +54,7 @@ export default function DeleteMessageModal({
                 </Button>
                 <Button
                     onClick={onClose}
-                    disabled={isPending}
+                    disabled={isAnyPending}
                     variant="ghost"
                     className="w-full border border-ancient-input-border text-ancient-text-light min-h-[40px] mt-1"
                 >

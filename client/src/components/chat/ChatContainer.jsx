@@ -9,7 +9,8 @@ import ImageGridWrapper from "./ImageGridWrapper";
 import SelectMessagesBar from "./SelectMessagesBar";
 import { useInfiniteScroll } from "@/hooks/ui/useInfiniteScroll";
 import { showToast } from "@/lib/toast";
-
+import Image from "next/image";
+import { useRenderLog } from "@/hooks/ui/useRenderLog";
 const ForwardModal = dynamic(() => import("./ForwardModal"), { ssr: false });
 import { useMessagesPaginated } from '@/hooks/messages/useMessagesPaginated';
 import { useDeleteMessage } from '@/hooks/messages/useDeleteMessage';
@@ -17,14 +18,22 @@ import LoadingSpinner from "@/components/common/LoadingSpinner";
 import EmptyState from "@/components/common/EmptyState";
 import { MdArrowDownward, MdChat } from "react-icons/md";
 import DeleteMessageModal from "@/components/common/DeleteMessageModal";
-import { clusterMessages } from "@/utils/chatHelpers";
+import { clusterMessages, isWithinDeletionWindow } from "@/utils/chatHelpers";
 import dynamic from "next/dynamic";
 
 function ChatContainer() {
   const currentChatUser = useChatStore((s) => s.currentChatUser);
   const userInfo = useAuthStore((s) => s.userInfo);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const selectMode = useChatStore((s) => s.selectMode);
+  const setSelectMode = useChatStore((s) => s.setSelectMode);
+  const selectedIds = useChatStore((s) => s.selectedIds);
+  const setSelectedIds = useChatStore((s) => s.setSelectedIds);
+  const isDeletingForMe = useChatStore((s) => s.isDeletingForMe);
+  const setIsDeletingForMe = useChatStore((s) => s.setIsDeletingForMe);
+  const isDeletingForEveryone = useChatStore((s) => s.isDeletingForEveryone);
+  const setIsDeletingForEveryone = useChatStore((s) => s.setIsDeletingForEveryone);
+
+
   const [showForward, setShowForward] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const setMessages = useChatStore((s) => s.setMessages);
@@ -146,10 +155,10 @@ function ChatContainer() {
       return ta - tb;
     });
 
-    return all.filter((m) => !isDeletedForUser(m, userInfo?.id));
-  }, [messages, pagesData, isDeletedForUser, userInfo?.id, currentChatUser?.id, currentChatUser?.conversationId, currentChatUser?.isGroup, currentChatUser?.type]);
+    return all;
+  }, [messages, pagesData, userInfo?.id, currentChatUser?.id, currentChatUser?.conversationId, currentChatUser?.isGroup, currentChatUser?.type]);
 
-
+  useRenderLog("ChatContainer", { filteredMessages, currentChatUser });
 
   // Scroll Anchoring: Preserve position when loading history from the top
   useLayoutEffect(() => {
@@ -231,8 +240,9 @@ function ChatContainer() {
     setShowForward(true);
   }, []);
   const toggleSelect = useCallback((id) => {
-    // Check if the message is already deleted
-    const message = filteredMessages.find(m => m.id === id);
+    const numId = Number(id);
+    // Check if the message is already deleted — use numeric comparison
+    const message = filteredMessages.find(m => Number(m.id) === numId);
     if (!message) return;
     if (message.isDeletedForEveryone || isDeletedForUser(message, userInfo?.id)) {
       showToast.error("Cannot select a deleted message");
@@ -243,20 +253,21 @@ function ChatContainer() {
     }
 
     setSelectedIds((prev) => {
-      const mid = Number(id);
-      if (prev.some(x => Number(x) === mid)) return prev.filter((x) => Number(x) !== mid);
-      if (prev.length >= 50) { // arbitrary higher limit for deletes/copy, but forward limits might apply elsewhere
+      let next;
+      if (prev.some(x => Number(x) === numId)) next = prev.filter((x) => Number(x) !== numId);
+      else if (prev.length >= 50) {
         showToast.info("You can select up to 50 messages at once");
         return prev;
       }
-      return [...prev, id];
+      else next = [...prev, numId];
+      return next;
     });
   }, [filteredMessages, isDeletedForUser, userInfo?.id]);
 
   const handleBulkCopy = useCallback(async () => {
     if (selectedIds.length === 0) return;
     const selectedMsgs = filteredMessages
-      .filter(m => selectedIds.includes(m.id))
+      .filter(m => selectedIds.some(x => Number(x) === Number(m.id)))
       .sort((a, b) => new Date(a.timestamp || a.createdAt || 0) - new Date(b.timestamp || b.createdAt || 0));
 
     const textToCopy = selectedMsgs
@@ -290,25 +301,42 @@ function ChatContainer() {
 
   const handleBulkDelete = useCallback(async (deleteType) => {
     if (selectedIds.length === 0) return;
+
+    if (deleteType === 'forMe') setIsDeletingForMe(true);
+    else setIsDeletingForEveryone(true);
+
     try {
-      await Promise.all(selectedIds.map(id => delMutation.mutateAsync({ id, deleteType })));
+      // SEQUENTIAL PROCESSING: To avoid saturating the database connection pool (P2028),
+      // we delete messages one by one with a tiny delay.
+      for (const id of selectedIds) {
+        await delMutation.mutateAsync({ id, deleteType });
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
       showToast.success(`Deleted ${selectedIds.length} messages`);
+      setShowDeleteConfirm(false);
+      setSelectMode(false);
+      setSelectedIds([]);
     } catch (e) {
       console.error("Bulk delete error", e);
       showToast.error("Failed to delete some messages");
     } finally {
-      setShowDeleteConfirm(false);
-      setSelectMode(false);
-      setSelectedIds([]);
+      setIsDeletingForMe(false);
+      setIsDeletingForEveryone(false);
     }
   }, [selectedIds, delMutation]);
 
-  // Determine if ALL selected messages belong to the current user
+  // Determine if ALL selected messages belong to the current user AND are within the legal deletion window
   const canDeleteForEveryone = useMemo(() => {
     if (selectedIds.length === 0) return false;
-    const selectedMsgs = filteredMessages.filter(m => selectedIds.includes(m.id));
-    return selectedMsgs.every(m => String(m.senderId) === String(userInfo?.id));
-  }, [selectedIds, filteredMessages, userInfo?.id]);
+    const selectedMsgs = filteredMessages.filter(m => selectedIds.some(x => Number(x) === Number(m.id)));
+
+    return selectedMsgs.every(m => {
+      const isMine = String(m.senderId) === String(userInfo?.id);
+      const isWithinWindow = isWithinDeletionWindow(m.timestamp || m.createdAt);
+      return isMine && isWithinWindow;
+    });
+  }, [selectedIds, filteredMessages, userInfo?.id, isWithinDeletionWindow]);
 
   const topSentinelRef = useInfiniteScroll({
     containerRef,
@@ -475,7 +503,8 @@ function ChatContainer() {
           open={showDeleteConfirm}
           onClose={() => setShowDeleteConfirm(false)}
           onDelete={handleBulkDelete}
-          isPending={delMutation.isPending}
+          isDeletingForMe={isDeletingForMe}
+          isDeletingForEveryone={isDeletingForEveryone}
           showForEveryoneButton={canDeleteForEveryone}
           title={`Delete ${selectedIds.length} Messages?`}
           description={null}

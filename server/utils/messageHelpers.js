@@ -1,3 +1,19 @@
+// 60-hour limit for "Delete for Everyone" to match modern WhatsApp standards.
+export const DELETION_WINDOW_HOURS = 60;
+export const DELETION_WINDOW_MS = DELETION_WINDOW_HOURS * 60 * 60 * 1000;
+
+/**
+ * Checks if a message is within the timeframe where "Delete for Everyone" is allowed.
+ * @param {Date|string|number} createdAt - The timestamp when the message was created
+ * @returns {boolean}
+ */
+export function isWithinDeletionWindow(createdAt) {
+  if (!createdAt) return false;
+  const createdTime = new Date(createdAt).getTime();
+  if (isNaN(createdTime)) return false;
+  return (Date.now() - createdTime) <= DELETION_WINDOW_MS;
+}
+
 export async function getOrCreateDirectConversation(prisma, userAId, userBId) {
   const a = Number(userAId);
   const b = Number(userBId);

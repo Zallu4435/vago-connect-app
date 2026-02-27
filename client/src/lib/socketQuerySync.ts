@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { Message } from '@/types';
 import { updateMessagesCache, updateContactFieldsInCache, upsertMessageInCache, updateContactProfileInCache, unshiftContactInCache } from './cacheHelpers';
+import { Logger } from '@/utils/logger';
 
 export const createSocketQuerySync = (queryClient: QueryClient) => {
   return {
@@ -94,6 +95,7 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
     },
 
     onChatCleared: (conversationId: number | string, clearedAt: string) => {
+      Logger.info(`Sync: Clearing message cache for chat ${conversationId}`);
       // 1. Reset contact preview
       updateContactFieldsInCache(queryClient, (c: any) =>
         String(c.conversationId) === String(conversationId)
@@ -118,6 +120,7 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
     },
 
     onChatDeleted: (conversationId: number | string) => {
+      Logger.info(`Sync: Removing chat ${conversationId} from list`);
       // Remove the conversation from the contacts list in cache
       queryClient.setQueriesData({ queryKey: ['contacts'] }, (oldData: any) => {
         if (!oldData) return oldData;

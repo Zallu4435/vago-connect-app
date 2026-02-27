@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import Avatar from "../common/Avatar";
 import { calculateTime } from "@/utils/CalculateTime";
 import MessageStatus from "../common/MessageStatus";
+import { useRenderLog } from "@/hooks/ui/useRenderLog";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { getAbsoluteUrl } from "@/lib/url";
@@ -18,6 +19,8 @@ function ChatListItem({ data, isContactsPage = false }) {
   const userInfo = useAuthStore((s) => s.userInfo);
   const setCurrentChatUser = useChatStore((s) => s.setCurrentChatUser);
   const setActivePage = useChatStore((s) => s.setActivePage);
+  const { setMessages, clearMessages } = useChatStore();
+  useRenderLog("ChatListItem", { data, isContactsPage });
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);

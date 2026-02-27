@@ -8,7 +8,7 @@ import { FaImage } from "react-icons/fa";
  * A single image item within the ImageGridMessage.
  * Handles local-to-remote transitions and upload progress.
  */
-const GridImageItem = ({ msg, index, handleImageClick, cellClass, isIncoming }) => {
+const GridImageItem = ({ msg, index, handleImageClick, cellClass, isIncoming, selectMode, isSelected, onToggleSelect }) => {
     const { isLoaded, setIsLoaded, isLocal } = useMediaTransition(msg, "GridImageItem");
 
     return (
@@ -48,6 +48,32 @@ const GridImageItem = ({ msg, index, handleImageClick, cellClass, isIncoming }) 
                 loading="lazy"
             />
 
+            {/* Selection Overlay */}
+            {selectMode && (
+                <div
+                    className={`absolute inset-0 z-30 flex items-start justify-end p-2 transition-all duration-200 ${isSelected ? "bg-ancient-icon-glow/20" : "bg-black/10 hover:bg-black/20"}`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleSelect?.(Number(msg.id));
+                    }}
+                >
+
+                    <div className={`
+                        w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200
+                        ${isSelected
+                            ? "bg-ancient-icon-glow border-ancient-icon-glow text-ancient-bg-dark"
+                            : "border-white/70 bg-black/20"
+                        }
+                    `}>
+                        {isSelected && (
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Progress bar overlay if sending */}
             <MediaUploadProgressBar message={msg} isLocal={isLocal} className="p-0.5" barHeight="h-[2px]" />
 
@@ -57,4 +83,15 @@ const GridImageItem = ({ msg, index, handleImageClick, cellClass, isIncoming }) 
     );
 };
 
-export default React.memo(GridImageItem);
+export default React.memo(GridImageItem, (prev, next) => {
+    // Always re-render if selection state changes
+    if (prev.isSelected !== next.isSelected) return false;
+    if (prev.selectMode !== next.selectMode) return false;
+    // Re-render if the message content/state changes
+    if (prev.msg?.id !== next.msg?.id) return false;
+    if (prev.msg?.content !== next.msg?.content) return false;
+    if (prev.msg?.messageStatus !== next.msg?.messageStatus) return false;
+    if (prev.isIncoming !== next.isIncoming) return false;
+    return true;
+});
+

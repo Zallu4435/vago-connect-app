@@ -7,6 +7,7 @@ import { upsertMessageInCache, updateContactProfileInCache, updateGroupProfileIn
 import type { Message } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
 import { showToast } from '@/lib/toast';
+import { Logger } from '@/utils/logger';
 
 export function useMessageSocketHandlers() {
   const socket = useSocketStore((s) => s.socket);
@@ -47,9 +48,11 @@ export function useMessageSocketHandlers() {
     const socketSync = createSocketQuerySync(qc);
 
     const onStatusUpdate = ({ messageId, status, conversationId }: any) => {
+      Logger.debug(`Socket: message-status-update for ${messageId}`, { status, conversationId });
       socketSync.onMessageStatusUpdate(messageId, status, conversationId);
     };
     const onMessagesRead = ({ messageIds, conversationId }: any) => {
+      Logger.debug(`Socket: messages-read for convo ${conversationId}`, { messageIds });
       if (Array.isArray(messageIds)) {
         socketSync.onMessagesRead(messageIds, conversationId, String(authUserIdRef.current));
       }
@@ -60,7 +63,19 @@ export function useMessageSocketHandlers() {
     const onDeleted = (data: any) => {
       const mid = data?.messageId || data?.id;
       const { deleteType, deletedBy } = data;
+      Logger.debug(`Socket: message-deleted ${mid}`, { deleteType });
+
+      // Update React Query Cache
       socketSync.onMessageDeleted(mid, deleteType, { deletedBy });
+
+      // CRITICAL: Also update the Zustand store to prevent stale data overriding the cache
+      const currentMsgs = useChatStore.getState().messages || [];
+      const updatedMsgs = currentMsgs.map(m => {
+        if (String(m.id) !== String(mid)) return m;
+        if (deleteType === 'forEveryone') return { ...m, content: 'This message was deleted', isDeletedForEveryone: true };
+        return { ...m, deletedBy: deletedBy || [] };
+      });
+      useChatStore.getState().setMessages(updatedMsgs);
     };
     const onReacted = ({ messageId, reactions }: any) => {
       socketSync.onMessageReacted(messageId, reactions || []);
@@ -72,6 +87,7 @@ export function useMessageSocketHandlers() {
       socketSync.onChatPinned(conversationId, pinned, pinOrder);
     };
     const onChatCleared = ({ conversationId, clearedAt }: any) => {
+      Logger.info(`Socket: chat-cleared for convo ${conversationId}`, { clearedAt });
       socketSync.onChatCleared(conversationId, clearedAt);
     };
     const onChatArchived = ({ conversationId, archived }: any) => {
@@ -81,6 +97,7 @@ export function useMessageSocketHandlers() {
       socketSync.onChatMuted(conversationId, muted, mutedUntil);
     };
     const onChatDeleted = ({ conversationId }: any) => {
+      Logger.info(`Socket: chat-deleted for convo ${conversationId}`);
       socketSync.onChatDeleted(conversationId);
     };
     const onForwarded = (payload: any) => {
@@ -200,6 +217,7 @@ export function useMessageSocketHandlers() {
     const onMessageSent = (data: any) => {
       const message: Message = data?.message || data;
       if (!message?.id) return;
+      Logger.debug(`Socket: message-sent (new message) ${message.id}`, { conversationId: (message as any).conversationId });
 
       // Always read from refs to get the latest values (no stale closure)
       const myAuthId = authUserIdRef.current;

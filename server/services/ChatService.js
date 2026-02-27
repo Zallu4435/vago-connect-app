@@ -143,6 +143,20 @@ export class ChatService {
             skipDuplicates: true,
         });
 
+        // FIX: If a user was previously in the group and marked as deleted, reset their state
+        await prisma.conversationParticipant.updateMany({
+            where: {
+                conversationId: groupId,
+                userId: { in: toAddIds },
+            },
+            data: {
+                isDeleted: false,
+                deletedAt: null,
+                clearedAt: null,
+                leftAt: null,
+            },
+        });
+
         const names = users.map((u) => u.name || `User ${u.id}`).join(', ');
         const sysMsg = await prisma.message.create({
             data: {
@@ -164,6 +178,7 @@ export class ChatService {
         const minimalParts = ChatMapper.mapActiveParticipantsToMinimal(updated.participants);
         SocketEmitter.emitToUsers(updated.participants.map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
         SocketEmitter.emitToUsers(updated.participants.map(p => p.userId), 'message-sent', { message: sysMsg });
+
         return { conversationId: groupId, participants: minimalParts };
     }
 
@@ -281,6 +296,7 @@ export class ChatService {
 
             SocketEmitter.emitToUsers(full.participants.map((p) => p.userId), 'group-updated', { conversation: minimal });
             SocketEmitter.emitToUsers(full.participants.map((p) => p.userId), 'message-sent', { message: sysMsg });
+
             return minimal;
         } catch (error) {
             if (iconPublicId) {

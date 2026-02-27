@@ -14,6 +14,10 @@ interface ChatState {
   activePage: "default" | "contacts" | "profile" | "calls";
   replyTo: Message | null;
   editMessage: Message | null;
+  selectMode: boolean;
+  selectedIds: number[];
+  isDeletingForMe: boolean;
+  isDeletingForEveryone: boolean;
 
   setUserContacts: (contacts: Contact[]) => void;
   setFilteredContacts: (contacts: Contact[]) => void;
@@ -31,6 +35,10 @@ interface ChatState {
   clearReplyTo: () => void;
   setEditMessage: (message: Message | null) => void;
   clearEditMessage: () => void;
+  setSelectMode: (mode: boolean) => void;
+  setSelectedIds: (ids: number[] | ((prev: number[]) => number[])) => void;
+  setIsDeletingForMe: (val: boolean) => void;
+  setIsDeletingForEveryone: (val: boolean) => void;
   updateMessageStatus: (id: number, status: MessageStatusType) => void;
 }
 
@@ -48,6 +56,10 @@ export const useChatStore = create<ChatState>()(
       activePage: "default",
       replyTo: null,
       editMessage: null,
+      selectMode: false,
+      selectedIds: [],
+      isDeletingForMe: false,
+      isDeletingForEveryone: false,
 
       setUserContacts: (contacts) => set({ userContacts: contacts }),
       setFilteredContacts: (contacts) => set({ filteredContacts: contacts }),
@@ -81,6 +93,12 @@ export const useChatStore = create<ChatState>()(
       clearReplyTo: () => set({ replyTo: null }),
       setEditMessage: (message) => set({ editMessage: message }),
       clearEditMessage: () => set({ editMessage: null }),
+      setSelectMode: (mode) => set({ selectMode: mode }),
+      setSelectedIds: (ids) => set((state) => ({
+        selectedIds: typeof ids === 'function' ? ids(state.selectedIds) : ids
+      })),
+      setIsDeletingForMe: (val) => set({ isDeletingForMe: val }),
+      setIsDeletingForEveryone: (val) => set({ isDeletingForEveryone: val }),
       updateMessageStatus: (id, status) =>
         set((state) => ({
           messages: state.messages.map((m) =>

@@ -15,6 +15,7 @@ import { usePinChat } from '@/hooks/chat/usePinChat';
 import { useLeaveGroup } from '@/hooks/groups/useGroupActions';
 import { useBlockUser } from '@/hooks/contacts/useBlockUser';
 import ActionSheet from "@/components/common/ActionSheet";
+import { useRenderLog } from "@/hooks/ui/useRenderLog";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import { getAbsoluteUrl } from "@/lib/url";
 import { getAvatarUrl } from "@/utils/chatHelpers";
@@ -31,6 +32,8 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   const initiateCall = useCallStore((s) => s.initiateCall);
   const callToastIdRef = useRef(null);
   const menuButtonRef = useRef(null);
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
+
   const [showMenu, setShowMenu] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -50,6 +53,8 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   const isTyping = typingUsers?.some((u) => String(u) === String(currentChatUser?.id));
   const isGroupChat = conversationType === "group" || currentChatUser?.isGroup;
   const hasMessages = messages && messages.length > 0;
+
+  useRenderLog("ChatHeader", { currentChatUser, isGroupChat });
 
   // Chat actions
   const clearChat = useClearChat();

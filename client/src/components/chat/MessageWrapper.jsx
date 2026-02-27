@@ -2,6 +2,7 @@
 import React from "react";
 import BaseMessageLayout from "./BaseMessageLayout";
 import { useChatStore } from "@/stores/chatStore";
+import { useAuthStore } from "@/stores/authStore";
 
 import TextMessage from '@/components/messages/TextMessage';
 import ImageMessage from '@/components/messages/ImageMessage';
@@ -28,7 +29,21 @@ function MessageWrapper({
     const currentChatUser = useChatStore((s) => s.currentChatUser);
     const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
     const senderAvatar = message?.sender?.profileImage || "/default_avatar.png";
-    const isSelected = selectedIds?.includes(message.id);
+    const isSelected = selectedIds?.some(x => Number(x) === Number(message.id));
+
+    const userInfo = useAuthStore((s) => s.userInfo);
+    const isDeletedForMe = React.useMemo(() => {
+        const arr = message?.deletedBy;
+        if (!Array.isArray(arr)) return false;
+        const uidStr = String(userInfo?.id ?? "");
+        return arr.some((e) => {
+            if (e == null) return false;
+            const val = (typeof e === 'object') ? (e.userId ?? e.id ?? e) : e;
+            return String(val) === uidStr;
+        });
+    }, [message?.deletedBy, userInfo?.id]);
+
+    const isDeleted = message.isDeletedForEveryone || isDeletedForMe;
 
     // Determine if it's a call by explicitly checking JSON content if type is missing, or type === 'call'
     const isCall = message.type === "call" || (message.content && message.content.includes('"callType"'));
@@ -46,14 +61,14 @@ function MessageWrapper({
             selectMode={selectMode}
             isSelected={isSelected}
             onSelectToggle={() => onToggleSelect?.(message.id)}
-            reactions={isCall ? [] : (message.isDeletedForEveryone ? [] : message.reactions)}
+            reactions={isCall ? [] : (isDeleted ? [] : message.reactions)}
             reactionAnchorMessage={message}
             actionAnchorMessage={message}
-            showActions={!message.isDeletedForEveryone && !isCall}
+            showActions={!isDeleted && !isCall}
             onReply={isCall ? undefined : onReply}
             onForward={isCall ? undefined : onForward}
         >
-            {message.isDeletedForEveryone ? (
+            {isDeleted ? (
                 <DeletedMessage message={message} isIncoming={isIncoming} />
             ) : (
                 <>
@@ -86,6 +101,6 @@ export default React.memo(MessageWrapper, (prev, next) => {
         prev.message === next.message &&
         prev.isIncoming === next.isIncoming &&
         prev.selectMode === next.selectMode &&
-        prev.selectedIds?.includes(prev.message.id) === next.selectedIds?.includes(next.message.id)
+        prev.selectedIds?.some(x => Number(x) === Number(prev.message.id)) === next.selectedIds?.some(x => Number(x) === Number(next.message.id))
     );
 });

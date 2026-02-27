@@ -26,21 +26,10 @@ function ImageGridWrapper({
     const senderAvatar = anchorMessage?.sender?.profileImage || "/default_avatar.png";
 
     // In Select Mode, we blanket select or deselect the entire Grid chunk based on the anchor ID
-    const isSelected = selectedIds?.includes(anchorMessage.id);
+    const isSelected = messagesArray.some(m => selectedIds?.some(x => Number(x) === Number(m.id)));
 
     // Flatten all reactions from the grid cluster
     const aggregatedReactions = messagesArray.flatMap(m => m.reactions || []);
-
-    const handleGridSelect = () => {
-        // Toggle selection for every ID within the Grid chunk
-        messagesArray.forEach(m => {
-            const targetState = !isSelected;
-            const isCurrentlySelected = selectedIds.includes(m.id);
-            if (targetState !== isCurrentlySelected) {
-                onToggleSelect?.(m.id);
-            }
-        });
-    };
 
     return (
         <BaseMessageLayout
@@ -50,18 +39,22 @@ function ImageGridWrapper({
             hasSender={!!anchorMessage?.sender}
             selectMode={selectMode}
             isSelected={isSelected}
-            onSelectToggle={handleGridSelect}
+            onSelectToggle={() => { }} // Individual items handle their own selection
             reactions={aggregatedReactions}
             reactionAnchorMessage={anchorMessage}
             actionAnchorMessage={messagesArray[messagesArray.length - 1]}
             showActions={true}
             onReply={onReply}
             onForward={onForward}
+            isGrid={true}
         >
             <ImageGridMessage
                 messagesArray={messagesArray}
                 isIncoming={isIncoming}
                 chatMessages={chatMessages}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={onToggleSelect}
             />
         </BaseMessageLayout>
     );
@@ -77,11 +70,16 @@ export default React.memo(ImageGridWrapper, (prev, next) => {
         return false;
     }
 
-    // 2. Check anchor ID selection
-    const prevAnchorId = prev.messagesArray[0]?.id;
-    const nextAnchorId = next.messagesArray[0]?.id;
-    if (prev.selectedIds?.includes(prevAnchorId) !== next.selectedIds?.includes(nextAnchorId)) {
-        return false;
+    // 2. Check cluster selection state
+    const prevAnySelected = prev.messagesArray.some(m => prev.selectedIds?.some(x => Number(x) === Number(m.id)));
+    const nextAnySelected = next.messagesArray.some(m => next.selectedIds?.some(x => Number(x) === Number(m.id)));
+    if (prevAnySelected !== nextAnySelected) return false;
+
+    // Check if individual selections within the cluster changed
+    for (const m of prev.messagesArray) {
+        const pSel = prev.selectedIds?.some(x => Number(x) === Number(m.id));
+        const nSel = next.selectedIds?.some(x => Number(x) === Number(m.id));
+        if (pSel !== nSel) return false;
     }
 
     // 3. Check for reaction changes across the entire grid
@@ -98,6 +96,14 @@ export default React.memo(ImageGridWrapper, (prev, next) => {
         ) {
             return false;
         }
+    }
+
+    // 4. Check for deletion status changes within the cluster
+    for (let i = 0; i < prev.messagesArray.length; i++) {
+        const pm = prev.messagesArray[i];
+        const nm = next.messagesArray[i];
+        if (pm.isDeletedForEveryone !== nm.isDeletedForEveryone) return false;
+        if (JSON.stringify(pm.deletedBy) !== JSON.stringify(nm.deletedBy)) return false;
     }
 
     return true;

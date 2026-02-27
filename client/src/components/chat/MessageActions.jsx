@@ -21,6 +21,7 @@ import { showToast } from "@/lib/toast";
 import ActionSheet from "@/components/common/ActionSheet";
 import DeleteMessageModal from "@/components/common/DeleteMessageModal";
 import ReactionPicker from "@/components/common/ReactionPicker";
+import { isWithinDeletionWindow } from "@/utils/chatHelpers";
 
 const DEFAULT_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "👏", "🔥", "✨", "🙏"];
 
@@ -29,6 +30,7 @@ function MessageActions({
   isIncoming = false,
   onReply,
   onForward,
+  isGrid = false,
 }) {
   const userInfo = useAuthStore((s) => s.userInfo);
   const isMine = useMemo(() => String(message?.senderId) === String(userInfo?.id), [message, userInfo]);
@@ -40,6 +42,13 @@ function MessageActions({
   const isChatBlocked = Boolean(contactEntry?.isBlocked || contactEntry?.blockedBy);
 
   if (isChatBlocked) return null;
+
+  const setSelectMode = useChatStore((s) => s.setSelectMode);
+  const setSelectedIds = useChatStore((s) => s.setSelectedIds);
+  const isDeletingForMe = useChatStore((s) => s.isDeletingForMe);
+  const setIsDeletingForMe = useChatStore((s) => s.setIsDeletingForMe);
+  const isDeletingForEveryone = useChatStore((s) => s.isDeletingForEveryone);
+  const setIsDeletingForEveryone = useChatStore((s) => s.setIsDeletingForEveryone);
 
   const [showReactionsMenu, setShowReactionsMenu] = useState(false);
   const [showDropdownMenu, setShowDropdownMenu] = useState(false);
@@ -56,15 +65,35 @@ function MessageActions({
   const reactMutation = useReactToMessage();
 
   const onDeleteClick = useCallback(() => {
-    console.log("Delete action clicked!");
-    setShowDeleteConfirm(true);
+    if (isGrid) {
+      // Enter selection mode with no pre-selection — user picks images explicitly
+      setSelectMode(true);
+      setSelectedIds([]);
+      showToast.info("Select images to delete, then tap the delete icon");
+    } else {
+      setShowDeleteConfirm(true);
+    }
     setShowDropdownMenu(false);
-  }, []);
+  }, [isGrid, setSelectMode, setSelectedIds]);
 
-  const doDelete = useCallback((deleteType) => {
+  const doDelete = useCallback(async (deleteType) => {
     console.log("Confirming delete:", deleteType);
-    delMutation.mutate({ id: message.id, deleteType });
-    setShowDeleteConfirm(false);
+
+    if (deleteType === 'forMe') setIsDeletingForMe(true);
+    else setIsDeletingForEveryone(true);
+
+    try {
+      await delMutation.mutateAsync({ id: message.id, deleteType });
+      // Artificial delay for better UX (so user sees the loading state)
+      await new Promise(resolve => setTimeout(resolve, 300));
+      setShowDeleteConfirm(false);
+    } catch (e) {
+      console.error("Delete error", e);
+      showToast.error("Failed to delete message");
+    } finally {
+      setIsDeletingForMe(false);
+      setIsDeletingForEveryone(false);
+    }
   }, [message, delMutation]);
 
   const onEditClick = useCallback(() => {
@@ -124,13 +153,10 @@ function MessageActions({
   const canEdit = isMine && message?.type === "text" && !message?.isDeletedForEveryone;
   const canDelete = !message?.isDeletedForEveryone;
 
-  // Enforce 48-hour rule for "Delete for Everyone" locally
+  // Enforce 60-hour rule for "Delete for Everyone" locally using shared utility
   const canDeleteForEveryone = useMemo(() => {
     if (!isMine) return false;
-    const createdAt = new Date(message?.createdAt).getTime();
-    if (isNaN(createdAt)) return false;
-    const fortyEightHours = 48 * 60 * 60 * 1000;
-    return (Date.now() - createdAt) <= fortyEightHours;
+    return isWithinDeletionWindow(message?.createdAt);
   }, [isMine, message?.createdAt]);
 
   return (
@@ -227,7 +253,8 @@ function MessageActions({
           open={showDeleteConfirm}
           onClose={() => setShowDeleteConfirm(false)}
           onDelete={doDelete}
-          isPending={delMutation.isPending}
+          isDeletingForMe={isDeletingForMe}
+          isDeletingForEveryone={isDeletingForEveryone}
           showForEveryoneButton={canDeleteForEveryone}
           description="Are you sure you want to delete this message?"
         />
@@ -240,6 +267,7 @@ export default React.memo(MessageActions, (prev, next) => {
   return (
     prev.message?.id === next.message?.id &&
     prev.isIncoming === next.isIncoming &&
+    prev.isGrid === next.isGrid &&
     prev.message?.reactions?.length === next.message?.reactions?.length &&
     prev.message?.isDeletedForEveryone === next.message?.isDeletedForEveryone
   );

@@ -6,7 +6,8 @@ import {
     resolveConversation,
     unhideConversationParticipants,
     buildMediaFileData,
-    prepareReply
+    prepareReply,
+    isWithinDeletionWindow
 } from "../utils/messageHelpers.js";
 
 
@@ -354,7 +355,10 @@ export class MessageService {
 
         const message = await prisma.message.findUnique({
             where: { id: mId },
-            include: { conversation: { include: { participants: true } } },
+            include: {
+                conversation: { include: { participants: true } },
+                mediaFiles: true
+            },
         });
 
         if (!message) {
@@ -379,38 +383,61 @@ export class MessageService {
             if (message.isDeletedForEveryone) {
                 return { id: message.id, deleteType: "forEveryone", status: 'idempotent' };
             }
-            const createdAt = new Date(message.createdAt).getTime();
-            const fortyEightHours = 48 * 60 * 60 * 1000;
-            if (Date.now() - createdAt > fortyEightHours) {
+            if (!isWithinDeletionWindow(message.createdAt)) {
                 throw Object.assign(new Error("Delete for everyone window expired"), { status: 400 });
             }
 
-            return await prisma.$transaction(async (tx) => {
-                const updated = await tx.message.update({
-                    where: { id: mId },
-                    data: {
-                        isDeletedForEveryone: true,
-                        deletedForEveryoneAt: new Date(),
-                        content: "This message was deleted",
-                    },
-                });
+            // Perform Cloudinary cleanup before database update
+            if (message.mediaFiles && message.mediaFiles.length > 0) {
+                for (const mf of message.mediaFiles) {
+                    if (mf.storageProvider === 'cloudinary' && mf.cloudinaryPublicId) {
+                        // CHECK: Are any OTHER media records using the same publicId? (e.g. forwards or copies)
+                        const others = await prisma.mediaFile.count({
+                            where: {
+                                cloudinaryPublicId: mf.cloudinaryPublicId,
+                                id: { not: mf.id }
+                            }
+                        });
 
-                return { id: updated.id, deleteType: "forEveryone", participants: message.conversation.participants };
-            }, { timeout: 30000 });
-        } else {
-            // deleteForMe
-            return await prisma.$transaction(async (tx) => {
-                const currentMsg = await tx.message.findUnique({ where: { id: mId } });
-                const deleted = Array.isArray(currentMsg?.deletedBy) ? currentMsg.deletedBy : [];
-                if (!deleted.includes(reqId)) {
-                    deleted.push(reqId);
+                        // If no other message uses it, we can safely delete from cloud storage
+                        if (others === 0) {
+                            try {
+                                await deleteCloudinaryFile(mf.cloudinaryPublicId, mf.cloudinaryResourceType || 'image');
+                            } catch (cldErr) {
+                                console.error(`[MessageService:delete] Cloudinary delete failed for ${mf.cloudinaryPublicId}`, { error: cldErr });
+                                // We don't throw; we finish the DB update even if cloud deletion fails
+                            }
+                        }
+                    }
                 }
-                const updated = await tx.message.update({
-                    where: { id: mId },
-                    data: { deletedBy: deleted },
-                });
-                return { id: updated.id, deleteType: "forMe", participants: message.conversation.participants };
-            }, { timeout: 30000 });
+            }
+
+            // forEveryone: Atomic update (Atomic by default in Prisma single operations)
+            const updated = await prisma.message.update({
+                where: { id: mId },
+                data: {
+                    isDeletedForEveryone: true,
+                    deletedForEveryoneAt: new Date(),
+                    content: "This message was deleted",
+                },
+            });
+
+            return { id: updated.id, deleteType: "forEveryone", participants: message.conversation.participants };
+        } else {
+            // forMe: Use a simple read-then-update without a long-lasting interactive transaction
+            // while not strictly atomic against concurrent "forMe" from other users, 
+            // "forMe" is user-specific, so concurrent "forMe" on the same message for the same user is impossible.
+            const currentMsg = await prisma.message.findUnique({ where: { id: mId }, select: { deletedBy: true } });
+            const deleted = Array.isArray(currentMsg?.deletedBy) ? [...currentMsg.deletedBy] : [];
+            const reqIdNum = Number(reqId);
+            if (!deleted.includes(reqIdNum)) {
+                deleted.push(reqIdNum);
+            }
+            const updated = await prisma.message.update({
+                where: { id: mId },
+                data: { deletedBy: deleted },
+            });
+            return { id: updated.id, deleteType: "forMe", participants: message.conversation.participants, deletedBy: deleted };
         }
     }
 
