@@ -1,8 +1,11 @@
 {
   "type": "module",
   "scripts": {
-    "start": "nodemon index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "start": "node index.js",
+    "build": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "start:prod": "npm run build && npm run migrate && npm run start"
   },
   "dependencies": {
     "@prisma/client": "^4.14.0",
