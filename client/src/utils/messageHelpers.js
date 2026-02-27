@@ -30,6 +30,7 @@ export const normalizeMessage = (raw, fromId, toId, fallbackType = "text") => {
         caption: typeof raw?.caption === 'string' ? raw.caption : undefined,
         replyToMessageId: raw?.replyToMessageId,
         quotedMessage: raw?.quotedMessage,
+        isForwarded: Boolean(raw?.isForwarded),
         isLocal: Boolean(raw?.isLocal),
     };
 };

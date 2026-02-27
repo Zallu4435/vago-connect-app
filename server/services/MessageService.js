@@ -443,6 +443,7 @@ export class MessageService {
 
     static async forwardMessages({ messageIds, toConversationIds, requesterId }) {
         const prisma = getPrismaInstance();
+        const reqId = Number(requesterId);
 
         // 1. Resolve source messages and destination conversations outside transaction
         const msgs = await prisma.message.findMany({
@@ -457,7 +458,7 @@ export class MessageService {
         }
 
         for (const m of msgs) {
-            const isParticipant = m.conversation.participants.some(p => p.userId === requesterId);
+            const isParticipant = m.conversation.participants.some(p => p.userId === reqId);
             if (!isParticipant) {
                 throw Object.assign(new Error(`No access to source message ${m.id}`), { status: 403 });
             }
@@ -471,14 +472,14 @@ export class MessageService {
             throw Object.assign(new Error(`One or more destination conversations not found`), { status: 404 });
         }
         for (const c of destConvos) {
-            const isParticipant = c.participants.some(p => p.userId === requesterId);
+            const isParticipant = c.participants.some(p => p.userId === reqId);
             if (!isParticipant) {
                 throw Object.assign(new Error(`No access to destination conversation ${c.id}`), { status: 403 });
             }
 
             if (c.type === 'direct') {
-                const other = c.participants.find(p => p.userId !== requesterId);
-                if (other && await isBlockedBetweenUsers(prisma, requesterId, other.userId)) {
+                const other = c.participants.find(p => p.userId !== reqId);
+                if (other && await isBlockedBetweenUsers(prisma, reqId, other.userId)) {
                     throw Object.assign(new Error(`Cannot forward to blocked contact`), { status: 403 });
                 }
             }
@@ -494,7 +495,7 @@ export class MessageService {
                     const newMsg = await tx.message.create({
                         data: {
                             conversationId: c.id,
-                            senderId: requesterId,
+                            senderId: reqId,
                             type: m.type,
                             content: m.content,
                             caption: m.caption,
@@ -541,19 +542,19 @@ export class MessageService {
                         }
                     }
 
-                    created.push({
-                        id: newMsg.id,
-                        conversationId: c.id,
-                        senderId: requesterId,
-                        type: newMsg.type,
-                        content: newMsg.content,
-                        status: newMsg.status,
-                        createdAt: newMsg.createdAt,
+                    const emitData = {
+                        ...newMsg,
                         isForwarded: true,
                         forwardCount: newMsg.forwardCount,
-                    });
+                        conversation: {
+                            id: c.id,
+                            type: c.type,
+                            participants: c.participants
+                        }
+                    };
 
-                    emits.push({ messageId: newMsg.id, conversationId: c.id, participants: c.participants });
+                    created.push(emitData);
+                    emits.push(emitData);
                 }
             }
 

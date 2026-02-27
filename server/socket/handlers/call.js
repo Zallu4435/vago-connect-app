@@ -7,6 +7,12 @@ export function handleCallEvents(io, socket, onlineUsers) {
         // payload: { callType, from: {id,name,image}, to: {id,name,image} }
         const toId = payload?.to?.id ?? payload?.to;
         const fromId = payload?.from?.id ?? payload?.from;
+
+        if (String(fromId) === String(toId)) {
+            socket.emit("call-failed", { reason: "self-call" });
+            return;
+        }
+
         const isCalleeOnline = onlineUsers.has(String(toId));
 
         // Block check

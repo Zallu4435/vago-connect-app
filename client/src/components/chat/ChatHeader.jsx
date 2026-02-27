@@ -72,7 +72,7 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   };
 
   const handleVoiceCall = () => {
-    if (!currentChatUser || !userInfo) return;
+    if (!currentChatUser || !userInfo || isSelfChat) return;
     if (isBlocked || blockedBy) {
       showToast.error("Cannot call a blocked contact");
       return;
@@ -105,7 +105,7 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   };
 
   const handleVideoCall = () => {
-    if (!currentChatUser || !userInfo) return;
+    if (!currentChatUser || !userInfo || isSelfChat) return;
     if (isBlocked || blockedBy) {
       showToast.error("Cannot call a blocked contact");
       return;
@@ -187,7 +187,7 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
 
       {/* Right: Action Icons */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {!isGroupChat && (
+        {!isGroupChat && !isSelfChat && (
           <button
             className="p-2 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95"
             title="Video Call"
@@ -228,7 +228,7 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
                 disabled: !hasMessages || (isBlocked || blockedBy),
                 onClick: () => onOpenMedia?.(),
               },
-              ...(isGroupChat ? [] : [{
+              ...((isGroupChat || isSelfChat) ? [] : [{
                 label: "Voice Call",
                 icon: MdCall,
                 disabled: isBlocked || blockedBy,

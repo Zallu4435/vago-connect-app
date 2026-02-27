@@ -8,6 +8,7 @@ import type { Message } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
 import { showToast } from '@/lib/toast';
 import { Logger } from '@/utils/logger';
+import { normalizeMessage } from '@/utils/messageHelpers';
 
 export function useMessageSocketHandlers() {
   const socket = useSocketStore((s) => s.socket);

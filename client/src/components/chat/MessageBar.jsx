@@ -161,13 +161,24 @@ function MessageBar({ isOnline = true }) {
     }
 
     const tempId = Date.now();
+    console.log("[MessageBar] Sending message. Reply to:", replyTo?.id);
+
     const optimisticMsg = normalizeMessage({
       id: tempId,
       conversationId: currentChatUser?.conversationId || (currentChatUser?.isGroup ? currentChatUser.id : 0),
       content: text,
       status: "pending",
       createdAt: new Date().toISOString(),
+      replyToMessageId: replyTo?.id,
+      quotedMessage: replyTo ? {
+        id: replyTo.id,
+        content: replyTo.content || replyTo.message,
+        senderId: replyTo.senderId,
+        type: replyTo.type
+      } : undefined
     }, userInfo.id, currentChatUser.id, "text");
+
+    console.log("[MessageBar] Optimistic message created:", optimisticMsg);
 
     setMessages((prev) => ([...(prev || []), optimisticMsg]));
     setMessage("");

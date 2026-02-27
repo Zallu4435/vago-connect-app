@@ -117,21 +117,22 @@ export function handleChatEvents(io, socket, onlineUsers) {
         }
     });
 
-    socket.on("forward-messages", async (payload) => {
+    socket.on("forward-messages", async (payload, callback) => {
         const requesterId = socket.userId || payload.requesterId;
         const { messageIds, toConversationIds } = payload;
         try {
-            const result = await MessageService.forwardMessages({ messageIds, toConversationIds, requesterId });
-            if (result.emits) {
-                result.emits.forEach(e => {
-                    e.participants.forEach(p => {
-                        if (p.userId) io.to(String(p.userId)).emit("message-forwarded", { messageId: e.messageId, conversationId: e.conversationId });
-                    });
+            const { emits } = await MessageService.forwardMessages({ messageIds, toConversationIds, requesterId });
+            if (emits) {
+                emits.forEach(e => {
+                    // Use standard emitMessageSent for consistency across all message types
+                    SocketEmitter.emitMessageSent(e.conversation, e);
                 });
             }
+            if (typeof callback === "function") callback({ success: true });
         } catch (error) {
             console.error("Socket forward-messages error:", error);
             io.to(String(requesterId)).emit("message-error", { error: error.message });
+            if (typeof callback === "function") callback({ success: false, error: error.message });
         }
     });
 

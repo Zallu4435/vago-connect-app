@@ -77,8 +77,6 @@ function MessageActions({
   }, [isGrid, setSelectMode, setSelectedIds]);
 
   const doDelete = useCallback(async (deleteType) => {
-    console.log("Confirming delete:", deleteType);
-
     if (deleteType === 'forMe') setIsDeletingForMe(true);
     else setIsDeletingForEveryone(true);
 
@@ -97,7 +95,7 @@ function MessageActions({
   }, [message, delMutation]);
 
   const onEditClick = useCallback(() => {
-    console.log("Action: setEditMessage called with:", message.id); setEditMessage(message);
+    setEditMessage(message);
     setShowDropdownMenu(false);
   }, [message, setEditMessage]);
 
@@ -114,10 +112,17 @@ function MessageActions({
   }, [message, onReply]);
 
   const handleForward = useCallback(() => {
-    console.log("Forward action clicked for message:", message.id);
-    onForward?.(message);
+    if (isGrid) {
+      // Enter selection mode with no pre-selection — user picks images explicitly
+      setSelectMode(true);
+      setSelectedIds([]);
+      showToast.info("Select images to forward, then tap the actions icon");
+    } else {
+      console.log("Forward action clicked for message:", message.id);
+      onForward?.(message);
+    }
     setShowDropdownMenu(false);
-  }, [message, onForward]);
+  }, [isGrid, message, onForward, setSelectMode, setSelectedIds]);
 
   const onCopy = useCallback(async () => {
     console.log("Copy action clicked!");

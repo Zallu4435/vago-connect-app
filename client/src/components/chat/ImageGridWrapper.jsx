@@ -3,6 +3,7 @@ import React from "react";
 import BaseMessageLayout from "./BaseMessageLayout";
 import { useChatStore } from "@/stores/chatStore";
 import ImageGridMessage from '@/components/messages/ImageGridMessage';
+import { showToast } from "@/lib/toast";
 
 /**
  * ImageGridWrapper - Wraps arrays of clustered images
@@ -19,6 +20,7 @@ function ImageGridWrapper({
     chatMessages,
 }) {
     const currentChatUser = useChatStore((s) => s.currentChatUser);
+    const setSelectedIds = useChatStore((s) => s.setSelectedIds);
     const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
 
     // We source the sender info from the first message in the cluster consistently
@@ -39,7 +41,24 @@ function ImageGridWrapper({
             hasSender={!!anchorMessage?.sender}
             selectMode={selectMode}
             isSelected={isSelected}
-            onSelectToggle={() => { }} // Individual items handle their own selection
+            onSelectToggle={() => {
+                if (isSelected) {
+                    // Deselect all in this grid
+                    const currentIds = messagesArray.map(m => Number(m.id));
+                    setSelectedIds(prev => prev.filter(id => !currentIds.includes(Number(id))));
+                } else {
+                    // Select all in this grid (up to the limit)
+                    const currentIds = messagesArray.map(m => Number(m.id));
+                    setSelectedIds(prev => {
+                        const newSelection = [...new Set([...prev, ...currentIds])];
+                        if (newSelection.length > 50) {
+                            showToast.info("Selection limit reached (50 messages)");
+                            return prev;
+                        }
+                        return newSelection;
+                    });
+                }
+            }}
             reactions={aggregatedReactions}
             reactionAnchorMessage={anchorMessage}
             actionAnchorMessage={messagesArray[messagesArray.length - 1]}

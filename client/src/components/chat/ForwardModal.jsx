@@ -11,6 +11,10 @@ import { MdPersonSearch, MdCheckCircle } from "react-icons/md";
 import ModalShell from "@/components/common/ModalShell";
 import ModalHeader from "@/components/common/ModalHeader";
 import Avatar from "@/components/common/Avatar";
+import { useChatStore } from "@/stores/chatStore";
+import { normalizeMessage } from "@/utils/messageHelpers";
+import { upsertMessageInCache } from "@/lib/cacheHelpers";
+import { useQueryClient } from "@tanstack/react-query";
 
 const MAX_SELECTIONS = 5;
 
@@ -20,6 +24,10 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
   const [searchTerm, setSearchTerm] = useState("");
   const searchRef = useRef(null);
   const forwardMutation = useForwardMessages();
+  const currentChatUser = useChatStore((s) => s.currentChatUser);
+  const storeMessages = useChatStore((s) => s.messages);
+  const setMessages = useChatStore((s) => s.setMessages);
+  const qc = useQueryClient();
 
   // Debounce the search term before sending to backend (400ms)
   const debouncedQ = useDebounce(searchTerm, 400);
@@ -70,16 +78,50 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
   };
 
   const handleForward = () => {
+    console.log("[ForwardModal] Forwarding started. Message IDs:", initialMessageIds, "Target Convos:", selectedConvoIds);
     if (!selectedConvoIds.length || !initialMessageIds.length) return;
+
+    // OPTIMISTIC UPDATE: If forwarding to the current conversation
+    const currentConvId = Number(currentChatUser?.conversationId || (currentChatUser?.id && currentChatUser?.isGroup ? currentChatUser.id : 0));
+    const isForwardingToCurrent = selectedConvoIds.some(id => Number(id) === currentConvId);
+
+    if (isForwardingToCurrent) {
+      console.log("[ForwardModal] Optimistically adding messages to current chat");
+      const optimisticMsgs = initialMessageIds.map(mid => {
+        const original = storeMessages.find(m => Number(m.id) === Number(mid));
+        if (!original) return null;
+
+        return normalizeMessage({
+          id: `temp-${Date.now()}-${Math.random()}`,
+          conversationId: currentConvId,
+          content: original.content || original.message,
+          status: "pending",
+          createdAt: new Date().toISOString(),
+          isForwarded: true,
+          type: original.type,
+          caption: original.caption,
+          isLocal: true,
+        }, userInfo.id, currentChatUser.id, original.type);
+      }).filter(Boolean);
+
+      if (optimisticMsgs.length > 0) {
+        setMessages(prev => [...(prev || []), ...optimisticMsgs]);
+        optimisticMsgs.forEach(msg => upsertMessageInCache(qc, msg));
+      }
+    }
+
     forwardMutation.mutate(
       { messageIds: initialMessageIds, toConversationIds: selectedConvoIds },
       {
         onSuccess: () => {
+          console.log("[ForwardModal] Forwarding success.");
           showToast.success("Messages forwarded successfully");
           onClose?.();
         },
-        onError: () =>
-          showToast.error("Failed to forward messages"),
+        onError: (err) => {
+          console.error("[ForwardModal] Forwarding error:", err);
+          showToast.error("Failed to forward messages");
+        },
       }
     );
   };
