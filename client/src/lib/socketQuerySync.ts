@@ -168,10 +168,17 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
       unshiftContactInCache(queryClient, newContact);
     },
 
-    onGroupMembersUpdated: (conversationId: string | number, participants: any[]) => {
+    onGroupMembersUpdated: (conversationId: string | number, participants: any[], currentUserId?: string) => {
       updateContactFieldsInCache(queryClient, (c: any) => {
         if (String(c.conversationId) !== String(conversationId)) return c;
-        return { ...c, participants };
+
+        const isMeInActive = currentUserId && participants.some((p: any) => String(p.userId) === String(currentUserId) && !p.leftAt);
+
+        return {
+          ...c,
+          participants,
+          leftAt: isMeInActive ? null : c.leftAt // Clear leftAt in sidebar if re-added
+        };
       });
     },
 

@@ -177,20 +177,26 @@ export function useMessageSocketHandlers() {
 
     const onGroupMembersUpdated = ({ conversationId, participants }: any) => {
       if (!conversationId || !participants) return;
+      const myId = authUserIdRef.current;
       const current = useChatStore.getState().currentChatUser;
-      if (current && (current.id === conversationId || (current as any).conversationId === conversationId)) {
+
+      if (current && (String(current.id) === String(conversationId) || String((current as any).conversationId) === String(conversationId))) {
+        // Check if I am now an active participant
+        const isMeInActive = participants.some((p: any) => String(p.userId) === String(myId) && !p.leftAt);
+
         useChatStore.getState().setCurrentChatUser({
           ...current,
-          participants
+          participants,
+          leftAt: isMeInActive ? null : (current as any).leftAt
         } as any);
       }
-      socketSync.onGroupMembersUpdated(conversationId, participants);
+      socketSync.onGroupMembersUpdated(conversationId, participants, String(myId || ''));
     };
 
     const onGroupRoleUpdated = ({ conversationId, userId, role }: any) => {
       if (!conversationId || !userId || !role) return;
       const current = useChatStore.getState().currentChatUser;
-      if (current && (current.id === conversationId || (current as any).conversationId === conversationId)) {
+      if (current && (String(current.id) === String(conversationId) || String((current as any).conversationId) === String(conversationId))) {
         const updatedParticipants = (current as any).participants?.map((p: any) =>
           String(p.userId) === String(userId) ? { ...p, role } : p
         );
@@ -207,7 +213,7 @@ export function useMessageSocketHandlers() {
       const myAuthId = authUserIdRef.current;
       const current = useChatStore.getState().currentChatUser;
 
-      if (current && (current.id === conversationId || (current as any).conversationId === conversationId)) {
+      if (current && (String(current.id) === String(conversationId) || String((current as any).conversationId) === String(conversationId))) {
         const isMe = String(userId) === String(myAuthId);
         const updatedParticipants = (current as any).participants?.map((p: any) =>
           String(p.userId) === String(userId) ? { ...p, leftAt } : p
@@ -219,6 +225,17 @@ export function useMessageSocketHandlers() {
         } as any);
       }
       socketSync.onGroupLeft(conversationId, userId, leftAt, String(myAuthId || ''));
+    };
+
+    const onGroupDeleted = ({ conversationId }: any) => {
+      Logger.info(`Socket: group-deleted for convo ${conversationId}`);
+      // Invalidate contacts and active chat
+      socketSync.onChatDeleted(conversationId);
+      const current = useChatStore.getState().currentChatUser;
+      if (current && (String(current.id) === String(conversationId) || String((current as any).conversationId) === String(conversationId))) {
+        useChatStore.getState().setCurrentChatUser(null);
+        showToast.info("This group has been deleted");
+      }
     };
 
     const onProfileUpdated = ({ user }: any) => {
@@ -244,13 +261,15 @@ export function useMessageSocketHandlers() {
     const onMessageSent = (data: any) => {
       const message: Message = data?.message || data;
       if (!message?.id) return;
-      Logger.debug(`Socket: message-sent (new message) ${message.id}`, { conversationId: (message as any).conversationId });
 
-      // Always read from refs to get the latest values (no stale closure)
       const myAuthId = authUserIdRef.current;
       const currentChatUser = currentChatUserRef.current;
 
-      // Real-time status for incoming
+      const isGroup = (currentChatUser as any)?.isGroup || (currentChatUser as any)?.type === 'group';
+      const activeTypeStr = isGroup ? 'GROUP' : 'DIRECT';
+      const isLeftChat = !!(currentChatUser as any)?.leftAt;
+
+      // Always read from refs to get the latest values (no stale closure)
       if (Number(message.senderId) !== Number(myAuthId)) {
         const isGroup = (currentChatUser as any)?.isGroup || (currentChatUser as any)?.type === 'group';
         const activeConvId = (currentChatUser as any)?.conversationId || currentChatUser?.id;
@@ -327,8 +346,10 @@ export function useMessageSocketHandlers() {
           const isMe = Number(message.senderId) === Number(myAuthId);
           const peerIdMatch = isMe ? String(message.receiverId) : String(message.senderId);
 
-          const isMatch = (convId && convId !== "0" && String(c?.conversationId) === String(convId)) ||
-            (String(c?.id) === peerIdMatch);
+          const isGroupMsg = !!convId && String(convId) !== "0";
+          const isMatch = isGroupMsg
+            ? (c.isGroup && String(c.conversationId) === String(convId))
+            : (!c.isGroup && String(c.id) === peerIdMatch);
 
           if (!isMatch) return c;
 
@@ -386,6 +407,7 @@ export function useMessageSocketHandlers() {
     s.off('group-members-updated', onGroupMembersUpdated);
     s.off('group-role-updated', onGroupRoleUpdated);
     s.off('group-left', onGroupLeft);
+    s.off('group-deleted', onGroupDeleted);
 
     // Attach all fresh handlers
     s.on('message-status-update', onStatusUpdate);
@@ -412,6 +434,7 @@ export function useMessageSocketHandlers() {
     s.on('group-members-updated', onGroupMembersUpdated);
     s.on('group-role-updated', onGroupRoleUpdated);
     s.on('group-left', onGroupLeft);
+    s.on('group-deleted', onGroupDeleted);
 
     return () => {
       s.off('message-status-update', onStatusUpdate);
@@ -438,6 +461,7 @@ export function useMessageSocketHandlers() {
       s.off('group-members-updated', onGroupMembersUpdated);
       s.off('group-role-updated', onGroupRoleUpdated);
       s.off('group-left', onGroupLeft);
+      s.off('group-deleted', onGroupDeleted);
     };
     // Only depend on socket — currentChatUser is accessed via ref to prevent stale closures
     // while still allowing the handler to read the latest value at call time

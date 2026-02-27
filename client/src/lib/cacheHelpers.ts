@@ -33,6 +33,7 @@ export const upsertMessageInCache = (queryClient: QueryClient, message: any, tem
         const qKey = query.queryKey;
         const cacheAuthId = qKey && qKey.length >= 2 ? String(qKey[1]) : null;
         const cachePeerId = qKey && qKey.length >= 3 ? String(qKey[2]) : null;
+        const cacheType = qKey && qKey.length >= 4 ? String(qKey[3]) : 'direct';
 
         const idToSearch = tempId ? String(tempId) : null;
         const msgIdStr = String(message.id);
@@ -41,34 +42,40 @@ export const upsertMessageInCache = (queryClient: QueryClient, message: any, tem
             return mid === msgIdStr || (idToSearch && mid === idToSearch);
         };
 
-        // Determine if this message actually belongs in THIS specific cache
-        const msgConvId = String(message.conversationId || "");
+        const msgConvId = String((message as any).conversationId || "");
         const msgSenderId = String(message.senderId || "");
-        const msgReceiverId = String(message.receiverId || "");
+        const msgReceiverId = String((message as any).receiverId || "");
+        const isGroupMsg = !!msgConvId && msgConvId !== "0";
 
         let belongsToThisCache = false;
+
         if (cachePeerId && cacheAuthId) {
-            // 1. Exact conversationId match (Groups / Professional DMs)
-            if (msgConvId !== "" && msgConvId !== "0" && msgConvId === cachePeerId) {
-                belongsToThisCache = true;
-            }
-            // 2. Peer matching (Fallback / Optimistic / Simple DMs)
-            else {
-                const isSavedMessagesCache = cachePeerId === cacheAuthId;
-                if (isSavedMessagesCache) {
-                    // Only messages where both sender and receiver are the same user
-                    if (msgSenderId === cacheAuthId && msgReceiverId === cacheAuthId) {
-                        belongsToThisCache = true;
-                    }
-                } else {
-                    // Standard DMs: must match the pair (Me, Peer)
-                    const isIncomingFromPeer = msgSenderId === cachePeerId && msgReceiverId === cacheAuthId;
-                    const isOutgoingToPeer = msgSenderId === cacheAuthId && msgReceiverId === cachePeerId;
-                    if (isIncomingFromPeer || isOutgoingToPeer) {
-                        belongsToThisCache = true;
+            if (isGroupMsg) {
+                // Must be a 'group' cache and the ID must match the msgConvId
+                if (cacheType === 'group' && msgConvId === cachePeerId) {
+                    belongsToThisCache = true;
+                }
+            } else {
+                // Direct Messages: must be a 'direct' cache type
+                if (cacheType === 'direct') {
+                    const isSavedMessagesCache = cachePeerId === cacheAuthId;
+                    if (isSavedMessagesCache) {
+                        if (msgSenderId === cacheAuthId && msgReceiverId === cacheAuthId) {
+                            belongsToThisCache = true;
+                        }
+                    } else {
+                        const isIncomingFromPeer = msgSenderId === cachePeerId && msgReceiverId === cacheAuthId;
+                        const isOutgoingToPeer = msgSenderId === cacheAuthId && msgReceiverId === cachePeerId;
+                        if (isIncomingFromPeer || isOutgoingToPeer) {
+                            belongsToThisCache = true;
+                        }
                     }
                 }
             }
+        }
+
+        if (belongsToThisCache) {
+            console.log(`[CACHELOG] !! BELONGS !! msg ${message.id} -> [Peer:${cachePeerId}, Auth:${cacheAuthId}, Type:${cacheType}]`);
         }
 
         if (!belongsToThisCache) return;

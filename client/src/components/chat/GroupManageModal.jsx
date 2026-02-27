@@ -8,6 +8,7 @@ import { useUpdateGroupSettings } from '@/hooks/groups/useUpdateGroupSettings';
 import { useAddGroupMembers, useRemoveGroupMembers } from '@/hooks/groups/useGroupMembers';
 import { useUpdateGroupRole } from '@/hooks/groups/useUpdateGroupRole';
 import { useLeaveGroup, useDeleteGroup } from '@/hooks/groups/useGroupActions';
+import { useDeleteChat } from '@/hooks/chat/useChatActions';
 import { showToast } from "@/lib/toast";
 import { IoArrowBack, IoAdd, IoTrash, IoExitOutline, IoChevronForward } from "react-icons/io5";
 import { FaMagic, FaScroll, FaFeather, FaTabletAlt, FaUsers, FaLock, FaFire, FaShieldAlt } from "react-icons/fa";
@@ -41,6 +42,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
   const [confirmRemove, setConfirmRemove] = useState({ open: false, memberId: null, memberName: "" });
   // Confirm: Demote admin
   const [confirmDemote, setConfirmDemote] = useState({ open: false, userId: null, memberName: "" });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Hooks for mutations
   const updateSettings = useUpdateGroupSettings();
@@ -54,9 +56,10 @@ export default function GroupManageModal({ open, onClose, groupId }) {
   // Derive group data from currentChatUser if it's the target group
   // Assuming currentChatUser contains group details (members, name, description, icon, adminId, etc.)
   const groupData = useMemo(() => {
-    if (currentChatUser && (currentChatUser.id === groupId || currentChatUser.conversationId === groupId)) {
-      return currentChatUser;
-    }
+    if (!currentChatUser) return null;
+    const cid = String(currentChatUser.id || currentChatUser.conversationId || "");
+    const gid = String(groupId || "");
+    if (cid === gid) return currentChatUser;
     return null;
   }, [currentChatUser, groupId]);
 
@@ -203,26 +206,38 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     setShowDeleteConfirm(true);
   };
 
+  const deleteChat = useDeleteChat();
+
+  const isCreator = useMemo(() => {
+    return String(groupData?.createdById) === String(userInfo?.id);
+  }, [groupData, userInfo]);
+
   const confirmDeleteGroup = async () => {
     if (!groupId) return;
+    setIsDeleting(true);
 
     try {
-      // 1. Leave the group first (to notify others and record status)
-      await leaveGroup.mutateAsync(groupId);
+      if (isCreator) {
+        // 1. Group Creator nukes the group for everyone
+        await deleteGroup.mutateAsync(groupId);
+        showToast.success("Group deleted for everyone.");
+      } else {
+        // 2. Normal member/admin: 'Delete for me' behavior
+        if (!isLeft) {
+          await leaveGroup.mutateAsync(groupId);
+        }
+        await deleteChat.mutateAsync({ chatId: groupId });
+        showToast.info("Group removed from your chats.");
+      }
 
-      // 2. Actually delete the group
-      deleteGroup.mutate(groupId, {
-        onSuccess: () => {
-          showToast.info("Group deleted.");
-          setShowDeleteConfirm(false);
-          onClose?.();
-        },
-        onError: () => showToast.error("Failed to delete group."),
-      });
+      setShowDeleteConfirm(false);
+      setCurrentChatUser(null);
+      onClose?.();
     } catch (e) {
       console.error("Delete sequence error:", e);
-      // Fallback: try delete even if leave failed (might be a permission quirk)
-      deleteGroup.mutate(groupId);
+      showToast.error("Failed to delete group.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -361,15 +376,18 @@ export default function GroupManageModal({ open, onClose, groupId }) {
               <span>Leave group</span>
               <IoExitOutline className="text-red-300 text-2xl" />
             </button>
-            {currentUserIsAdmin && (
-              <button
-                onClick={handleDeleteGroup}
-                className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/70 rounded-lg text-red-400 font-bold flex items-center justify-between transition-colors duration-200"
-              >
+            <button
+              onClick={handleDeleteGroup}
+              className="w-full text-left p-4 bg-ancient-bg-dark/50 hover:bg-red-900/40 rounded-lg text-red-500 font-bold flex items-center justify-between border border-red-900/20 transition-all duration-200 group"
+            >
+              <div className="flex flex-col">
                 <span>Delete group</span>
-                <IoTrash className="text-red-400 text-2xl" />
-              </button>
-            )}
+                <span className="text-[10px] text-red-400/60 font-normal">
+                  {isCreator ? "This will delete the group for all members" : "Remove this group from your chat history"}
+                </span>
+              </div>
+              <IoTrash className="text-red-400 text-2xl group-hover:scale-110 transition-transform" />
+            </button>
           </div>
         )}
 
@@ -404,9 +422,9 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         onConfirm={confirmDeleteGroup}
         title="Delete group?"
         description="This will permanently delete the group for all members. This action cannot be undone."
-        confirmText="Delete"
+        confirmText={isDeleting ? "Deleting..." : "Delete"}
         cancelText="Cancel"
-        confirmLoading={deleteGroup.isPending}
+        confirmLoading={isDeleting}
         variant="danger"
       />
 

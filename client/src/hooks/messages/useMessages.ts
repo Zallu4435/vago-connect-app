@@ -3,12 +3,12 @@ import { MessageService } from '@/services/messageService';
 import type { Message } from '@/types';
 import { queryKeys } from '@/lib/queryKeys';
 
-export function useMessages(userId?: string, peerId?: string): UseQueryResult<Message[], Error> {
+export function useMessages(userId?: string, peerId?: string, isGroup: boolean = false): UseQueryResult<Message[], Error> {
   return useQuery<Message[], Error>({
-    queryKey: userId && peerId ? queryKeys.messages.byChat(userId, peerId) : ['messages', '', ''] as const,
+    queryKey: userId && peerId ? queryKeys.messages.byChat(userId, peerId, isGroup) : ['messages', '', '', 'direct'] as const,
     enabled: Boolean(userId && peerId),
     queryFn: async () => {
-      const data = await MessageService.getMessages(Number(peerId!));
+      const data = await MessageService.getMessages(Number(peerId!), { isGroup });
       const backend = (data?.messages as any[]) || [];
       const mapped: Message[] = backend.map((m) => ({
         id: Number(m.id),

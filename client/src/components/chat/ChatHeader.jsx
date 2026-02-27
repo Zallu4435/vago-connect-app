@@ -12,7 +12,7 @@ import { useRef, useState, useMemo } from "react";
 import { useContacts } from '@/hooks/contacts/useContacts';
 import { useClearChat, useDeleteChat } from '@/hooks/chat/useChatActions';
 import { usePinChat } from '@/hooks/chat/usePinChat';
-import { useLeaveGroup } from '@/hooks/groups/useGroupActions';
+import { useLeaveGroup, useDeleteGroup } from '@/hooks/groups/useGroupActions';
 import { useBlockUser } from '@/hooks/contacts/useBlockUser';
 import ActionSheet from "@/components/common/ActionSheet";
 import { useRenderLog } from "@/hooks/ui/useRenderLog";
@@ -61,7 +61,8 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   const isOnline = onlineUsers?.some((u) => String(u) === String(currentChatUser?.id));
   const isTyping = typingUsers?.some((u) => String(u) === String(currentChatUser?.id));
   const isGroupChat = !!currentChatUser?.isGroup || contactEntry?.type === "group";
-  const hasMessages = messages && messages.length > 0;
+  const isCreator = String(currentChatUser?.createdById || contactEntry?.createdById || "") === String(userInfo?.id);
+  const hasMessages = !!conversationId || (messages && messages.length > 0);
 
   useRenderLog("ChatHeader", { currentChatUser, isGroupChat });
 
@@ -70,6 +71,7 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   const deleteChat = useDeleteChat();
   const pinChat = usePinChat();
   const leaveGroup = useLeaveGroup();
+  const deleteGroup = useDeleteGroup();
   const blockUser = useBlockUser();
 
   const setCallToast = (fn) => {
@@ -318,17 +320,29 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
       <ConfirmModal
         open={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!conversationId) return;
-          deleteChat.mutate(
-            { chatId: conversationId },
-            { onSuccess: () => { setShowDeleteConfirm(false); setCurrentChatUser(null); } }
-          );
+          try {
+            if (isGroupChat && !isLeft) {
+              if (isCreator) {
+                await deleteGroup.mutateAsync(conversationId);
+              } else {
+                await leaveGroup.mutateAsync(conversationId);
+                await deleteChat.mutateAsync({ chatId: conversationId });
+              }
+            } else {
+              await deleteChat.mutateAsync({ chatId: conversationId });
+            }
+            setShowDeleteConfirm(false);
+            setCurrentChatUser(null);
+          } catch (err) {
+            console.error("ChatHeader delete error:", err);
+          }
         }}
         title="Delete this chat?"
         description="This will permanently delete the conversation from your chats list. It does not delete messages for the other participant."
-        confirmText={deleteChat.isPending ? "Deleting..." : "Delete"}
-        confirmLoading={deleteChat.isPending}
+        confirmText={(deleteChat.isPending || leaveGroup.isPending || deleteGroup.isPending) ? "Deleting..." : "Delete"}
+        confirmLoading={deleteChat.isPending || leaveGroup.isPending || deleteGroup.isPending}
         variant="danger"
       />
 

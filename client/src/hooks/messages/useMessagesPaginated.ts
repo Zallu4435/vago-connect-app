@@ -22,7 +22,9 @@ export function useMessagesPaginated(userId?: string, peerId?: string, opts: Opt
   const authUserId = useAuthStore((s) => s.userInfo?.id);
 
   return useInfiniteQuery<Page, Error>({
-    queryKey: userId && peerId ? [...queryKeys.messages.byChat(userId, peerId), 'infinite', limit, markRead] : ['messages', '', '', 'infinite', limit, markRead] as const,
+    queryKey: (userId && peerId)
+      ? [...queryKeys.messages.byChat(userId, peerId, !!opts.isGroup), 'infinite', limit, markRead]
+      : ['messages', '', '', 'direct', 'infinite', limit, markRead] as const,
     enabled: Boolean(userId && peerId),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage?.nextCursor ?? null,

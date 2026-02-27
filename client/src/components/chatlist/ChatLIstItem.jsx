@@ -11,7 +11,7 @@ import { FaThumbtack } from "react-icons/fa";
 import ActionSheet from "@/components/common/ActionSheet";
 import { usePinChat } from '@/hooks/chat/usePinChat';
 import { useDeleteChat, useClearChat } from '@/hooks/chat/useChatActions';
-import { useLeaveGroup } from '@/hooks/groups/useGroupActions';
+import { useLeaveGroup, useDeleteGroup } from '@/hooks/groups/useGroupActions';
 import { useBlockUser } from '@/hooks/contacts/useBlockUser';
 import ConfirmModal from "@/components/common/ConfirmModal";
 
@@ -76,6 +76,7 @@ function ChatListItem({ data, isContactsPage = false }) {
   const deleteChat = useDeleteChat();
   const clearChat = useClearChat();
   const leaveGroup = useLeaveGroup();
+  const deleteGroup = useDeleteGroup();
   const blockUser = useBlockUser();
 
   const onDelete = (e) => { e?.stopPropagation?.(); setShowDeleteConfirm(true); setMenuOpen(false); };
@@ -204,18 +205,35 @@ function ChatListItem({ data, isContactsPage = false }) {
       <ConfirmModal
         open={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        onConfirm={(e) => {
+        onConfirm={async (e) => {
           e?.stopPropagation?.();
           if (!data?.conversationId) return;
-          deleteChat.mutate(
-            { chatId: data.conversationId },
-            { onSuccess: () => setShowDeleteConfirm(false) }
-          );
+
+          const gid = data.conversationId;
+          const isGroup = !!data.isGroup;
+          const isLeft = !!data.leftAt;
+          const isCreator = String(data.createdById) === String(userInfo?.id);
+
+          try {
+            if (isGroup && !isLeft) {
+              if (isCreator) {
+                await deleteGroup.mutateAsync(gid);
+              } else {
+                await leaveGroup.mutateAsync(gid);
+                await deleteChat.mutateAsync({ chatId: gid });
+              }
+            } else {
+              await deleteChat.mutateAsync({ chatId: gid });
+            }
+            setShowDeleteConfirm(false);
+          } catch (err) {
+            console.error("ChatListItem delete error:", err);
+          }
         }}
         title="Delete this chat?"
         description="This will permanently delete the conversation from your chats list."
-        confirmText={deleteChat.isPending ? "Deleting..." : "Delete"}
-        confirmLoading={deleteChat.isPending}
+        confirmText={(deleteChat.isPending || leaveGroup.isPending || deleteGroup.isPending) ? "Deleting..." : "Delete"}
+        confirmLoading={deleteChat.isPending || leaveGroup.isPending || deleteGroup.isPending}
         variant="danger"
       />
 

@@ -13,7 +13,12 @@ export class ChatMapper {
     }
 
     static toMinimalParticipant(p) {
-        return { user: p.user, role: p.role };
+        return {
+            userId: p.userId,
+            user: p.user,
+            role: p.role,
+            leftAt: p.leftAt
+        };
     }
 
     static mapParticipantsToMinimal(participants) {

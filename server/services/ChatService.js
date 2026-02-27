@@ -143,7 +143,7 @@ export class ChatService {
             skipDuplicates: true,
         });
 
-        // FIX: If a user was previously in the group and marked as deleted, reset their state
+        console.log(`[BATCH LOG] Adding members to group ${groupId}:`, toAddIds);
         await prisma.conversationParticipant.updateMany({
             where: {
                 conversationId: groupId,
@@ -154,6 +154,17 @@ export class ChatService {
                 deletedAt: null,
                 clearedAt: null,
                 leftAt: null,
+                role: 'member', // Force new/re-added users to be normal members
+                joinedAt: new Date(),
+                unreadCount: 0,
+                lastReadMessageId: null,
+                isPinned: false,
+                pinnedAt: null,
+                pinOrder: 0,
+                isArchived: false,
+                archivedAt: null,
+                isMuted: false,
+                mutedUntil: null
             },
         });
 
@@ -364,6 +375,7 @@ export class ChatService {
     }
 
     static async leaveGroup({ userId, groupId, permissions }) {
+        console.log(`[BATCH LOG] User ${userId} attempting to leave group ${groupId}`);
         const prisma = getPrismaInstance();
         if (!groupId) throw Object.assign(new Error("groupId is required"), { status: 400 });
 
@@ -388,6 +400,20 @@ export class ChatService {
                 where: { id: newAdmin.id },
                 data: { role: 'admin' }
             });
+
+            // Notify everyone about the new admin via system message
+            await prisma.message.create({
+                data: {
+                    conversationId: groupId,
+                    senderId: userId,
+                    type: 'text',
+                    content: `${newAdmin.user?.name || "A member"} is now an admin`,
+                    isSystemMessage: true,
+                    systemMessageType: 'role_updated',
+                    status: 'sent',
+                }
+            });
+
             SocketEmitter.emitToUsers(activeParticipants.map(p => p.userId), 'group-role-updated', { conversationId: groupId, userId: newAdmin.userId, role: 'admin' });
         }
 
@@ -426,6 +452,7 @@ export class ChatService {
     }
 
     static async deleteGroup({ adminId, groupId }) {
+        console.log(`[BATCH LOG] Admin ${adminId} attempting global delete of group ${groupId}`);
         const prisma = getPrismaInstance();
         if (!groupId) throw Object.assign(new Error("groupId is required"), { status: 400 });
 
@@ -435,11 +462,18 @@ export class ChatService {
         });
         if (!convo || convo.type !== 'group') throw Object.assign(new Error("Group not found"), { status: 404 });
 
-        const adminPart = convo.participants.find((p) => p.userId === adminId);
-        if (!adminPart || adminPart.role !== 'admin') throw Object.assign(new Error("Only admins can delete the group"), { status: 403 });
+        const participant = convo.participants.find((p) => p.userId === adminId);
+        if (!participant) throw Object.assign(new Error("You must be a member to delete the group"), { status: 403 });
+
+        if (convo.createdById !== adminId) {
+            console.log(`[BATCH LOG] Delete failed: User ${adminId} is not creator (Creator is ${convo.createdById})`);
+            throw Object.assign(new Error("Only the group creator can delete the group for everyone"), { status: 403 });
+        }
 
         // Notify all participants before actual deletion
-        SocketEmitter.emitToUsers(convo.participants.map(p => p.userId), 'group-deleted', { conversationId: groupId });
+        const participantIds = convo.participants.map(p => p.userId);
+        console.log(`[BATCH LOG] Creator confirmed. Notifying ${participantIds.length} users and nuking group ${groupId}`);
+        SocketEmitter.emitToUsers(participantIds, 'group-deleted', { conversationId: groupId });
         await prisma.conversation.delete({ where: { id: groupId } });
 
         return { message: "Group deleted successfully", conversationId: groupId };
@@ -562,6 +596,7 @@ export class ChatService {
     }
 
     static async deleteChatForMe({ userId, conversationId }) {
+        console.log(`[BATCH LOG] User ${userId} attempting deleteChatForMe for ${conversationId}`);
         const prisma = getPrismaInstance();
         if (!conversationId) throw Object.assign(new Error("Invalid conversation id"), { status: 400 });
 
