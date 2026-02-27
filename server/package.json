@@ -3,8 +3,8 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "build": "prisma generate",
-    "migrate": "prisma db push --accept-data-loss",
+    "build": "npx prisma generate",
+    "migrate": "npx prisma db push --accept-data-loss",
     "start:prod": "npm run build && npm run migrate && node index.js"
   },
   "dependencies": {
