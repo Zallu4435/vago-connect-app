@@ -13,7 +13,6 @@ import { useSocketStore } from "@/stores/socketStore";
 import { useEditMessage } from '@/hooks/messages/useEditMessage';
 import { useSendMedia } from '@/hooks/messages/useSendMedia';
 import { normalizeMessage } from "@/utils/messageHelpers";
-import ErrorMessage from "@/components/common/ErrorMessage";
 import { showToast } from "@/lib/toast";
 import ActionSheet from "@/components/common/ActionSheet";
 import MediaPreviewModal from "./MediaPreviewModal";
@@ -33,6 +32,7 @@ function MessageBar({ isOnline = true }) {
   const isBlocked = Boolean(contactEntry?.isBlocked);
   const blockedBy = Boolean(contactEntry?.blockedBy);
   const isChatBlocked = isBlocked || blockedBy;
+  const isLeft = Boolean(contactEntry?.leftAt);
 
   const messages = useChatStore((s) => s.messages);
   const setMessages = useChatStore((s) => s.setMessages);
@@ -128,8 +128,8 @@ function MessageBar({ isOnline = true }) {
 
   const sendMessage = useCallback(() => {
     if (!isOnline) return;
-    if (isChatBlocked) {
-      showToast.error("Cannot message a blocked contact");
+    if (isChatBlocked || isLeft) {
+      showToast.error(isLeft ? "You are no longer a member of this group" : "Cannot message a blocked contact");
       return;
     }
     const text = message.trim();
@@ -356,11 +356,13 @@ function MessageBar({ isOnline = true }) {
         onDrop={isChatBlocked ? undefined : onDrop}
         onDragOver={isChatBlocked ? undefined : onDragOver}
       >
-        {isChatBlocked ? (
+        {(isChatBlocked || isLeft) ? (
           <div className="flex-1 flex justify-center items-center text-ancient-text-muted text-sm sm:text-base font-medium">
-            {isBlocked
-              ? "You blocked this contact."
-              : "You cannot send messages to this contact."}
+            {isLeft
+              ? "You can't send messages to this group because you're no longer a member."
+              : isBlocked
+                ? "You blocked this contact."
+                : "You cannot send messages to this contact."}
           </div>
         ) : !showAudioRecorder ? (
           <>
@@ -379,11 +381,11 @@ function MessageBar({ isOnline = true }) {
                 <button
                   ref={attachButtonRef}
                   type="button"
-                  disabled={isChatBlocked}
+                  disabled={isChatBlocked || isLeft}
                   onClick={() => { setShowAttachMenu((v) => !v); setShowEmojiPicker(false); }}
                   className={`
                     p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95
-                    ${isChatBlocked ? "opacity-30 cursor-not-allowed text-ancient-icon-inactive" : "text-ancient-icon-inactive hover:text-white"}
+                    ${(isChatBlocked || isLeft) ? "opacity-30 cursor-not-allowed text-ancient-icon-inactive" : "text-ancient-icon-inactive hover:text-white"}
                   `}
                   title="Attach"
                 >
@@ -417,12 +419,12 @@ function MessageBar({ isOnline = true }) {
             <div className="flex-1 relative">
               <input
                 type="text"
-                placeholder={isChatBlocked ? "Cannot send messages to a blocked contact" : "Type a message..."}
+                placeholder={isChatBlocked ? "Cannot send messages to a blocked contact" : (isLeft ? "You can't send messages to this group" : "Type a message...")}
                 className={`
                   w-full h-11 sm:h-12 bg-ancient-input-bg border border-ancient-input-border rounded-full px-4 sm:px-5
                   text-sm sm:text-base text-ancient-text-light placeholder:text-ancient-text-muted
                   focus:outline-none focus:border-ancient-icon-glow transition-all shadow-inner
-                  ${isChatBlocked ? "opacity-50 cursor-not-allowed" : ""}
+                  ${(isChatBlocked || isLeft) ? "opacity-50 cursor-not-allowed" : ""}
                 `}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -442,7 +444,7 @@ function MessageBar({ isOnline = true }) {
                   }
                 }}
                 ref={inputRef}
-                disabled={!isOnline}
+                disabled={!isOnline || isLeft}
               />
 
               {/* Upload Progress Overlay */}
@@ -465,7 +467,7 @@ function MessageBar({ isOnline = true }) {
               className="p-2 sm:p-2.5 rounded-full hover:bg-ancient-bg-dark/60 transition-all active:scale-95 flex-shrink-0 disabled:opacity-70"
               onClick={message.trim().length > 0 ? sendMessage : () => setShowAudioRecorder(true)}
               title={message.trim().length > 0 ? "Send Message" : "Record Voice"}
-              disabled={!isOnline}
+              disabled={!isOnline || isLeft}
             >
               {message.trim().length > 0 ? (
                 <MdSend className="text-ancient-icon-glow text-xl sm:text-2xl" />

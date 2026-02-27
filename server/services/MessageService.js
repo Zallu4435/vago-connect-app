@@ -22,6 +22,10 @@ export class MessageService {
 
         return await prisma.$transaction(async (tx) => {
             const convo = await resolveConversation(tx, from, to, isGroup);
+            if (isGroup) {
+                const isPart = convo.participants.some(p => p.userId === Number(from) && !p.leftAt);
+                if (!isPart) throw Object.assign(new Error("Cannot send message. You are not a member of this group."), { status: 403 });
+            }
             const replyData = await prepareReply(tx, convo.id, replyToMessageId, Number(from));
 
             const newMessage = await tx.message.create({
@@ -75,6 +79,10 @@ export class MessageService {
 
             return await prisma.$transaction(async (tx) => {
                 const convo = await resolveConversation(tx, from, to, isGroup);
+                if (isGroup) {
+                    const isPart = convo.participants.some(p => p.userId === Number(from) && !p.leftAt);
+                    if (!isPart) throw Object.assign(new Error("Cannot send message. You are not a member of this group."), { status: 403 });
+                }
                 const replyData = await prepareReply(tx, convo.id, replyToMessageId, Number(from));
 
                 const newMessage = await tx.message.create({
@@ -126,14 +134,20 @@ export class MessageService {
 
         const participant = await prisma.conversationParticipant.findFirst({
             where: { conversationId: convo.id, userId: Number(from) },
-            select: { clearedAt: true },
+            select: { clearedAt: true, joinedAt: true, leftAt: true },
         });
         const clearedAt = participant?.clearedAt || null;
+        const leftAt = participant?.leftAt || null;
+        const joinedAt = participant?.joinedAt || null;
 
         const rows = await prisma.message.findMany({
             where: {
                 conversationId: convo.id,
-                ...(clearedAt ? { createdAt: { gt: clearedAt } } : {}),
+                AND: [
+                    clearedAt ? { createdAt: { gt: clearedAt } } : {},
+                    joinedAt ? { createdAt: { gte: joinedAt } } : {},
+                    leftAt ? { createdAt: { lte: leftAt } } : {},
+                ],
                 NOT: {
                     deletedBy: { array_contains: Number(from) },
                 },
@@ -203,8 +217,8 @@ export class MessageService {
         });
         if (!message) throw Object.assign(new Error("Message not found"), { status: 404 });
 
-        const isParticipant = message.conversation.participants.some(p => p.userId === reqId);
-        if (!isParticipant) throw Object.assign(new Error("Not a participant"), { status: 403 });
+        const isParticipant = message.conversation.participants.some(p => p.userId === reqId && !p.leftAt);
+        if (!isParticipant) throw Object.assign(new Error("Cannot perform action. You are not a member of this group."), { status: 403 });
 
         if (message.conversation.type === 'direct') {
             const other = message.conversation.participants.find(p => p.userId !== reqId);
@@ -259,8 +273,8 @@ export class MessageService {
         });
         if (!message) throw Object.assign(new Error("Message not found"), { status: 404 });
 
-        const isParticipant = message.conversation.participants.some(p => p.userId === reqId);
-        if (!isParticipant) throw Object.assign(new Error("Not a participant"), { status: 403 });
+        const isParticipant = message.conversation.participants.some(p => p.userId === reqId && !p.leftAt);
+        if (!isParticipant) throw Object.assign(new Error("Cannot perform action. You are not a member of this group."), { status: 403 });
 
         if (message.conversation.type === 'direct') {
             const other = message.conversation.participants.find(p => p.userId !== reqId);
@@ -365,8 +379,8 @@ export class MessageService {
             return { id: mId, deleteType: "forEveryone", status: 'idempotent' };
         }
 
-        const isParticipant = message.conversation.participants.some(p => p.userId === reqId);
-        if (!isParticipant) throw Object.assign(new Error("Not a participant"), { status: 403 });
+        const isParticipant = message.conversation.participants.some(p => p.userId === reqId && !p.leftAt);
+        if (!isParticipant) throw Object.assign(new Error("Cannot perform action. You are not a member of this group."), { status: 403 });
 
         if (deleteType === "forEveryone") {
             if (message.senderId !== reqId) {
@@ -458,7 +472,7 @@ export class MessageService {
         }
 
         for (const m of msgs) {
-            const isParticipant = m.conversation.participants.some(p => p.userId === reqId);
+            const isParticipant = m.conversation.participants.some(p => p.userId === reqId && !p.leftAt);
             if (!isParticipant) {
                 throw Object.assign(new Error(`No access to source message ${m.id}`), { status: 403 });
             }
@@ -472,7 +486,7 @@ export class MessageService {
             throw Object.assign(new Error(`One or more destination conversations not found`), { status: 404 });
         }
         for (const c of destConvos) {
-            const isParticipant = c.participants.some(p => p.userId === reqId);
+            const isParticipant = c.participants.some(p => p.userId === reqId && !p.leftAt);
             if (!isParticipant) {
                 throw Object.assign(new Error(`No access to destination conversation ${c.id}`), { status: 403 });
             }

@@ -61,6 +61,7 @@ export function useContacts(userId?: string): UseQueryResult<Contact[], Error> {
             isSystemMessage: Boolean(m?.isSystemMessage),
             systemMessageType: m?.systemMessageType || null,
             totalUnreadMessages: ps?.unreadCount || 0,
+            leftAt: ps?.leftAt || null,
           } as any;
         })
         .filter(Boolean) as any[];

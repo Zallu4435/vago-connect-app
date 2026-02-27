@@ -208,13 +208,16 @@ export class ChatService {
         });
 
         const removedUsers = await prisma.user.findMany({ where: { id: { in: toRemove } }, select: { id: true, name: true } });
+        const adminUser = await prisma.user.findUnique({ where: { id: adminId }, select: { name: true } });
+        const adminName = adminUser?.name || "Admin";
         const names = removedUsers.map((u) => u.name || `User ${u.id}`).join(', ');
+
         const sysMsg = await prisma.message.create({
             data: {
                 conversationId: groupId,
                 senderId: adminId,
                 type: 'text',
-                content: `${names} left the group`,
+                content: `${names} ${removedUsers.length > 1 ? 'were' : 'was'} removed by ${adminName}`,
                 isSystemMessage: true,
                 systemMessageType: 'member_removed',
                 status: 'sent',
@@ -226,10 +229,19 @@ export class ChatService {
             include: { participants: { include: { user: { select: { id: true, name: true, profileImage: true } } } } },
         });
         const minimalParts = ChatMapper.mapActiveParticipantsToMinimal(updated.participants);
-        SocketEmitter.emitToUsers(updated.participants.filter(p => !p.leftAt).map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
 
-        // Notify both active members and the left members about the system message
-        SocketEmitter.emitToUsers(updated.participants.map(p => p.userId), 'message-sent', { message: sysMsg });
+        // Notify current active members about updated list
+        const activeUids = updated.participants.filter(p => !p.leftAt).map(p => p.userId);
+        SocketEmitter.emitToUsers(activeUids, 'group-members-updated', { conversationId: groupId, participants: minimalParts });
+
+        // Notify BOTH active members and the removed members about the system message
+        const allParticipantsToNotify = updated.participants.map(p => p.userId);
+        SocketEmitter.emitToUsers(allParticipantsToNotify, 'message-sent', { message: sysMsg });
+
+        // Specifically notify removed users that they are out
+        toRemove.forEach(uid => {
+            SocketEmitter.emitToUser(uid, 'group-left', { conversationId: groupId, leftAt: new Date() });
+        });
 
         return { conversationId: groupId, participants: minimalParts };
     }
@@ -395,7 +407,7 @@ export class ChatService {
                 type: 'text',
                 content: `${name} left the group`,
                 isSystemMessage: true,
-                systemMessageType: 'member_removed',
+                systemMessageType: 'member_left',
                 status: 'sent',
             },
         });
@@ -408,6 +420,7 @@ export class ChatService {
 
         SocketEmitter.emitToUsers(updated.participants.filter(p => !p.leftAt).map(p => p.userId), 'group-members-updated', { conversationId: groupId, participants: minimalParts });
         SocketEmitter.emitToUsers(updated.participants.map(p => p.userId), 'message-sent', { message: sysMsg });
+        SocketEmitter.emitToUser(userId, 'group-left', { conversationId: groupId, leftAt: new Date() });
 
         return { message: "Left group successfully", conversationId: groupId };
     }

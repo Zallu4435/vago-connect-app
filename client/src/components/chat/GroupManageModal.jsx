@@ -60,11 +60,19 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     return null;
   }, [currentChatUser, groupId]);
 
-  const currentUserIsAdmin = useMemo(() => {
-    return groupData?.participants?.some(
-      (p) => String(p.userId) === String(userInfo?.id) && p.role === 'admin'
+  const isLeft = useMemo(() => {
+    if (groupData?.leftAt) return true;
+    return !!groupData?.participants?.some(
+      (p) => String(p.userId) === String(userInfo?.id) && p.leftAt
     );
   }, [groupData, userInfo]);
+
+  const currentUserIsAdmin = useMemo(() => {
+    if (isLeft) return false;
+    return !!groupData?.participants?.some(
+      (p) => String(p.userId) === String(userInfo?.id) && p.role === 'admin' && !p.leftAt
+    );
+  }, [groupData, userInfo, isLeft]);
 
   const groupCreatorId = groupData?.createdById; // original creator
 
@@ -183,10 +191,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     if (!groupId) return;
     leaveGroup.mutate(groupId, {
       onSuccess: () => {
-        showToast.info("You left the group.");
         setShowLeaveConfirm(false);
-        setCurrentChatUser(null);
-        queryClient.invalidateQueries({ queryKey: ["contacts"] });
         onClose?.();
       },
       onError: () => showToast.error("Failed to leave the group."),
@@ -198,18 +203,27 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDeleteGroup = () => {
+  const confirmDeleteGroup = async () => {
     if (!groupId) return;
-    deleteGroup.mutate(groupId, {
-      onSuccess: () => {
-        showToast.info("Group deleted.");
-        setShowDeleteConfirm(false);
-        setCurrentChatUser(null);
-        queryClient.invalidateQueries({ queryKey: ["contacts"] });
-        onClose?.();
-      },
-      onError: () => showToast.error("Failed to delete group."),
-    });
+
+    try {
+      // 1. Leave the group first (to notify others and record status)
+      await leaveGroup.mutateAsync(groupId);
+
+      // 2. Actually delete the group
+      deleteGroup.mutate(groupId, {
+        onSuccess: () => {
+          showToast.info("Group deleted.");
+          setShowDeleteConfirm(false);
+          onClose?.();
+        },
+        onError: () => showToast.error("Failed to delete group."),
+      });
+    } catch (e) {
+      console.error("Delete sequence error:", e);
+      // Fallback: try delete even if leave failed (might be a permission quirk)
+      deleteGroup.mutate(groupId);
+    }
   };
 
   if (!open || !groupData) return null; // Ensure groupData is available
@@ -218,8 +232,8 @@ export default function GroupManageModal({ open, onClose, groupId }) {
     <AnimatedPanel open={open} direction="right">
       {/* Header */}
       <ModalHeader
-        title="Group settings"
-        Icon={FaTabletAlt}
+        title={isLeft ? "Group info" : "Group settings"}
+        Icon={isLeft ? FaUsers : FaTabletAlt}
         onBack={onClose}
       />
 
@@ -255,7 +269,7 @@ export default function GroupManageModal({ open, onClose, groupId }) {
               isEditable={currentUserIsAdmin}
             />
           </div>
-          {currentUserIsAdmin && (
+          {currentUserIsAdmin && !isLeft && (
             <button
               onClick={handleUpdateSettings}
               disabled={updateSettings.isPending}
@@ -264,13 +278,18 @@ export default function GroupManageModal({ open, onClose, groupId }) {
               {updateSettings.isPending ? "Saving..." : "Save changes"} <FaMagic />
             </button>
           )}
+          {isLeft && (
+            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm font-medium">
+              You are no longer a member of this group and cannot edit its settings.
+            </div>
+          )}
         </div>
 
         {/* Members Section */}
         <div className="bg-ancient-bg-medium rounded-xl p-6 border border-ancient-border-stone shadow-xl">
           <div className="flex items-center justify-between mb-4 pb-4 border-b border-ancient-input-border">
             <h4 className="text-ancient-text-light text-2xl font-bold flex items-center gap-3">
-              <FaUsers className="text-ancient-icon-glow" /> Members ({groupData.participants?.filter(p => !p.leftAt).length || 0})
+              <FaUsers className="text-ancient-icon-glow" /> Members ({groupData.participants?.filter(p => !Boolean(p.leftAt)).length || 0})
             </h4>
             {currentUserIsAdmin && (
               <button
@@ -283,10 +302,10 @@ export default function GroupManageModal({ open, onClose, groupId }) {
             )}
           </div>
           <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
-            {groupData.participants?.filter(p => !p.leftAt).length === 0 && (
+            {groupData.participants?.filter(p => !Boolean(p.leftAt)).length === 0 && (
               <div className="text-ancient-text-muted text-center py-4">No members yet.</div>
             )}
-            {groupData.participants?.filter(p => !p.leftAt).map((p) => (
+            {groupData.participants?.filter(p => !Boolean(p.leftAt)).map((p) => (
               <ThemedMemberListItem
                 key={p.userId}
                 member={{
@@ -329,28 +348,30 @@ export default function GroupManageModal({ open, onClose, groupId }) {
         )}
 
 
-        {/* Danger zone */}
-        <div className="bg-red-900/20 rounded-xl p-6 border border-red-700 shadow-xl space-y-4">
-          <h4 className="text-red-400 text-2xl font-bold flex items-center gap-3 mb-4 pb-4 border-b border-red-700">
-            <FaFire className="text-red-400" /> Danger zone
-          </h4>
-          <button
-            onClick={handleLeaveGroup}
-            className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/50 rounded-lg text-red-300 font-bold flex items-center justify-between transition-colors duration-200"
-          >
-            <span>Leave group</span>
-            <IoExitOutline className="text-red-300 text-2xl" />
-          </button>
-          {currentUserIsAdmin && ( // Only admin can delete group
+        {/* Danger zone - Only show if user is still in group */}
+        {!isLeft && (
+          <div className="bg-red-900/20 rounded-xl p-6 border border-red-700 shadow-xl space-y-4">
+            <h4 className="text-red-400 text-2xl font-bold flex items-center gap-3 mb-4 pb-4 border-b border-red-700">
+              <FaFire className="text-red-400" /> Danger zone
+            </h4>
             <button
-              onClick={handleDeleteGroup}
-              className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/70 rounded-lg text-red-400 font-bold flex items-center justify-between transition-colors duration-200"
+              onClick={handleLeaveGroup}
+              className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/50 rounded-lg text-red-300 font-bold flex items-center justify-between transition-colors duration-200"
             >
-              <span>Delete group</span>
-              <IoTrash className="text-red-400 text-2xl" />
+              <span>Leave group</span>
+              <IoExitOutline className="text-red-300 text-2xl" />
             </button>
-          )}
-        </div>
+            {currentUserIsAdmin && (
+              <button
+                onClick={handleDeleteGroup}
+                className="w-full text-left p-4 bg-ancient-input-bg hover:bg-red-800/70 rounded-lg text-red-400 font-bold flex items-center justify-between transition-colors duration-200"
+              >
+                <span>Delete group</span>
+                <IoTrash className="text-red-400 text-2xl" />
+              </button>
+            )}
+          </div>
+        )}
 
       </div>
 

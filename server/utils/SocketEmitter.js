@@ -32,9 +32,14 @@ export class SocketEmitter {
         const isDirect = conversation.type === 'direct';
         const senderId = Number(message.senderId);
 
+        const isGroup = conversation.type === 'group';
+
         conversation.participants.forEach(p => {
             const uid = Number(p.userId);
             if (!uid) return;
+
+            // If it's a group, only send to those who haven't left
+            if (isGroup && p.leftAt) return;
 
             // For direct messages, try to inject receiverId if missing so frontend can match accurately
             let payload = { ...message };

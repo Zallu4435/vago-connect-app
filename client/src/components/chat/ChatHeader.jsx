@@ -8,7 +8,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { useCallStore } from "@/stores/callStore";
 import { useSocketStore } from "@/stores/socketStore";
 import { showToast } from "@/lib/toast";
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { useContacts } from '@/hooks/contacts/useContacts';
 import { useClearChat, useDeleteChat } from '@/hooks/chat/useChatActions';
 import { usePinChat } from '@/hooks/chat/usePinChat';
@@ -42,16 +42,25 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
 
   // Get conversation details
   const { data: contacts = [] } = useContacts(userInfo?.id);
-  const contactEntry = contacts.find((c) => String(c?.id) === String(currentChatUser?.id));
-  const conversationId = contactEntry?.conversationId;
-  const conversationType = contactEntry?.type;
-  const isSelfChat = String(currentChatUser?.id) === String(userInfo?.id) || Boolean(contactEntry?.isSelf);
-  const isPinned = Boolean(contactEntry?.isPinned);
-  const isBlocked = Boolean(contactEntry?.isBlocked);
-  const blockedBy = Boolean(contactEntry?.blockedBy);
+  const contactEntry = useMemo(() => {
+    const curId = String(currentChatUser?.id || "");
+    const curConvId = String(currentChatUser?.conversationId || "");
+    return contacts.find((c) =>
+      String(c.id) === curId ||
+      String(c.conversationId) === curId ||
+      (curConvId && String(c.conversationId) === curConvId)
+    );
+  }, [contacts, currentChatUser]);
+
+  const conversationId = currentChatUser?.conversationId || contactEntry?.conversationId;
+  const isLeft = !!currentChatUser?.leftAt || !!contactEntry?.leftAt;
+  const isSelfChat = String(currentChatUser?.id) === String(userInfo?.id) || !!contactEntry?.isSelf;
+  const isPinned = !!contactEntry?.isPinned;
+  const isBlocked = !!contactEntry?.isBlocked;
+  const blockedBy = !!contactEntry?.blockedBy;
   const isOnline = onlineUsers?.some((u) => String(u) === String(currentChatUser?.id));
   const isTyping = typingUsers?.some((u) => String(u) === String(currentChatUser?.id));
-  const isGroupChat = conversationType === "group" || currentChatUser?.isGroup;
+  const isGroupChat = !!currentChatUser?.isGroup || contactEntry?.type === "group";
   const hasMessages = messages && messages.length > 0;
 
   useRenderLog("ChatHeader", { currentChatUser, isGroupChat });
@@ -151,25 +160,27 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
           <MdArrowBack className="text-xl text-ancient-text-light" />
         </button>
 
-        {conversationType !== "direct" && (
-          <Avatar
-            type="sm"
-            image={getAbsoluteUrl(getAvatarUrl(currentChatUser, userInfo, isSelfChat))}
-            isGroup={true}
-          />
-        )}
+        <Avatar
+          type="sm"
+          image={getAbsoluteUrl(getAvatarUrl(currentChatUser, userInfo, isSelfChat))}
+          isGroup={isGroupChat}
+        />
 
-        <div className="flex flex-col min-w-0 flex-1 cursor-pointer" onClick={() => (conversationType === "group" || currentChatUser?.isGroup) && onOpenGroupManage?.()}>
+        <div className="flex flex-col min-w-0 flex-1 cursor-pointer" onClick={() => isGroupChat && onOpenGroupManage?.()}>
           <span className="text-ancient-text-light text-base sm:text-lg font-semibold truncate hover:underline">
             {isSelfChat
               ? (isPinned ? "Saved messages" : "You")
               : (currentChatUser?.name || currentChatUser?.username || "Unknown")}
           </span>
           <span className="text-ancient-text-muted text-xs sm:text-sm truncate hover:underline">
-            {conversationType === "group" || currentChatUser?.isGroup ? (
-              (currentChatUser?.participants || contactEntry?.participants || [])
-                .map((p) => String(p.userId) === String(userInfo?.id) ? "You" : (p.user?.name?.split(" ")[0] || "Unknown"))
-                .join(", ") || "Tap here for group info"
+            {isGroupChat ? (
+              isLeft ? (
+                <span className="text-red-400 font-medium italic">You left this group</span>
+              ) : (
+                (currentChatUser?.participants || contactEntry?.participants || [])
+                  .map((p) => String(p.userId) === String(userInfo?.id) ? "You" : (p.user?.name?.split(" ")[0] || "Unknown"))
+                  .join(", ") || "Tap here for group info"
+              )
             ) : isSelfChat ? (
               "Keep notes and links handy"
             ) : isBlocked || blockedBy ? (
@@ -236,8 +247,11 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
               }]),
               ...(isGroupChat
                 ? [{
-                  label: "Manage Group",
-                  onClick: () => onOpenGroupManage?.(),
+                  label: isLeft ? "Group Info" : "Manage Group",
+                  onClick: () => {
+                    setShowMenu(false);
+                    onOpenGroupManage?.();
+                  },
                 }]
                 : []),
               {
@@ -271,7 +285,7 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
                 onClick: () => setShowBlockConfirm(true),
                 danger: !isBlocked,
               }]),
-              ...(isGroupChat ? [{
+              ...(isGroupChat && !isLeft ? [{
                 label: "Exit Group",
                 disabled: !conversationId || leaveGroup.isPending,
                 onClick: () => setShowExitConfirm(true),

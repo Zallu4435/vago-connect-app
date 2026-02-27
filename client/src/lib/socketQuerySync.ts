@@ -184,5 +184,20 @@ export const createSocketQuerySync = (queryClient: QueryClient) => {
         return { ...c, participants: updatedParticipants };
       });
     },
+
+    onGroupLeft: (conversationId: string | number, userId: string | number, leftAt: string, currentUserId: string) => {
+      updateContactFieldsInCache(queryClient, (c: any) => {
+        if (String(c.conversationId) !== String(conversationId)) return c;
+        const isMe = String(userId) === String(currentUserId);
+        const updatedParticipants = (c.participants || []).map((p: any) =>
+          String(p.userId) === String(userId) ? { ...p, leftAt } : p
+        );
+        return {
+          ...c,
+          participants: updatedParticipants,
+          ...(isMe ? { leftAt } : {})
+        };
+      });
+    },
   };
 };

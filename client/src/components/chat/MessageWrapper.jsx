@@ -3,6 +3,7 @@ import React from "react";
 import BaseMessageLayout from "./BaseMessageLayout";
 import { useChatStore } from "@/stores/chatStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useContacts } from "@/hooks/contacts/useContacts";
 
 import TextMessage from '@/components/messages/TextMessage';
 import ImageMessage from '@/components/messages/ImageMessage';
@@ -27,11 +28,15 @@ function MessageWrapper({
     onForward,
 }) {
     const currentChatUser = useChatStore((s) => s.currentChatUser);
+    const userInfo = useAuthStore((s) => s.userInfo);
+    const { data: contacts = [] } = useContacts(userInfo?.id);
+    const contactEntry = contacts.find((c) => String(c?.id) === String(currentChatUser?.id));
+    const isLeft = Boolean(contactEntry?.leftAt);
+
     const isGroup = currentChatUser?.isGroup || currentChatUser?.type === 'group';
     const senderAvatar = message?.sender?.profileImage || "/default_avatar.png";
     const isSelected = selectedIds?.some(x => Number(x) === Number(message.id));
 
-    const userInfo = useAuthStore((s) => s.userInfo);
     const isDeletedForMe = React.useMemo(() => {
         const arr = message?.deletedBy;
         if (!Array.isArray(arr)) return false;
@@ -67,6 +72,7 @@ function MessageWrapper({
             showActions={!isDeleted && !isCall}
             onReply={isCall ? undefined : onReply}
             onForward={isCall ? undefined : onForward}
+            isLeft={isLeft}
         >
             {isDeleted ? (
                 <DeletedMessage message={message} isIncoming={isIncoming} />

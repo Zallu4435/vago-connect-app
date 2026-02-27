@@ -100,6 +100,13 @@ export function useMessageSocketHandlers() {
     const onChatDeleted = ({ conversationId }: any) => {
       Logger.info(`Socket: chat-deleted for convo ${conversationId}`);
       socketSync.onChatDeleted(conversationId);
+
+      // CRITICAL: Handle real-time closure of the deleted chat
+      const current = useChatStore.getState().currentChatUser;
+      if (current && (String(current.id) === String(conversationId) || String((current as any).conversationId) === String(conversationId))) {
+        useChatStore.getState().setCurrentChatUser(null);
+        showToast.info("This chat was deleted");
+      }
     };
     const onForwarded = (payload: any) => {
       socketSync.onMessageForwarded(payload);
@@ -195,6 +202,25 @@ export function useMessageSocketHandlers() {
       socketSync.onGroupRoleUpdated(conversationId, userId, role);
     };
 
+    const onGroupLeft = ({ conversationId, userId, leftAt }: any) => {
+      if (!conversationId) return;
+      const myAuthId = authUserIdRef.current;
+      const current = useChatStore.getState().currentChatUser;
+
+      if (current && (current.id === conversationId || (current as any).conversationId === conversationId)) {
+        const isMe = String(userId) === String(myAuthId);
+        const updatedParticipants = (current as any).participants?.map((p: any) =>
+          String(p.userId) === String(userId) ? { ...p, leftAt } : p
+        );
+        useChatStore.getState().setCurrentChatUser({
+          ...current,
+          participants: updatedParticipants,
+          ...(isMe ? { leftAt } : {})
+        } as any);
+      }
+      socketSync.onGroupLeft(conversationId, userId, leftAt, String(myAuthId || ''));
+    };
+
     const onProfileUpdated = ({ user }: any) => {
       if (!user?.id) return;
       const current = useChatStore.getState().currentChatUser;
@@ -250,7 +276,8 @@ export function useMessageSocketHandlers() {
       }
 
       const convId = (message as any)?.conversationId;
-      if (!convId) return;
+      // Skip if completely null/undefined, but 0 is a valid DM conversation indicator in some parts of our app
+      if (convId === undefined || convId === null) return;
 
       // For Saved Messages (chat with self), the status should be 'read' immediately
       if (Number(message.senderId) === Number(message.receiverId)) {
@@ -358,6 +385,7 @@ export function useMessageSocketHandlers() {
     s.off('group-created', onGroupCreated);
     s.off('group-members-updated', onGroupMembersUpdated);
     s.off('group-role-updated', onGroupRoleUpdated);
+    s.off('group-left', onGroupLeft);
 
     // Attach all fresh handlers
     s.on('message-status-update', onStatusUpdate);
@@ -383,6 +411,7 @@ export function useMessageSocketHandlers() {
     s.on('group-created', onGroupCreated);
     s.on('group-members-updated', onGroupMembersUpdated);
     s.on('group-role-updated', onGroupRoleUpdated);
+    s.on('group-left', onGroupLeft);
 
     return () => {
       s.off('message-status-update', onStatusUpdate);
@@ -408,6 +437,7 @@ export function useMessageSocketHandlers() {
       s.off('group-created', onGroupCreated);
       s.off('group-members-updated', onGroupMembersUpdated);
       s.off('group-role-updated', onGroupRoleUpdated);
+      s.off('group-left', onGroupLeft);
     };
     // Only depend on socket — currentChatUser is accessed via ref to prevent stale closures
     // while still allowing the handler to read the latest value at call time

@@ -7,7 +7,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useReactToMessage } from '@/hooks/messages/useReactToMessage';
 import { useChatStore } from "@/stores/chatStore";
 
-export default function ReactionModal({ open, onClose, message, anchorRef, reactions }) {
+export default function ReactionModal({ open, onClose, message, anchorRef, reactions, isLeft }) {
     // [DEBUG] Performance validation log
     if (open) {
         console.log(`[ReactionModal] Render open: ${open}, msgId: ${message?.id || '?'}, reactions: ${reactions?.length || message?.reactions?.length || 0}`);
@@ -44,6 +44,7 @@ export default function ReactionModal({ open, onClose, message, anchorRef, react
     const displayedReactions = groupedReactions[activeTab] || [];
 
     const handleRemoveReaction = (reaction) => {
+        if (isLeft) return;
         if (String(reaction.userId) === String(userInfo?.id)) {
             const peerId = currentChatUser?.id || currentChatUser?.conversationId;
             reactMutation.mutate({
@@ -110,8 +111,8 @@ export default function ReactionModal({ open, onClose, message, anchorRef, react
                         return (
                             <div
                                 key={`${reaction.userId}-${index}`}
-                                className={`flex items-center justify-between p-2 rounded-lg hover:bg-ancient-input-bg transition-colors ${isMe ? 'cursor-pointer group' : ''}`}
-                                onClick={() => isMe ? handleRemoveReaction(reaction) : null}
+                                className={`flex items-center justify-between p-2 rounded-lg hover:bg-ancient-input-bg transition-colors ${isMe && !isLeft ? 'cursor-pointer group' : ''}`}
+                                onClick={() => (isMe && !isLeft) ? handleRemoveReaction(reaction) : null}
                             >
                                 <div className="flex items-center gap-3">
                                     <Avatar

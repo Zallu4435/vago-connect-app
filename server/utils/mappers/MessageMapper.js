@@ -55,6 +55,7 @@ export class MessageMapper {
                 isMuted: p.isMuted,
                 isArchived: p.isArchived,
                 unreadCount: p.unreadCount,
+                leftAt: p.leftAt,
             },
             user: other ? {
                 id: other.id,

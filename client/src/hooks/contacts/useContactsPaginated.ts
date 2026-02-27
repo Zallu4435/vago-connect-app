@@ -75,6 +75,7 @@ export function useContactsPaginated(userId?: string, opts: Options = {}): UseIn
             isSystemMessage: Boolean(m?.isSystemMessage),
             systemMessageType: m?.systemMessageType || null,
             totalUnreadMessages: ps?.unreadCount || 0,
+            leftAt: ps?.leftAt || null,
           } as any;
         })
         .filter(Boolean) as any[];

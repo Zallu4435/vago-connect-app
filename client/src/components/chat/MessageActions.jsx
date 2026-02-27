@@ -40,9 +40,7 @@ function MessageActions({
   const { data: contacts = [] } = useContacts(userInfo?.id);
   const contactEntry = contacts.find((c) => String(c?.id) === String(currentChatUser?.id));
   const isChatBlocked = Boolean(contactEntry?.isBlocked || contactEntry?.blockedBy);
-
-  if (isChatBlocked) return null;
-
+  const isLeft = Boolean(contactEntry?.leftAt);
   const setSelectMode = useChatStore((s) => s.setSelectMode);
   const setSelectedIds = useChatStore((s) => s.setSelectedIds);
   const isDeletingForMe = useChatStore((s) => s.isDeletingForMe);
@@ -64,6 +62,9 @@ function MessageActions({
   const delMutation = useDeleteMessage();
   const reactMutation = useReactToMessage();
 
+  // React Hooks must be called in the same order and count every render.
+  // Move all hooks above the early return.
+
   const onDeleteClick = useCallback(() => {
     if (isGrid) {
       // Enter selection mode with no pre-selection — user picks images explicitly
@@ -74,7 +75,7 @@ function MessageActions({
       setShowDeleteConfirm(true);
     }
     setShowDropdownMenu(false);
-  }, [isGrid, setSelectMode, setSelectedIds]);
+  }, [isGrid, setSelectMode, setSelectedIds, setShowDeleteConfirm, setShowDropdownMenu]);
 
   const doDelete = useCallback(async (deleteType) => {
     if (deleteType === 'forMe') setIsDeletingForMe(true);
@@ -92,24 +93,24 @@ function MessageActions({
       setIsDeletingForMe(false);
       setIsDeletingForEveryone(false);
     }
-  }, [message, delMutation]);
+  }, [message, delMutation, setIsDeletingForMe, setIsDeletingForEveryone]);
 
   const onEditClick = useCallback(() => {
     setEditMessage(message);
     setShowDropdownMenu(false);
-  }, [message, setEditMessage]);
+  }, [message, setEditMessage, setShowDropdownMenu]);
 
   const onReact = useCallback((emoji) => {
     const peerId = currentChatUser?.id || currentChatUser?.conversationId;
     reactMutation.mutate({ id: message.id, emoji, peerId });
     setShowReactionsMenu(false);
     setShowDropdownMenu(false);
-  }, [message, reactMutation, currentChatUser]);
+  }, [message, reactMutation, currentChatUser, setShowReactionsMenu, setShowDropdownMenu]);
 
   const handleReply = useCallback(() => {
     onReply?.(message);
     setShowDropdownMenu(false);
-  }, [message, onReply]);
+  }, [message, onReply, setShowDropdownMenu]);
 
   const handleForward = useCallback(() => {
     if (isGrid) {
@@ -122,7 +123,7 @@ function MessageActions({
       onForward?.(message);
     }
     setShowDropdownMenu(false);
-  }, [isGrid, message, onForward, setSelectMode, setSelectedIds]);
+  }, [isGrid, message, onForward, setSelectMode, setSelectedIds, setShowDropdownMenu]);
 
   const onCopy = useCallback(async () => {
     console.log("Copy action clicked!");
@@ -153,16 +154,19 @@ function MessageActions({
       showToast.error("Failed to copy message");
     }
     setShowDropdownMenu(false);
-  }, [message]);
+  }, [message, setShowDropdownMenu]);
 
-  const canEdit = isMine && message?.type === "text" && !message?.isDeletedForEveryone;
-  const canDelete = !message?.isDeletedForEveryone;
-
-  // Enforce 60-hour rule for "Delete for Everyone" locally using shared utility
   const canDeleteForEveryone = useMemo(() => {
     if (!isMine) return false;
     return isWithinDeletionWindow(message?.createdAt);
   }, [isMine, message?.createdAt]);
+
+  const canEdit = isMine && message?.type === "text" && !message?.isDeletedForEveryone;
+  const canDelete = !message?.isDeletedForEveryone;
+
+
+
+  if (isChatBlocked || isLeft) return null;
 
   return (
     <div

@@ -25,6 +25,7 @@ function BaseMessageLayout({
     onReply,
     onForward,
     isGrid,
+    isLeft,
     children,
 }) {
 
@@ -86,7 +87,7 @@ function BaseMessageLayout({
                                 flex items-center gap-[2px]
                                 ${isIncoming ? "left-2" : "right-2"}
                             `}
-                            onClick={() => setShowReactionsModal(true)}
+                            onClick={() => !isLeft && setShowReactionsModal(true)}
                         >
                             <div className="
                                 flex items-center gap-[3px]
@@ -124,6 +125,7 @@ function BaseMessageLayout({
                 message={reactionAnchorMessage}
                 anchorRef={reactionsRef}
                 reactions={reactions}
+                isLeft={isLeft}
             />
         </div>
     );

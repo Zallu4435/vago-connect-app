@@ -54,7 +54,9 @@ function ChatListItem({ data, isContactsPage = false }) {
     } catch { preview = "📞 Call"; }
   } else if (isSystemMsg) {
     // System messages (joined/left group) shown as italic text, no sender prefix
-    preview = data?.message || "";
+    let msg = data?.message || "";
+    if (userInfo?.name && msg.startsWith(userInfo.name)) msg = msg.replace(userInfo.name, "You");
+    preview = msg;
   } else {
     if (data?.type === "image") preview = "📷 Image";
     else if (data?.type === "video") preview = "🎬 Video";
@@ -147,8 +149,8 @@ function ChatListItem({ data, isContactsPage = false }) {
                   disabled: !data?.isBlocked && data?.blockedBy,
                   danger: !data?.isBlocked
                 }]),
-                // Show Exit ONLY for Groups
-                ...(data?.isGroup || data?.type === "group" ? [{ label: "Exit Group", onClick: onExit, danger: true }] : []),
+                // Show Exit ONLY for Groups if NOT already left
+                ...((data?.isGroup || data?.type === "group") && !data?.leftAt ? [{ label: "Exit Group", onClick: onExit, danger: true }] : []),
               ]}
             />
           </div>
