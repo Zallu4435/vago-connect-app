@@ -149,7 +149,6 @@ function MessageBar({ isOnline = true }) {
         { id: editMessage.id, content: text },
         {
           onError: (e) => {
-            console.error("editMessage error", e);
             showToast.error("Failed to edit message. Try again.");
           }
         }
@@ -161,7 +160,6 @@ function MessageBar({ isOnline = true }) {
     }
 
     const tempId = Date.now();
-    console.log("[MessageBar] Sending message. Reply to:", replyTo?.id);
 
     const optimisticMsg = normalizeMessage({
       id: tempId,
@@ -177,8 +175,6 @@ function MessageBar({ isOnline = true }) {
         type: replyTo.type
       } : undefined
     }, userInfo.id, currentChatUser.id, "text");
-
-    console.log("[MessageBar] Optimistic message created:", optimisticMsg);
 
     setMessages((prev) => ([...(prev || []), optimisticMsg]));
     setMessage("");

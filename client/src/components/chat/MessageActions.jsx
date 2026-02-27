@@ -87,7 +87,6 @@ function MessageActions({
       await new Promise(resolve => setTimeout(resolve, 300));
       setShowDeleteConfirm(false);
     } catch (e) {
-      console.error("Delete error", e);
       showToast.error("Failed to delete message");
     } finally {
       setIsDeletingForMe(false);
@@ -119,21 +118,18 @@ function MessageActions({
       setSelectedIds([]);
       showToast.info("Select images to forward, then tap the actions icon");
     } else {
-      console.log("Forward action clicked for message:", message.id);
       onForward?.(message);
     }
     setShowDropdownMenu(false);
   }, [isGrid, message, onForward, setSelectMode, setSelectedIds, setShowDropdownMenu]);
 
   const onCopy = useCallback(async () => {
-    console.log("Copy action clicked!");
     const text = message?.content || message?.message || "";
     if (!text) return;
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(text);
       } else {
-        console.log("Using execCommand fallback for copy");
         const textArea = document.createElement("textarea");
         textArea.value = text;
         textArea.style.position = "absolute";
@@ -150,7 +146,6 @@ function MessageActions({
       }
       showToast.success("Message copied to clipboard");
     } catch (err) {
-      console.error("Copy error:", err);
       showToast.error("Failed to copy message");
     }
     setShowDropdownMenu(false);
@@ -249,7 +244,6 @@ function MessageActions({
           ].map(item => ({
             ...item,
             onClick: () => {
-              console.log("ActionSheet menu item clicked:", item.label);
               item.onClick();
             }
           }))}

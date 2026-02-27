@@ -68,7 +68,7 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
           const id = scheduleTokenRefresh(token, () => {
-            try { refreshFn?.(); } catch {}
+            try { refreshFn?.(); } catch { }
           }, 5);
           set({ refreshTimeoutId: (id as unknown as TimeoutLike) || null });
         },

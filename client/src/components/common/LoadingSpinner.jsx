@@ -21,9 +21,9 @@ function LoadingSpinner({ label = "Loading...", className = "", size = 20 }) {
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
-        style={{ 
-          width: typeof size === 'number' ? `${Math.max(16, size)}px` : size, 
-          height: typeof size === 'number' ? `${Math.max(16, size)}px` : size 
+        style={{
+          width: typeof size === 'number' ? `${Math.max(16, size)}px` : size,
+          height: typeof size === 'number' ? `${Math.max(16, size)}px` : size
         }}
         aria-hidden="true"
       >

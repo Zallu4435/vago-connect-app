@@ -64,7 +64,7 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
   const isCreator = String(currentChatUser?.createdById || contactEntry?.createdById || "") === String(userInfo?.id);
   const hasMessages = !!conversationId || (messages && messages.length > 0);
 
-  useRenderLog("ChatHeader", { currentChatUser, isGroupChat });
+  // useRenderLog("ChatHeader", { currentChatUser, isGroupChat });
 
   // Chat actions
   const clearChat = useClearChat();
@@ -336,7 +336,7 @@ function ChatHeader({ onOpenMedia, onOpenGroupManage }) {
             setShowDeleteConfirm(false);
             setCurrentChatUser(null);
           } catch (err) {
-            console.error("ChatHeader delete error:", err);
+            // Handle error silently or with UI notification
           }
         }}
         title="Delete this chat?"

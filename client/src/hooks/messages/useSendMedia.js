@@ -97,7 +97,6 @@ export const useSendMedia = () => {
         } catch (err) {
             useChatStore.getState().updateMessageStatus(tempId, "error");
             showToast.error("Upload failed. Try again.");
-            console.error("uploadFile error", err);
         } finally {
             setTimeout(() => setUploadProgress({ label: "", percent: 0 }), 400);
         }

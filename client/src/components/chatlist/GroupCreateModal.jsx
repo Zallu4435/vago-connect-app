@@ -84,7 +84,6 @@ export default function GroupCreateModal({ open, onClose }) {
       },
       onError: (error) => {
         showToast.error("Failed to create group. Please try again.");
-        console.error("Group creation error:", error);
       },
     });
   };

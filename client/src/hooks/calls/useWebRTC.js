@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useSocketStore } from "@/stores/socketStore";
 import { useCallStore } from "@/stores/callStore";
 import { callSession } from '@/hooks/calls/useCallSocketHandlers';
+import { showToast } from "@/lib/toast";
 
 // Public STUN servers — works on localhost and LAN; production needs TURN
 const ICE_SERVERS = {
@@ -45,6 +46,7 @@ export function useWebRTC(callData, isCaller) {
 
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
+    const initPromiseRef = useRef(null); // Lock to prevent concurrent initPeer calls
 
     const [localStream, setLocalStream] = useState(null);
     const [remoteStream, setRemoteStream] = useState(null);
@@ -54,16 +56,26 @@ export function useWebRTC(callData, isCaller) {
     const [remoteCameraOff, setRemoteCameraOff] = useState(false);
     const [connectionState, setConnectionState] = useState("new");
 
-    // Stable derived values via ref — avoid stale closures inside peer callbacks
-    const peerIdRef = useRef(null);
-    const myIdRef = useRef(null);
-    const isVideoCallRef = useRef(false);
+    // ── Stable derived values at top level ────────────────────────────────────
+    const peerIdRef = useRef(isCaller ? callData?.to?.id : callData?.from?.id);
+    const myIdRef = useRef(isCaller ? callData?.from?.id : callData?.to?.id);
+    const isVideoCallRef = useRef(callData?.callType === "video");
 
+    // Refs for toggles to avoid dependency loops in initPeer
+    const isMutedRef = useRef(false);
+    const isCameraOffRef = useRef(false);
+
+    // ── Update refs reactively ────────────────────────────────────────────────
     useEffect(() => {
         peerIdRef.current = isCaller ? callData?.to?.id : callData?.from?.id;
         myIdRef.current = isCaller ? callData?.from?.id : callData?.to?.id;
         isVideoCallRef.current = callData?.callType === "video";
-    });
+    }, [callData, isCaller]);
+
+    useEffect(() => {
+        isMutedRef.current = isMuted;
+        isCameraOffRef.current = isCameraOff;
+    }, [isMuted, isCameraOff]);
 
     // ── Cleanup ───────────────────────────────────────────────────────────────
     const cleanup = useCallback(() => {
@@ -78,6 +90,7 @@ export function useWebRTC(callData, isCaller) {
             peerRef.current = null;
         }
         initialisedRef.current = false;
+        initPromiseRef.current = null;
         pendingOfferRef.current = null;
         setLocalStream(null);
         setRemoteStream(null);
@@ -101,71 +114,100 @@ export function useWebRTC(callData, isCaller) {
 
     // ── Create RTCPeerConnection + getUserMedia ───────────────────────────────
     const initPeer = useCallback(async () => {
-        if (initialisedRef.current || peerRef.current) return null;
-        initialisedRef.current = true;
+        // 1. Check existing PC that is still active
+        if (peerRef.current && peerRef.current.signalingState !== "closed") return peerRef.current;
 
-        const constraints = isVideoCallRef.current
-            ? { audio: true, video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } }
-            : { audio: true, video: false };
+        // 2. Check in-flight initialization
+        if (initPromiseRef.current) return initPromiseRef.current;
 
-        let stream;
-        try {
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
-        } catch (err) {
-            console.error("[WebRTC] getUserMedia failed:", err.name, err.message);
-            initialisedRef.current = false;
-            return null;
-        }
+        const performInit = async () => {
+            if (peerRef.current && peerRef.current.signalingState !== "closed") return peerRef.current;
+            initialisedRef.current = true;
 
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+            const constraints = isVideoCallRef.current
+                ? { audio: true, video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } }
+                : { audio: true, video: false };
 
-        const pc = new RTCPeerConnection(ICE_SERVERS);
-        peerRef.current = pc;
+            const pc = new RTCPeerConnection(ICE_SERVERS);
+            peerRef.current = pc;
 
-        // Add local tracks
-        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-        // ICE → relay
-        pc.onicecandidate = (event) => {
-            if (event.candidate && socket?.current) {
-                socket.current.emit("webrtc-ice-candidate", {
-                    to: String(peerIdRef.current),
-                    from: String(myIdRef.current),
-                    candidate: event.candidate.toJSON(),
-                });
-            }
-        };
-
-        // Remote tracks
-        const remote = new MediaStream();
-        remoteStreamRef.current = remote;
-        setRemoteStream(remote);
-        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remote;
-
-        pc.ontrack = (event) => {
-            event.streams[0]?.getTracks().forEach((track) => {
-                // Prevent duplicate tracks
-                if (!remote.getTracks().find((t) => t.id === track.id)) {
-                    remote.addTrack(track);
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                if (pc.signalingState === "closed") {
+                    stream.getTracks().forEach(t => t.stop());
+                    return null;
                 }
-            });
-            setRemoteStream(new MediaStream(remote.getTracks()));
-            if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remote;
-        };
 
-        // Connection state — use stable hangUpRef to avoid staleness
-        pc.onconnectionstatechange = () => {
-            const state = pc.connectionState;
-            setConnectionState(state);
-            if (state === "failed" || state === "disconnected") {
-                hangUpRef.current?.();
+                localStreamRef.current = stream;
+                setLocalStream(stream);
+                if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+
+                stream.getAudioTracks().forEach((t) => { t.enabled = !isMutedRef.current; });
+                stream.getVideoTracks().forEach((t) => { t.enabled = !isCameraOffRef.current; });
+
+                stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+            } catch (err) {
+                if (pc.signalingState === "closed") return null;
+
+                const deviceName = isVideoCallRef.current ? "camera/microphone" : "microphone";
+                if (err.name === "NotReadableError") {
+                    showToast.error(`Could not access ${deviceName}. It might be in use by another application.`);
+                } else if (err.name === "NotAllowedError") {
+                    showToast.error(`Permission denied for ${deviceName}. Please allow access in browser settings.`);
+                } else {
+                    showToast.error(`Could not access ${deviceName}. (${err.name})`);
+                }
             }
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate && socket?.current) {
+                    socket.current.emit("webrtc-ice-candidate", {
+                        to: String(peerIdRef.current),
+                        from: String(myIdRef.current),
+                        candidate: event.candidate.toJSON(),
+                    });
+                }
+            };
+
+            const remote = new MediaStream();
+            remoteStreamRef.current = remote;
+            setRemoteStream(remote);
+            if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remote;
+
+            pc.ontrack = (event) => {
+                event.streams[0]?.getTracks().forEach((track) => {
+                    if (!remote.getTracks().find((t) => t.id === track.id)) {
+                        remote.addTrack(track);
+                    }
+                });
+                setRemoteStream(new MediaStream(remote.getTracks()));
+                if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remote;
+            };
+
+            pc.onconnectionstatechange = () => {
+                const state = pc.connectionState;
+                setConnectionState(state);
+                if (state === "failed" || state === "disconnected") {
+                    hangUpRef.current?.();
+                }
+            };
+
+            return pc;
         };
 
-        return pc;
-    }, [socket]); // socket ref is stable
+        const promise = performInit();
+        initPromiseRef.current = promise;
+
+        promise.finally(() => {
+            if (initPromiseRef.current === promise) {
+                if (!peerRef.current || peerRef.current.signalingState === "closed") {
+                    initPromiseRef.current = null;
+                }
+            }
+        });
+
+        return promise;
+    }, [socket]);
 
     // ── Caller: create + send offer ───────────────────────────────────────────
     const startCall = useCallback(async () => {
@@ -187,12 +229,15 @@ export function useWebRTC(callData, isCaller) {
 
     // ── Callee: set remote desc + answer ──────────────────────────────────────
     const handleOffer = useCallback(async (offer) => {
-        // If peer isn't ready yet, buffer the offer
-        if (!peerRef.current) {
+        let pc = peerRef.current;
+        if (!pc) {
+            pc = await initPeer();
+        }
+
+        if (!pc) {
             pendingOfferRef.current = offer;
             return;
         }
-        const pc = peerRef.current;
 
         isSettingRemoteRef.current = true;
         try {
@@ -210,7 +255,7 @@ export function useWebRTC(callData, isCaller) {
             from: String(myIdRef.current),
             answer: pc.localDescription,
         });
-    }, [drainICEQueue, socket]);
+    }, [drainICEQueue, initPeer, socket]);
 
     // ── Caller: set remote answer ─────────────────────────────────────────────
     const handleAnswer = useCallback(async (answer) => {
@@ -256,38 +301,45 @@ export function useWebRTC(callData, isCaller) {
 
         cleanup();
         endCallStore();
-    }, [socket, cleanup, endCallStore]); // note: peerIdRef is a ref, not reactive
+    }, [socket, cleanup, endCallStore]);
 
-    // Keep hangUpRef in sync with latest hangUp so onconnectionstatechange is never stale
     useEffect(() => { hangUpRef.current = hangUp; }, [hangUp]);
 
     // ── Mute toggle — also notify remote via socket ───────────────────────────
     const toggleMute = useCallback(() => {
-        const stream = localStreamRef.current;
-        if (!stream) return;
-        const next = !isMuted;
-        stream.getAudioTracks().forEach((t) => { t.enabled = !next; });
+        const next = !isMutedRef.current;
         setIsMuted(next);
-        // Notify remote
+        isMutedRef.current = next;
+
+        const stream = localStreamRef.current;
+        if (stream) {
+            stream.getAudioTracks().forEach((t) => { t.enabled = !next; });
+        }
+
         socket?.current?.emit("call-media-state", {
             to: String(peerIdRef.current),
+            from: String(myIdRef.current),
             muted: next,
         });
-    }, [isMuted, socket]);
+    }, [socket]);
 
     // ── Camera toggle — also notify remote ───────────────────────────────────
     const toggleCamera = useCallback(() => {
-        const stream = localStreamRef.current;
-        if (!stream) return;
-        const next = !isCameraOff;
-        stream.getVideoTracks().forEach((t) => { t.enabled = !next; });
+        const next = !isCameraOffRef.current;
         setIsCameraOff(next);
-        // Notify remote
+        isCameraOffRef.current = next;
+
+        const stream = localStreamRef.current;
+        if (stream) {
+            stream.getVideoTracks().forEach((t) => { t.enabled = !next; });
+        }
+
         socket?.current?.emit("call-media-state", {
             to: String(peerIdRef.current),
+            from: String(myIdRef.current),
             cameraOff: next,
         });
-    }, [isCameraOff, socket]);
+    }, [socket]);
 
     // ── Socket event listeners ────────────────────────────────────────────────
     useEffect(() => {
@@ -295,11 +347,9 @@ export function useWebRTC(callData, isCaller) {
         if (!s) return;
 
         const onOffer = ({ offer }) => {
-            // Only callee processes offers
             if (!isCaller) handleOffer(offer);
         };
         const onAnswer = ({ answer }) => {
-            // Only caller processes answers
             if (isCaller) handleAnswer(answer);
         };
         const onICE = ({ candidate }) => handleICECandidate(candidate);
@@ -324,7 +374,6 @@ export function useWebRTC(callData, isCaller) {
         };
     }, [socket, isCaller, handleOffer, handleAnswer, handleICECandidate, cleanup, endCallStore]);
 
-    // ── Caller: watch callAccepted and start once ─────────────────────────────
     const callAccepted = useCallStore((s) => s.callAccepted);
     const startedRef = useRef(false);
     useEffect(() => {
@@ -334,11 +383,9 @@ export function useWebRTC(callData, isCaller) {
         }
     }, [isCaller, callAccepted, startCall]);
 
-    // ── Callee: init peer on mount, then handle any buffered offer ────────────
     useEffect(() => {
         if (!isCaller) {
             initPeer().then(() => {
-                // If an offer arrived before initPeer completed, handle it now
                 if (pendingOfferRef.current) {
                     const offer = pendingOfferRef.current;
                     pendingOfferRef.current = null;

@@ -93,7 +93,7 @@ export function useCallSocketHandlers() {
     };
 
     const onCallBusy = () => {
-      callSession.callMessageId = null;
+      showToast.error("Call busy: Remote user is already in another call");
       callSession.callStartTime = null;
       endCall();
       showToast.info('The user is currently busy.');

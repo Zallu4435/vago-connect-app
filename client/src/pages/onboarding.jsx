@@ -43,7 +43,6 @@ function Onboarding() {
           }
         },
         onError: (error) => {
-          console.error("Onboarding failed:", error);
           showToast.error("Something went wrong. Please try again.");
         },
       }

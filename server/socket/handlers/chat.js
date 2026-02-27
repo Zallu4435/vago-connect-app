@@ -40,7 +40,7 @@ export function handleChatEvents(io, socket, onlineUsers) {
 
             SocketEmitter.emitMessageSent(convo, { ...newMsg, tempId });
         } catch (error) {
-            console.error("Socket send-text-message error:", error);
+            // Socket send-text-message error
             // Optional: emit an error back to sender
             io.to(String(from)).emit("message-error", { tempId, error: error.message });
         }
@@ -66,7 +66,7 @@ export function handleChatEvents(io, socket, onlineUsers) {
 
             SocketEmitter.emitMessageSent(convo, { ...newMsg, tempId });
         } catch (error) {
-            console.error("Socket send-location-message error:", error);
+            // Socket send-location-message error
             io.to(String(from)).emit("message-error", { tempId, error: error.message });
         }
     });
@@ -80,7 +80,7 @@ export function handleChatEvents(io, socket, onlineUsers) {
                 if (p.userId) io.to(String(p.userId)).emit("message-edited", { messageId: result.id, newContent: result.content, editedAt: result.editedAt });
             });
         } catch (error) {
-            console.error("Socket edit-message error:", error);
+            // Socket edit-message error
             io.to(String(requesterId)).emit("message-error", { error: error.message });
         }
     });
@@ -96,7 +96,7 @@ export function handleChatEvents(io, socket, onlineUsers) {
                 });
             }
         } catch (error) {
-            console.error("Socket delete-message error:", error);
+            // Socket delete-message error
             io.to(String(requesterId)).emit("message-error", { error: error.message });
         }
     });
@@ -112,7 +112,7 @@ export function handleChatEvents(io, socket, onlineUsers) {
                 });
             }
         } catch (error) {
-            console.error("Socket react-message error:", error);
+            // Socket react-message error
             io.to(String(requesterId)).emit("message-error", { error: error.message });
         }
     });
@@ -130,7 +130,7 @@ export function handleChatEvents(io, socket, onlineUsers) {
             }
             if (typeof callback === "function") callback({ success: true });
         } catch (error) {
-            console.error("Socket forward-messages error:", error);
+            // Socket forward-messages error
             io.to(String(requesterId)).emit("message-error", { error: error.message });
             if (typeof callback === "function") callback({ success: false, error: error.message });
         }
@@ -146,7 +146,7 @@ export function handleChatEvents(io, socket, onlineUsers) {
                 });
             }
         } catch (error) {
-            console.error("Error updating status to delivered via socket:", error);
+            // Error updating status to delivered via socket
         }
     });
 
@@ -160,7 +160,7 @@ export function handleChatEvents(io, socket, onlineUsers) {
                 });
             }
         } catch (error) {
-            console.error("Error updating status to read via socket:", error);
+            // Error updating status to read via socket
         }
     });
 

@@ -75,7 +75,7 @@ export const upsertMessageInCache = (queryClient: QueryClient, message: any, tem
         }
 
         if (belongsToThisCache) {
-            console.log(`[CACHELOG] !! BELONGS !! msg ${message.id} -> [Peer:${cachePeerId}, Auth:${cacheAuthId}, Type:${cacheType}]`);
+            // Belongs to this cache
         }
 
         if (!belongsToThisCache) return;

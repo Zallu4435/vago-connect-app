@@ -9,9 +9,6 @@ import { useChatStore } from "@/stores/chatStore";
 
 export default function ReactionModal({ open, onClose, message, anchorRef, reactions, isLeft }) {
     // [DEBUG] Performance validation log
-    if (open) {
-        console.log(`[ReactionModal] Render open: ${open}, msgId: ${message?.id || '?'}, reactions: ${reactions?.length || message?.reactions?.length || 0}`);
-    }
     const userInfo = useAuthStore((s) => s.userInfo);
     const currentChatUser = useChatStore((s) => s.currentChatUser);
     const reactMutation = useReactToMessage();

@@ -47,7 +47,6 @@ function Login() {
       });
       router.push("/");
     } catch (err) {
-      console.error(err);
       showToast.error("Login failed. Please try again.");
     } finally {
       setIsLoading(false);

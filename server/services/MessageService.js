@@ -114,7 +114,6 @@ export class MessageService {
             try {
                 await deleteCloudinaryFile(cld.public_id, resource_type);
             } catch (cleanError) {
-                console.error(`Failed to scrub orphaned ${type}`, cleanError);
             }
             throw insertError;
         }
@@ -418,7 +417,6 @@ export class MessageService {
                             try {
                                 await deleteCloudinaryFile(mf.cloudinaryPublicId, mf.cloudinaryResourceType || 'image');
                             } catch (cldErr) {
-                                console.error(`[MessageService:delete] Cloudinary delete failed for ${mf.cloudinaryPublicId}`, { error: cldErr });
                                 // We don't throw; we finish the DB update even if cloud deletion fails
                             }
                         }

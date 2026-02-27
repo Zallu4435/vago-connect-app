@@ -33,7 +33,6 @@ export const downloadMedia = async (url, fileName = "download") => {
         }, 3000);
 
     } catch (error) {
-        console.error("Native Downloader Failed. Triggering hard-fallback to window.open", error);
         window.open(url, "_blank", "noopener,noreferrer");
     }
 };

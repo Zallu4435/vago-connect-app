@@ -38,7 +38,6 @@ export const useAudioBlob = (src) => {
                 setBlobUrl(url);
             } catch (err) {
                 if (!active) return;
-                console.error("Audio Load Error:", err);
                 setError("Failed to load audio");
             } finally {
                 if (active) setIsLoading(false);

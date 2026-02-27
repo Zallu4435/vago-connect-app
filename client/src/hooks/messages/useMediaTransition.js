@@ -22,8 +22,6 @@ export const useMediaTransition = (message, componentName = "MediaMessage") => {
 
         if (!isSwap) {
             setIsLoaded(false);
-        } else {
-            console.log(`[${componentName}] Skipping loading reset for local-to-remote swap.`);
         }
 
         prevContentRef.current = content;

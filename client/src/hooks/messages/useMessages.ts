@@ -32,9 +32,7 @@ export function useMessages(userId?: string, peerId?: string, isGroup: boolean =
         caption: m.caption,
         duration: m.duration,
         isEdited: m.isEdited,
-        sender: m.sender || null,
       } as any));
-      console.log("[UI DEBUG] Fetched messages from backend", mapped);
       return mapped;
     },
     staleTime: 1000 * 60 * 5,

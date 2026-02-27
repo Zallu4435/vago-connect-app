@@ -16,7 +16,7 @@ export class SocketEmitter {
                 }
             }
         } catch (error) {
-            console.error(`SocketEmitter: Failed to emit ${event} to user ${userId}`, error);
+            // Silently fail or use a server-side logger if available
         }
         return false;
     }

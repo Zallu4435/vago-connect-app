@@ -97,7 +97,8 @@ export function useMessageSocketHandlers() {
     const onChatMuted = ({ conversationId, muted, mutedUntil }: any) => {
       socketSync.onChatMuted(conversationId, muted, mutedUntil);
     };
-    const onChatDeleted = ({ conversationId }: any) => {
+    const onChatDeleted = (data: any) => {
+      const { conversationId } = data;
       Logger.info(`Socket: chat-deleted for convo ${conversationId}`);
       socketSync.onChatDeleted(conversationId);
 
@@ -105,7 +106,11 @@ export function useMessageSocketHandlers() {
       const current = useChatStore.getState().currentChatUser;
       if (current && (String(current.id) === String(conversationId) || String((current as any).conversationId) === String(conversationId))) {
         useChatStore.getState().setCurrentChatUser(null);
-        showToast.info("This chat was deleted");
+
+        // Suppress toast if WE were the one who deleted it (already handled by mutation onSuccess)
+        if (Number(data?.initiatorId) !== Number(authUserIdRef.current)) {
+          showToast.info("This chat was deleted");
+        }
       }
     };
     const onForwarded = (payload: any) => {
@@ -148,7 +153,6 @@ export function useMessageSocketHandlers() {
         );
       }
       showToast.error(error || "An error occurred");
-      console.error("Socket error:", error);
     };
 
     const onGroupUpdated = ({ conversation }: any) => {
@@ -227,14 +231,19 @@ export function useMessageSocketHandlers() {
       socketSync.onGroupLeft(conversationId, userId, leftAt, String(myAuthId || ''));
     };
 
-    const onGroupDeleted = ({ conversationId }: any) => {
+    const onGroupDeleted = (data: any) => {
+      const { conversationId } = data;
       Logger.info(`Socket: group-deleted for convo ${conversationId}`);
       // Invalidate contacts and active chat
       socketSync.onChatDeleted(conversationId);
       const current = useChatStore.getState().currentChatUser;
       if (current && (String(current.id) === String(conversationId) || String((current as any).conversationId) === String(conversationId))) {
         useChatStore.getState().setCurrentChatUser(null);
-        showToast.info("This group has been deleted");
+
+        // Suppress toast if WE were the one who deleted it (already handled by mutation onSuccess)
+        if (Number(data?.initiatorId) !== Number(authUserIdRef.current)) {
+          showToast.info("This group has been deleted");
+        }
       }
     };
 

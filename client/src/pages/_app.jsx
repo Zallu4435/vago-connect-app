@@ -15,7 +15,7 @@ import { FaScroll } from "react-icons/fa"; // Reliable scroll icon
 
 export default function App({ Component, pageProps }) {
   const handleError = (error, errorInfo) => {
-    console.error("App error:", error, errorInfo);
+    // Handle error
   };
 
   const [authChecked, setAuthChecked] = useState(false);
@@ -26,9 +26,8 @@ export default function App({ Component, pageProps }) {
     const initAuth = async () => {
       try {
         await refreshAccessToken();
-        console.log("Session refreshed.");
       } catch (err) {
-        console.log("No valid session found. Proceeding unauthenticated.");
+        // No valid session found. Proceeding unauthenticated.
       } finally {
         if (mounted) setAuthChecked(true);
       }

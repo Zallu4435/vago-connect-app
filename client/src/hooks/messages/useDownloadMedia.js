@@ -41,7 +41,6 @@ export const useDownloadMedia = () => {
             setTimeout(() => { URL.revokeObjectURL(objectUrl); }, 1000);
 
         } catch (error) {
-            console.error("Download failed:", error);
             showToast.error("Failed to download media");
         } finally {
             setTimeout(() => setDownloadProgress({ id: null, percent: 0 }), 300);

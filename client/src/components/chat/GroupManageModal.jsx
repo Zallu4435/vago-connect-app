@@ -234,7 +234,6 @@ export default function GroupManageModal({ open, onClose, groupId }) {
       setCurrentChatUser(null);
       onClose?.();
     } catch (e) {
-      console.error("Delete sequence error:", e);
       showToast.error("Failed to delete group.");
     } finally {
       setIsDeleting(false);

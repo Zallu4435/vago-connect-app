@@ -78,7 +78,6 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
   };
 
   const handleForward = () => {
-    console.log("[ForwardModal] Forwarding started. Message IDs:", initialMessageIds, "Target Convos:", selectedConvoIds);
     if (!selectedConvoIds.length || !initialMessageIds.length) return;
 
     // OPTIMISTIC UPDATE: If forwarding to the current conversation
@@ -86,7 +85,6 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
     const isForwardingToCurrent = selectedConvoIds.some(id => Number(id) === currentConvId);
 
     if (isForwardingToCurrent) {
-      console.log("[ForwardModal] Optimistically adding messages to current chat");
       const optimisticMsgs = initialMessageIds.map(mid => {
         const original = storeMessages.find(m => Number(m.id) === Number(mid));
         if (!original) return null;
@@ -114,12 +112,10 @@ export default function ForwardModal({ open, onClose, initialMessageIds = [] }) 
       { messageIds: initialMessageIds, toConversationIds: selectedConvoIds },
       {
         onSuccess: () => {
-          console.log("[ForwardModal] Forwarding success.");
           showToast.success("Messages forwarded successfully");
           onClose?.();
         },
         onError: (err) => {
-          console.error("[ForwardModal] Forwarding error:", err);
           showToast.error("Failed to forward messages");
         },
       }

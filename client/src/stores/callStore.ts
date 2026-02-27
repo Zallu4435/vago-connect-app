@@ -34,7 +34,7 @@ export const useCallStore = create<CallState>()(
       setVideoCall: (value) => set({ videoCall: value }),
       setCall: (call) => set({ call }),
 
-      initiateCall: (call, type) =>
+      initiateCall: (call, type) => {
         set({
           call,
           audioCall: type === "audio",
@@ -42,12 +42,17 @@ export const useCallStore = create<CallState>()(
           calling: true,
           callAccepted: false,
           callRejected: false,
-        }),
+        });
+      },
 
-      acceptCall: () => set({ callAccepted: true, calling: false }),
-      rejectCall: () => set({ callRejected: true, calling: false }),
+      acceptCall: () => {
+        set({ callAccepted: true, calling: false });
+      },
+      rejectCall: () => {
+        set({ callRejected: true, calling: false });
+      },
 
-      endCall: () =>
+      endCall: () => {
         set({
           audioCall: false,
           videoCall: false,
@@ -55,7 +60,8 @@ export const useCallStore = create<CallState>()(
           calling: false,
           callAccepted: false,
           callRejected: false,
-        }),
+        });
+      },
 
       resetCallState: () =>
         set({

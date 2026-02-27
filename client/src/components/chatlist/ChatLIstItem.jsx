@@ -20,7 +20,7 @@ function ChatListItem({ data, isContactsPage = false }) {
   const setCurrentChatUser = useChatStore((s) => s.setCurrentChatUser);
   const setActivePage = useChatStore((s) => s.setActivePage);
   const { setMessages, clearMessages } = useChatStore();
-  useRenderLog("ChatListItem", { data, isContactsPage });
+  // useRenderLog("ChatListItem", { data, isContactsPage });
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -227,7 +227,7 @@ function ChatListItem({ data, isContactsPage = false }) {
             }
             setShowDeleteConfirm(false);
           } catch (err) {
-            console.error("ChatListItem delete error:", err);
+            // Error handling
           }
         }}
         title="Delete this chat?"

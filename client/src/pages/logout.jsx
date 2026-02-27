@@ -29,7 +29,7 @@ function LogoutPage() { // Renamed component to follow Next.js page conventions
             socket.current.emit("signout", userInfo.id);
             socket.current.disconnect();
           } catch (e) {
-            console.warn("Socket disconnect issue:", e);
+            // Socket disconnect issue
           }
         }
 
@@ -44,7 +44,6 @@ function LogoutPage() { // Renamed component to follow Next.js page conventions
         showToast.info("Signed out successfully.");
         router.push("/login");
       } catch (error) {
-        console.error("Logout error:", error);
         showToast.error("Could not sign out cleanly. Redirecting to login.");
         router.push("/login");
       }

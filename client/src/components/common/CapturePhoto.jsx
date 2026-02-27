@@ -21,14 +21,13 @@ function CapturePhoto({ onCapture, onClose }) {
           video.srcObject = stream;
           const playSafe = () => {
             video.play().catch((err) => {
-              if (err?.name !== "AbortError") console.error("video.play error:", err);
+              // Silently handle abort errors or other playback issues
             });
           };
           if (video.readyState >= 1) playSafe();
           else video.onloadedmetadata = playSafe;
         }
       } catch (err) {
-        console.error("Camera (Scrying Orb) error:", err);
         onClose?.();
       } finally {
         startingRef.current = false;

@@ -158,7 +158,7 @@ function ChatContainer() {
     return all;
   }, [messages, pagesData, userInfo?.id, currentChatUser?.id, currentChatUser?.conversationId, currentChatUser?.isGroup, currentChatUser?.type]);
 
-  useRenderLog("ChatContainer", { filteredMessages, currentChatUser });
+  // useRenderLog("ChatContainer", { filteredMessages, currentChatUser });
 
   // Scroll Anchoring: Preserve position when loading history from the top
   useLayoutEffect(() => {
@@ -294,7 +294,6 @@ function ChatContainer() {
       setSelectMode(false);
       setSelectedIds([]);
     } catch (err) {
-      console.error("Copy error:", err);
       showToast.error("Failed to copy messages");
     }
   }, [selectedIds, filteredMessages, userInfo?.id, currentChatUser?.name]);
@@ -318,7 +317,6 @@ function ChatContainer() {
       setSelectMode(false);
       setSelectedIds([]);
     } catch (e) {
-      console.error("Bulk delete error", e);
       showToast.error("Failed to delete some messages");
     } finally {
       setIsDeletingForMe(false);

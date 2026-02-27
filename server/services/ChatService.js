@@ -98,7 +98,7 @@ export class ChatService {
                 try {
                     await deleteCloudinaryFile(iconPublicId, 'image');
                 } catch (cleanupError) {
-                    console.error("Failed to scrub orphaned group icon during creation:", cleanupError);
+                    // We don't throw; we finish the DB update even if cloud deletion fails
                 }
             }
             throw error;
@@ -143,7 +143,6 @@ export class ChatService {
             skipDuplicates: true,
         });
 
-        console.log(`[BATCH LOG] Adding members to group ${groupId}:`, toAddIds);
         await prisma.conversationParticipant.updateMany({
             where: {
                 conversationId: groupId,
@@ -326,7 +325,6 @@ export class ChatService {
                 try {
                     await deleteCloudinaryFile(iconPublicId, 'image');
                 } catch (cleanupError) {
-                    console.error("Failed to scrub orphaned group icon during update:", cleanupError);
                 }
             }
             throw error;
@@ -375,7 +373,6 @@ export class ChatService {
     }
 
     static async leaveGroup({ userId, groupId, permissions }) {
-        console.log(`[BATCH LOG] User ${userId} attempting to leave group ${groupId}`);
         const prisma = getPrismaInstance();
         if (!groupId) throw Object.assign(new Error("groupId is required"), { status: 400 });
 
@@ -452,7 +449,6 @@ export class ChatService {
     }
 
     static async deleteGroup({ adminId, groupId }) {
-        console.log(`[BATCH LOG] Admin ${adminId} attempting global delete of group ${groupId}`);
         const prisma = getPrismaInstance();
         if (!groupId) throw Object.assign(new Error("groupId is required"), { status: 400 });
 
@@ -466,14 +462,13 @@ export class ChatService {
         if (!participant) throw Object.assign(new Error("You must be a member to delete the group"), { status: 403 });
 
         if (convo.createdById !== adminId) {
-            console.log(`[BATCH LOG] Delete failed: User ${adminId} is not creator (Creator is ${convo.createdById})`);
             throw Object.assign(new Error("Only the group creator can delete the group for everyone"), { status: 403 });
         }
 
-        // Notify all participants before actual deletion
-        const participantIds = convo.participants.map(p => p.userId);
-        console.log(`[BATCH LOG] Creator confirmed. Notifying ${participantIds.length} users and nuking group ${groupId}`);
-        SocketEmitter.emitToUsers(participantIds, 'group-deleted', { conversationId: groupId });
+        SocketEmitter.emitToUsers(participantIds, 'group-deleted', {
+            conversationId: groupId,
+            initiatorId: adminId
+        });
         await prisma.conversation.delete({ where: { id: groupId } });
 
         return { message: "Group deleted successfully", conversationId: groupId };
@@ -596,7 +591,6 @@ export class ChatService {
     }
 
     static async deleteChatForMe({ userId, conversationId }) {
-        console.log(`[BATCH LOG] User ${userId} attempting deleteChatForMe for ${conversationId}`);
         const prisma = getPrismaInstance();
         if (!conversationId) throw Object.assign(new Error("Invalid conversation id"), { status: 400 });
 
@@ -612,7 +606,11 @@ export class ChatService {
             data: { isDeleted: true, deletedAt: now },
         });
 
-        SocketEmitter.emitToUsers([userId], "chat-deleted", { conversationId, deletedAt: now.toISOString() });
+        SocketEmitter.emitToUsers([userId], "chat-deleted", {
+            conversationId,
+            deletedAt: now.toISOString(),
+            initiatorId: userId
+        });
 
         return true;
     }

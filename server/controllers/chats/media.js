@@ -250,7 +250,6 @@ export const proxyDownload = async (req, res, next) => {
       res.end(Buffer.from(arrayBuffer));
     }
   } catch (error) {
-    console.error("Proxy Download Error:", error);
     res.status(500).send("Internal Server Error during file proxying.");
   }
 };

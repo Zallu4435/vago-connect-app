@@ -10,7 +10,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:3000"],
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : ["http://localhost:3000"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -25,7 +25,6 @@ const port = process.env.PORT || 3005;
 // Create HTTP server and pass to Socket.IO
 const server = http.createServer(app);
 server.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
 });
 import { initializeSocket } from "./socket/index.js";
 

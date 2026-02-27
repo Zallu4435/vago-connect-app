@@ -6,7 +6,6 @@ export function handleCallEvents(io, socket, onlineUsers) {
     socket.on("call-user", async (payload) => {
         // payload: { callType, from: {id,name,image}, to: {id,name,image} }
         const toId = payload?.to?.id ?? payload?.to;
-        const fromId = payload?.from?.id ?? payload?.from;
 
         if (String(fromId) === String(toId)) {
             socket.emit("call-failed", { reason: "self-call" });
@@ -23,7 +22,7 @@ export function handleCallEvents(io, socket, onlineUsers) {
                 return;
             }
         } catch (err) {
-            console.error("Call block check failed", err);
+            // Block check failed
         }
 
         // Persist the call record immediately (works even if callee is offline)
@@ -41,7 +40,7 @@ export function handleCallEvents(io, socket, onlineUsers) {
             // Emit to callee if online (so the call appears in their chat too)
             if (isCalleeOnline) io.to(String(toId)).emit("message-sent", { message: callMsg });
         } catch (err) {
-            console.error("[call-user] Failed to create call message:", err);
+            // Failed to create call message
         }
 
         if (isCalleeOnline) {
